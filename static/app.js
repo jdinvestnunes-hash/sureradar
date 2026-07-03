@@ -461,6 +461,7 @@ function launchToBank() {
     event: CALC_SB.event, market: CALC_SB.market_label || "", sport: CALC_SB.sport,
     profit_pct: CALC_SB.profit_pct, total, expected: garantido, status: "pendente",
     legs: CALC_SB.legs.map((l, i) => ({ outcome: l.outcome, odd: CALC_ODDS[i] || l.odd, book: l.bookmaker_label || l.bookmaker, stake: CALC_STAKES[i] })),
+    jogo: CALC_SB.commence_br || "",            // dia + horário do JOGO
     created: new Date().toLocaleDateString("pt-BR"),
   });
   saveBanca();
@@ -485,7 +486,9 @@ function renderBanca() {
   banca.slice().reverse().forEach((e) => {
     const row = el("div", "bank-row");
     const ev = el("div", "bank-ev"); ev.appendChild(document.createTextNode(e.event));
-    ev.appendChild(el("small", null, e.market + " · " + sportUI(e.sport).label + " · " + e.created));
+    ev.appendChild(el("small", null, e.market + " · " + sportUI(e.sport).label));
+    // Dia + horário do JOGO (bem visível pra saber quando é)
+    if (e.jogo) ev.appendChild(el("div", "bank-jogo", "🕒 Jogo: " + e.jogo));
     // Pernas: casa onde apostar + quanto em cada uma
     if (e.legs && e.legs.length) {
       const legsBox = el("div", "bank-legs");
