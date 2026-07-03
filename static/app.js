@@ -274,17 +274,22 @@ function closeUpgrade() { $("#up-overlay").classList.add("hidden"); }
 
 // ---------- Calculadora ----------
 let CALC_SB = null;
+let CALC_STAKES = [];   // valor apostado em cada perna (editável)
+
 function openCalc(sb) {
   CALC_SB = sb;
   $("#calc-event").textContent = sb.event;
   $("#calc-market").textContent = (sb.market_label || "") + "  ·  +" + Number(sb.profit_pct).toFixed(2) + "%";
-  $("#calc-total").value = sb.banca || 1000;
-  computeCalc();
+  const total = sb.banca || 1000;
+  $("#calc-total").value = total;
+  CALC_STAKES = calcStakes(sb, total).stakes;   // split equilibrado inicial
+  renderCalc();
   $("#calc-launch").textContent = "＋ Lançar na banca";
   $("#calc-overlay").classList.remove("hidden");
 }
 function closeCalc() { $("#calc-overlay").classList.add("hidden"); CALC_SB = null; }
 
+// Split que dá lucro IGUAL dos dois lados (o ótimo) para um valor total.
 function calcStakes(sb, total) {
   const odds = sb.legs.map((l) => Number(l.odd));
   const margem = odds.reduce((s, o) => s + 1 / o, 0);
@@ -293,12 +298,20 @@ function calcStakes(sb, total) {
   return { stakes, retorno, lucro: retorno - total };
 }
 
-function computeCalc() {
+// A partir das apostas atuais (podem ter sido arredondadas): total investido,
+// retorno por resultado e o lucro GARANTIDO (o menor dos lucros).
+function calcResumo(legs, stakes) {
+  const total = stakes.reduce((s, v) => s + (Number(v) || 0), 0);
+  const retornos = legs.map((l, i) => (Number(stakes[i]) || 0) * Number(l.odd));
+  const lucros = retornos.map((r) => r - total);
+  return { total, retornos, lucros, garantido: lucros.length ? Math.min(...lucros) : 0 };
+}
+
+function renderCalc() {
   if (!CALC_SB) return;
-  const total = parseFloat($("#calc-total").value) || 0;
-  const { stakes, retorno, lucro } = calcStakes(CALC_SB, total);
+  const legs = CALC_SB.legs;
   const box = $("#calc-legs"); box.innerHTML = "";
-  CALC_SB.legs.forEach((leg, i) => {
+  legs.forEach((leg, i) => {
     const item = el("div", "calc-leg");
     const t = el("div", "calc-leg-top");
     const name = el("div");
@@ -307,26 +320,79 @@ function computeCalc() {
     t.appendChild(name);
     t.appendChild(el("div", "calc-leg-odd", "@ " + Number(leg.odd).toFixed(2)));
     item.appendChild(t);
+
     const st = el("div", "calc-stake");
-    st.appendChild(el("div", "calc-stake-label", "Apostar"));
-    const v = el("div");
-    v.appendChild(el("div", "calc-stake-val", brl(stakes[i])));
-    v.appendChild(el("div", "calc-stake-ret", "retorno " + brl(stakes[i] * Number(leg.odd))));
-    st.appendChild(v); item.appendChild(st); box.appendChild(item);
+    st.appendChild(el("div", "calc-stake-label", "Apostar na " + (leg.bookmaker_label || leg.bookmaker)));
+    const edit = el("div", "calc-stake-edit");
+    edit.appendChild(el("span", "calc-stake-cur", "R$"));
+    const inp = el("input");
+    inp.type = "number"; inp.min = "0"; inp.step = "1"; inp.className = "calc-stake-input";
+    inp.value = Math.round((Number(CALC_STAKES[i]) || 0) * 100) / 100;
+    inp.addEventListener("input", () => { CALC_STAKES[i] = parseFloat(inp.value) || 0; updateCalcTotals(); });
+    edit.appendChild(inp);
+    st.appendChild(edit);
+    item.appendChild(st);
+
+    const info = el("div", "calc-leg-info");
+    info.appendChild(el("div", "calc-leg-ret", ""));
+    info.appendChild(el("div", "calc-leg-lucro", ""));
+    item.appendChild(info);
+    box.appendChild(item);
   });
-  $("#calc-return").textContent = brl(retorno);
-  $("#calc-profit").textContent = (lucro >= 0 ? "+" : "") + brl(lucro);
+  updateCalcTotals();
+}
+
+// Atualiza só os números (não recria os inputs, pra não perder o foco ao digitar).
+function updateCalcTotals() {
+  if (!CALC_SB) return;
+  const { total, retornos, lucros, garantido } = calcResumo(CALC_SB.legs, CALC_STAKES);
+  const items = $("#calc-legs").children;
+  CALC_SB.legs.forEach((leg, i) => {
+    const info = items[i] && items[i].querySelector(".calc-leg-info");
+    if (!info) return;
+    info.children[0].textContent = "retorno " + brl(retornos[i]);
+    const lc = info.children[1];
+    lc.textContent = "se sair: " + (lucros[i] >= 0 ? "+" : "") + brl(lucros[i]);
+    lc.className = "calc-leg-lucro" + (lucros[i] >= 0 ? " ok" : " neg");
+  });
+  $("#calc-total").value = Math.round(total * 100) / 100;
+  const pct = total > 0 ? (garantido / total * 100) : 0;
+  $("#calc-return").textContent = brl(total + garantido);
+  $("#calc-profit").textContent = (garantido >= 0 ? "+" : "") + brl(garantido) +
+    "  (" + (garantido >= 0 ? "+" : "") + pct.toFixed(2) + "%)";
+  $("#calc-profit").className = "calc-result-val " + (garantido >= 0 ? "green" : "red");
+}
+
+// Total digitado -> refaz o split equilibrado.
+function onTotalInput() {
+  if (!CALC_SB) return;
+  CALC_STAKES = calcStakes(CALC_SB, parseFloat($("#calc-total").value) || 0).stakes;
+  renderCalc();
+}
+
+// Arredonda cada aposta ao múltiplo (1/5/10) e recalcula o lucro.
+function arredondarCalc(mult) {
+  if (!CALC_SB) return;
+  CALC_STAKES = CALC_STAKES.map((v) => Math.round((Number(v) || 0) / mult) * mult);
+  renderCalc();
+}
+
+// Reequilibra (lucro igual dos dois lados) mantendo o total atual.
+function equilibrarCalc() {
+  if (!CALC_SB) return;
+  const total = CALC_STAKES.reduce((s, v) => s + (Number(v) || 0), 0);
+  CALC_STAKES = calcStakes(CALC_SB, total).stakes;
+  renderCalc();
 }
 
 function launchToBank() {
   if (!CALC_SB) return;
-  const total = parseFloat($("#calc-total").value) || 0;
-  const { stakes, lucro } = calcStakes(CALC_SB, total);
+  const { total, garantido } = calcResumo(CALC_SB.legs, CALC_STAKES);
   banca.push({
     id: (CALC_SB.id || "t") + "-" + Date.now(),
     event: CALC_SB.event, market: CALC_SB.market_label || "", sport: CALC_SB.sport,
-    profit_pct: CALC_SB.profit_pct, total, expected: lucro, status: "pendente",
-    legs: CALC_SB.legs.map((l, i) => ({ outcome: l.outcome, odd: l.odd, book: l.bookmaker_label || l.bookmaker, stake: stakes[i] })),
+    profit_pct: CALC_SB.profit_pct, total, expected: garantido, status: "pendente",
+    legs: CALC_SB.legs.map((l, i) => ({ outcome: l.outcome, odd: l.odd, book: l.bookmaker_label || l.bookmaker, stake: CALC_STAKES[i] })),
     created: new Date().toLocaleDateString("pt-BR"),
   });
   saveBanca();
@@ -385,9 +451,13 @@ $("#max-profit").addEventListener("input", (e) => { filtros.max_profit = parseFl
 $("#sel-all").addEventListener("click", () => { filtros.bookmakers = META.bookmakers.map((b) => b.key); saveFiltros(); renderBookmakers(); carregar(); });
 $("#sel-none").addEventListener("click", () => { filtros.bookmakers = []; saveFiltros(); renderBookmakers(); carregar(); });
 $("#calc-close").addEventListener("click", closeCalc);
-$("#calc-total").addEventListener("input", computeCalc);
+$("#calc-total").addEventListener("input", onTotalInput);
 $("#calc-launch").addEventListener("click", launchToBank);
 $("#calc-overlay").addEventListener("click", (e) => { if (e.target.id === "calc-overlay") closeCalc(); });
+document.querySelectorAll(".calc-round-btn").forEach((b) => b.addEventListener("click", () => {
+  if (b.dataset.balance) equilibrarCalc();
+  else arredondarCalc(parseInt(b.dataset.round));
+}));
 $("#up-close").addEventListener("click", closeUpgrade);
 $("#up-cta").addEventListener("click", () => { location.href = "/planos"; });
 $("#up-overlay").addEventListener("click", (e) => { if (e.target.id === "up-overlay") closeUpgrade(); });

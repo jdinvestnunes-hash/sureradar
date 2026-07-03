@@ -251,6 +251,24 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 17p
 .calc-stake-label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.04em; }
 .calc-stake-val { font-size: 19px; font-weight: 800; color: var(--cyan); font-variant-numeric: tabular-nums; }
 .calc-stake-ret { font-size: 11px; color: var(--text-mute); margin-top: 4px; text-align: right; }
+
+/* Arredondar / editar apostas na calculadora */
+.calc-round { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; padding: 4px 22px 0; }
+.calc-round-lb { font-size: 12px; color: var(--text-dim); font-weight: 600; }
+.calc-round-btn { background: var(--surface-2); border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: 6px 11px; font-size: 12.5px; font-weight: 700; cursor: pointer; font-family: inherit; transition: .15s; }
+.calc-round-btn:hover { border-color: var(--cyan); }
+.calc-round-btn.alt { color: var(--cyan); }
+.calc-hint { font-size: 11.5px; color: var(--text-mute); padding: 8px 22px 0; line-height: 1.45; }
+.calc-stake-edit { display: flex; align-items: center; gap: 6px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; }
+.calc-stake-cur { color: var(--text-dim); font-weight: 700; font-size: 14px; }
+.calc-stake-input { width: 92px; background: none; border: none; outline: none; color: var(--cyan); font-size: 18px; font-weight: 800; font-family: inherit; text-align: right; font-variant-numeric: tabular-nums; }
+.calc-leg-info { display: flex; justify-content: space-between; align-items: baseline; margin-top: 8px; }
+.calc-leg-ret { font-size: 11px; color: var(--text-mute); }
+.calc-leg-lucro { font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.calc-leg-lucro.ok { color: var(--green, #2ee6a8); }
+.calc-leg-lucro.neg { color: #ff6b6b; }
+.calc-result-val.red { color: #ff6b6b; }
+
 .calc-result { display: flex; justify-content: space-between; gap: 16px; padding: 18px 22px; border-top: 1px solid var(--border-soft); margin-top: 6px; }
 .calc-result-label { font-size: 11px; color: var(--text-mute); text-transform: uppercase; letter-spacing: 0.05em; }
 .calc-result-val { font-size: 20px; font-weight: 800; margin-top: 4px; font-variant-numeric: tabular-nums; }
