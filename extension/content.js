@@ -8,8 +8,9 @@
 // varremos tudo e dividimos por lucro aqui no nosso lado.
 
 const INTERVALO_MS = 10 * 60 * 1000;  // 10 min
-const FETCH_TIMEOUT_MS = 12000;
-const DELAY_PG = 1100;                // DEVAGAR: rápido demais o site corta (502)
+const FETCH_TIMEOUT_MS = 15000;
+const DELAY_PG = 3500;                // BEM devagar: o site corta (502) se apressar
+const RETRY_ESPERA_MS = 15000;        // cortou? espera 15s e tenta de novo
 const MAX_PAGINAS = 60;               // varre bastante (60 × 25 = 1500 apostas)
 const LOTE_ENVIO = 4;                 // envia a cada 4 páginas (parcial já vale)
 
@@ -61,7 +62,10 @@ async function buscarDoc(url) {
   const t = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
   try {
     const r = await fetch(url, { credentials: "include", signal: ctrl.signal });
-    if (!r.ok) return null;
+    if (!r.ok) {
+      console.warn(`[SureRadar] página respondeu HTTP ${r.status} (rate-limit?)`);
+      return null;
+    }
     return new DOMParser().parseFromString(await r.text(), "text/html");
   } catch (e) {
     console.warn("[SureRadar] falha ao buscar:", e);
@@ -90,23 +94,27 @@ async function ciclo() {
   add(rasparDoc(document));
   let prox = linkProximo(document);
   let pag = 1;
+  let motivo = "sem link próximo na página";
 
   while (prox && pag < MAX_PAGINAS) {
     await dorme(DELAY_PG);
     let doc = await buscarDoc(prox);
-    if (!doc) {                         // 502/timeout: espera e tenta 1x de novo
-      await dorme(4000);
+    if (!doc) {                         // 502/timeout: espera BEM e tenta de novo
+      console.warn(`[SureRadar] p${pag + 1} cortada; esperando ${RETRY_ESPERA_MS / 1000}s pra tentar de novo…`);
+      await dorme(RETRY_ESPERA_MS);
       doc = await buscarDoc(prox);
-      if (!doc) break;
+      if (!doc) { motivo = `cortado pelo site na página ${pag + 1}`; break; }
     }
-    if (!add(rasparDoc(doc))) break;   // fim da lista
+    if (!add(rasparDoc(doc))) { motivo = "fim da lista"; break; }
     prox = linkProximo(doc);
     pag++;
+    motivo = prox ? motivo : "fim da lista";
     if (pag % LOTE_ENVIO === 0) {       // envia parcial (o servidor mescla)
       enviar(lote.splice(0), `parcial p${pag}`);
     }
   }
-  enviar(lote.splice(0), `final (${pag} págs)`);
+  if (pag >= MAX_PAGINAS) motivo = "cap de páginas";
+  enviar(lote.splice(0), `final (${pag} págs — ${motivo})`);
 }
 
 // Primeira coleta ~4s após carregar; depois a cada 10 min.
