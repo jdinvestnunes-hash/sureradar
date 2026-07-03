@@ -134,6 +134,12 @@ def init():
             user_id BIGINT PRIMARY KEY,
             dados TEXT NOT NULL,
             atualizado {_NUM} NOT NULL)""")
+        # Cache do FEED (surebets ao vivo) — 1 linha (id=1). Sobrevive a redeploys
+        # (o feed em memória zera; aqui a gente restaura no startup).
+        c.execute(f"""CREATE TABLE IF NOT EXISTS feed_cache(
+            id BIGINT PRIMARY KEY,
+            dados TEXT NOT NULL,
+            atualizado {_NUM} NOT NULL)""")
         if not PG:  # migração leve do SQLite antigo
             try:
                 c.execute("ALTER TABLE users ADD COLUMN plano_expira REAL")
@@ -197,6 +203,39 @@ def voltar_free(user_id: int):
     with _db() as c:
         c.execute(_q("UPDATE users SET plano='free', plano_expira=NULL WHERE id=?"), (user_id,))
     limpar_cache_sessoes()
+
+
+# ---------------------------------------------------------------------------
+# Cache do FEED (sobrevive a redeploys)
+# ---------------------------------------------------------------------------
+def feed_cache_get():
+    import json
+    try:
+        with _db() as c:
+            row = c.execute(_q("SELECT dados FROM feed_cache WHERE id=1")).fetchone()
+        if row:
+            d = json.loads(row["dados"])
+            return d if isinstance(d, list) else []
+    except Exception as e:
+        print("!! feed_cache_get:", e)
+    return []
+
+
+def feed_cache_set(bets):
+    import json
+    dados = json.dumps(bets or [], ensure_ascii=False)
+    agora = time.time()
+    try:
+        with _db() as c:
+            if PG:
+                c.execute(_q("""INSERT INTO feed_cache(id,dados,atualizado) VALUES(1,?,?)
+                               ON CONFLICT (id) DO UPDATE SET dados=EXCLUDED.dados,
+                               atualizado=EXCLUDED.atualizado"""), (dados, agora))
+            else:
+                c.execute("INSERT OR REPLACE INTO feed_cache(id,dados,atualizado) VALUES(1,?,?)",
+                          (dados, agora))
+    except Exception as e:
+        print("!! feed_cache_set:", e)
 
 
 # ---------------------------------------------------------------------------

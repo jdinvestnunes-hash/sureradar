@@ -51,6 +51,15 @@ async def lifespan(app):
     except Exception as e:
         print(f"!! FALHA ao conectar no banco: {e}\n"
               "   O site sobe, mas login/cadastro ficam indisponíveis até corrigir o DATABASE_URL.")
+    # Restaura o feed salvo no banco (o feed em memória zera a cada redeploy).
+    try:
+        cache = auth.feed_cache_get()
+        if cache:
+            feed.merge_surebets(cache, quando=pipeline._agora_iso() + " (cache)")
+            print(f">> Feed restaurado do cache: {len(cache)} surebets.")
+    except Exception as e:
+        print(f"!! Falha ao restaurar feed do cache: {e}")
+
     pipeline.iniciar_agendador()
     try:
         promo.iniciar()               # fluxo de marketing no grupo do Telegram
@@ -543,6 +552,12 @@ def ingest(payload: dict = Body(...)):
     if todos:
         vals = [c["profit_pct"] for c in todos]
         INGESTED_PROFIT = {"min": 0, "max": round(max(vals) + 0.5, 1)}
+
+    # persiste o feed pra sobreviver a redeploys
+    try:
+        auth.feed_cache_set(todos)
+    except Exception:
+        pass
 
     return {"ingeridas": len(contratos), "no_feed": len(todos),
             "casas": len(INGESTED_BOOKS), "esportes": len(INGESTED_SPORTS)}
