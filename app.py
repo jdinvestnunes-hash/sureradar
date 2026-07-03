@@ -373,7 +373,7 @@ def robots():
         "Disallow: /perfil\n"
         "Disallow: /login\n"
         "Disallow: /cadastro\n"
-        "Sitemap: https://sureradar.com.br/sitemap.xml\n"
+        "Sitemap: https://sureradar.site/sitemap.xml\n"
     )
     return Response(txt, media_type="text/plain")
 
@@ -382,7 +382,7 @@ def robots():
 def sitemap():
     xml = ('<?xml version="1.0" encoding="UTF-8"?>'
            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
-           '<url><loc>https://sureradar.com.br/</loc>'
+           '<url><loc>https://sureradar.site/</loc>'
            '<changefreq>daily</changefreq><priority>1.0</priority></url>'
            '</urlset>')
     return Response(xml, media_type="application/xml")

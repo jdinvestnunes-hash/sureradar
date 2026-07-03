@@ -5,6 +5,7 @@
   "description": "Lê as surebets da sua conta surebet.com e alimenta o painel SureRadar local, a cada 10 minutos.",
   "permissions": ["storage", "alarms"],
   "host_permissions": [
+    "https://sureradar.site/*",
     "http://localhost:8000/*",
     "http://127.0.0.1:8000/*",
     "https://pt.surebet.com/*",
