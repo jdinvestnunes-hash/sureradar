@@ -1,0 +1,5 @@
+# Config de build do Railway/Nixpacks.
+# Desliga a verificação de attestations do mise ao instalar o Python
+# (senão o build falha em "No GitHub artifact attestations found for python").
+[variables]
+MISE_PYTHON_GITHUB_ATTESTATIONS = "false"
