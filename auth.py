@@ -12,6 +12,7 @@ estiver definida; senão cai no SQLite local (bom para desenvolvimento).
 import hashlib
 import os
 import secrets
+import threading
 import time
 from contextlib import contextmanager
 from pathlib import Path
@@ -54,17 +55,44 @@ def _q(sql):
     return sql.replace("?", "%s") if PG else sql
 
 
+# Reúso de conexão por thread — evita reabrir TLS com o Supabase a cada request
+# (era a maior fonte de lentidão). Cada thread do FastAPI guarda a sua conexão.
+_local = threading.local()
+
+
+def _get_conn():
+    c = getattr(_local, "conn", None)
+    if c is not None and PG:
+        try:
+            if c.closed or c.broken:
+                c = None
+        except Exception:
+            c = None
+    if c is None:
+        c = _conn()
+        _local.conn = c
+    return c
+
+
 @contextmanager
 def _db():
-    c = _conn()
+    c = _get_conn()
     try:
         yield c
         c.commit()
     except Exception:
-        c.rollback()
+        # conexão pode ter quebrado: descarta pra reconectar na próxima
+        try:
+            c.rollback()
+        except Exception:
+            pass
+        try:
+            c.close()
+        except Exception:
+            pass
+        _local.conn = None
         raise
-    finally:
-        c.close()
+    # mantém a conexão aberta para reúso (NÃO fecha aqui)
 
 
 def _insert(c, sql, params):
@@ -162,6 +190,7 @@ def voltar_free(user_id: int):
     """Tira o PRO na marra (volta pra free, zera a expiração)."""
     with _db() as c:
         c.execute(_q("UPDATE users SET plano='free', plano_expira=NULL WHERE id=?"), (user_id,))
+    limpar_cache_sessoes()
 
 
 # ---------------------------------------------------------------------------
@@ -218,6 +247,19 @@ def autenticar(email: str, senha: str):
 # ---------------------------------------------------------------------------
 # Sessões
 # ---------------------------------------------------------------------------
+# Cache em memória do lookup de sessão (token -> perfil). Evita ir ao banco a
+# cada request/poll (o painel consulta de 30 em 30s). TTL curto p/ refletir
+# mudanças de plano rápido; limpo em logout e em ações de plano.
+_sess_cache = {}
+_SESS_TTL = 45
+_sess_lock = threading.Lock()
+
+
+def limpar_cache_sessoes():
+    with _sess_lock:
+        _sess_cache.clear()
+
+
 def criar_sessao(user_id: int) -> str:
     token = secrets.token_urlsafe(32)
     with _db() as c:
@@ -229,6 +271,10 @@ def criar_sessao(user_id: int) -> str:
 def usuario_da_sessao(token: str):
     if not token:
         return None
+    with _sess_lock:
+        ent = _sess_cache.get(token)
+        if ent and (time.time() - ent[1] < _SESS_TTL):
+            return dict(ent[0])
     with _db() as c:
         row = c.execute(_q(
             """SELECT u.id, u.nome, u.email, u.plano, u.plano_expira, s.criado AS s_criado
@@ -240,12 +286,17 @@ def usuario_da_sessao(token: str):
             c.execute(_q("DELETE FROM sessions WHERE token=?"), (token,))
             return None
         plano, exp = _normalizar_plano(c, row)
-    return {"id": row["id"], "nome": row["nome"], "email": row["email"],
-            "plano": plano, "plano_expira": exp}
+    perfil = {"id": row["id"], "nome": row["nome"], "email": row["email"],
+              "plano": plano, "plano_expira": exp}
+    with _sess_lock:
+        _sess_cache[token] = (dict(perfil), time.time())
+    return perfil
 
 
 def encerrar_sessao(token: str):
     if token:
+        with _sess_lock:
+            _sess_cache.pop(token, None)
         with _db() as c:
             c.execute(_q("DELETE FROM sessions WHERE token=?"), (token,))
 
@@ -271,4 +322,5 @@ def ativar_pro(user_id: int, plano: str, dias: int, valor: float, metodo: str = 
                   (nova_exp, user_id))
         c.execute(_q("INSERT INTO pagamentos(user_id,valor,plano,metodo,criado) VALUES(?,?,?,?,?)"),
                   (user_id, valor, plano, metodo, agora))
+    limpar_cache_sessoes()   # reflete o novo plano na hora
     return nova_exp

@@ -103,9 +103,39 @@ function render(){
   }).join("");
 }
 
+function telaSenha(msg){
+  document.querySelector(".wrap").innerHTML = `
+    <nav>
+      <div class="brand">Sure<span>Radar</span> · Admin</div>
+      <a href="/app" class="back">← Voltar</a>
+    </nav>
+    <div style="max-width:380px;margin:60px auto;text-align:center">
+      <div style="font-size:40px;margin-bottom:10px">🔒</div>
+      <h1 style="margin-bottom:6px">Área restrita</h1>
+      <p class="sub">${msg||"Digite a senha do admin para continuar."}</p>
+      <input id="adm-senha" type="password" class="search" placeholder="Senha do admin" style="text-align:center" />
+      <button id="adm-entrar" class="btn b-pro-act" style="width:100%;padding:12px;font-size:15px">Entrar</button>
+      <div id="adm-erro" style="color:var(--red);font-size:13px;margin-top:10px;min-height:18px"></div>
+    </div>`;
+  const entrar = async ()=>{
+    const senha = document.getElementById("adm-senha").value;
+    const r = await fetch("/api/admin/unlock",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({senha})});
+    const j = await r.json();
+    if(r.ok){ location.reload(); return; }
+    document.getElementById("adm-erro").textContent = j.erro||"Erro";
+  };
+  document.getElementById("adm-entrar").onclick = entrar;
+  document.getElementById("adm-senha").addEventListener("keydown",e=>{if(e.key==="Enter")entrar();});
+}
+
 async function carregar(){
   const r = await fetch("/api/admin/usuarios");
-  if(r.status===403){ document.body.innerHTML='<div class="wrap"><p class="empty">Sem permissão. Só admins.</p></div>'; return; }
+  if(r.status===403){ document.querySelector(".wrap").innerHTML='<p class="empty">Sem permissão. Só admins.</p>'; return; }
+  if(r.status===401){
+    const j = await r.json().catch(()=>({}));
+    telaSenha(j.sem_senha_configurada ? "Configure a variável ADMIN_PASSWORD no servidor (Railway)." : "Digite a senha do admin para continuar.");
+    return;
+  }
   const j = await r.json();
   USERS = j.usuarios||[];
   render();

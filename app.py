@@ -12,6 +12,7 @@ Endpoints:
     GET /api/surebets    -> surebets já filtradas conforme a query do usuário
 """
 
+import secrets
 import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -95,9 +96,24 @@ def _plano_efetivo(user):
     return user["plano"] if user else "free"
 
 
-def _eh_admin(user):
-    """True se o usuário logado pode usar o painel /admin (config.ADMIN_EMAILS)."""
+ADMIN_COOKIE = "sr_admin"
+_admin_tokens = set()   # tokens já desbloqueados com a senha (memória; zera no redeploy)
+
+
+def _admin_email(user):
+    """E-mail do usuário está na lista de admins (config.ADMIN_EMAILS)."""
     return bool(user) and (user.get("email", "").strip().lower() in config.ADMIN_EMAILS)
+
+
+def _admin_desbloqueado(request: Request):
+    tok = request.cookies.get(ADMIN_COOKIE)
+    return bool(tok) and tok in _admin_tokens
+
+
+def _admin_ok(request: Request, user):
+    """Admin liberado = e-mail admin E senha (ADMIN_PASSWORD) já validada nesta
+    sessão. Sem ADMIN_PASSWORD definida, o painel fica BLOQUEADO."""
+    return _admin_email(user) and bool(config.ADMIN_PASSWORD) and _admin_desbloqueado(request)
 
 
 def _com_sessao(resp: Response, user_id: int):
@@ -219,7 +235,7 @@ def me(request: Request):
     dias = auth.dias_restantes(user)
     return {"nome": user["nome"], "email": user["email"], "plano": _plano_efetivo(user),
             "dias": dias, "aviso_renovar": _aviso_renovar(dias),
-            "admin": _eh_admin(user)}
+            "admin": _admin_email(user)}
 
 
 @app.get("/api/perfil")
@@ -233,17 +249,46 @@ def perfil_dados(request: Request):
         "dias": dias,
         "expira": user.get("plano_expira"),
         "aviso_renovar": _aviso_renovar(dias),
-        "admin": _eh_admin(user),
+        "admin": _admin_email(user),
         "pagamentos": auth.listar_pagamentos(user["id"]),
     }
 
 
 # --- Painel ADMIN (dar/renovar PRO com a duração escolhida) ---
+@app.post("/api/admin/unlock")
+def admin_unlock(request: Request, payload: dict = Body(...)):
+    """2º fator do admin: valida a senha (ADMIN_PASSWORD) e libera esta sessão."""
+    user = _usuario(request)
+    if not _admin_email(user):
+        return JSONResponse({"erro": "sem permissão"}, status_code=403)
+    if not config.ADMIN_PASSWORD:
+        return JSONResponse({"erro": "ADMIN_PASSWORD não configurada no servidor."}, status_code=503)
+    if not secrets.compare_digest(str(payload.get("senha", "")), config.ADMIN_PASSWORD):
+        return JSONResponse({"erro": "Senha incorreta."}, status_code=401)
+    token = secrets.token_urlsafe(32)
+    _admin_tokens.add(token)
+    resp = JSONResponse({"ok": True})
+    resp.set_cookie(ADMIN_COOKIE, token, httponly=True, samesite="lax", max_age=8 * 3600, path="/")
+    return resp
+
+
+def _guard_admin(request, user):
+    """Devolve (None) se ok, ou um JSONResponse de erro com o motivo."""
+    if not _admin_email(user):
+        return JSONResponse({"erro": "sem permissão"}, status_code=403)
+    if not config.ADMIN_PASSWORD or not _admin_desbloqueado(request):
+        return JSONResponse({"erro": "precisa_senha",
+                             "sem_senha_configurada": not config.ADMIN_PASSWORD},
+                            status_code=401)
+    return None
+
+
 @app.get("/api/admin/usuarios")
 def admin_usuarios(request: Request):
     user = _usuario(request)
-    if not _eh_admin(user):
-        return JSONResponse({"erro": "sem permissão"}, status_code=403)
+    erro = _guard_admin(request, user)
+    if erro:
+        return erro
     lista = []
     for u in auth.listar_usuarios():
         lista.append({**u, "dias": auth.dias_restantes(u),
@@ -256,8 +301,9 @@ def admin_plano(request: Request, payload: dict = Body(...)):
     """Admin ativa/renova PRO (com a duração escolhida — SOMA nos dias restantes)
     ou volta pra Free. Body: {email, acao:'pro'|'free', dias:int}."""
     user = _usuario(request)
-    if not _eh_admin(user):
-        return JSONResponse({"erro": "sem permissão"}, status_code=403)
+    erro = _guard_admin(request, user)
+    if erro:
+        return erro
     alvo = auth.pegar_por_email(payload.get("email", ""))
     if not alvo:
         return JSONResponse({"erro": "usuário não encontrado"}, status_code=404)
@@ -619,7 +665,7 @@ def tela_admin(request: Request):
     user = _usuario(request)
     if not user:
         return RedirectResponse("/login", status_code=302)
-    if not _eh_admin(user):
+    if not _admin_email(user):
         return RedirectResponse("/app", status_code=302)
     return FileResponse(STATIC_DIR / "admin.html")
 

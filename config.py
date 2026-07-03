@@ -29,6 +29,10 @@ ADMIN_EMAILS = {
     if e.strip()
 }
 
+# Senha do painel admin (2º fator, além do e-mail). Defina ADMIN_PASSWORD no
+# Railway. Se ficar vazia, o painel admin fica BLOQUEADO (segurança).
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "").strip()
+
 # Avisar no perfil para renovar quando faltar este nº de dias (ou menos).
 AVISO_RENOVACAO_DIAS = 5
 
