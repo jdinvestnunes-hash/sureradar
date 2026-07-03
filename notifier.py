@@ -78,9 +78,27 @@ def formatar_surebet(sb):
         linhas.append(f"✅ Lucro garantido: <b>{_brl(sb['lucro_brl'])}</b>")
     if getattr(config, "SITE_URL", ""):
         linhas.append("")
-        linhas.append("🔓 Entradas de <b>5% a 15%+</b> são exclusivas do PRO")
-        linhas.append(f'👉 <a href="{config.SITE_URL}">{config.SITE_URL}</a>')
+        linhas.append(f'🆓 <b>Crie sua conta grátis aqui</b> 👉 <a href="{config.SITE_URL}">{config.SITE_URL}</a>')
     return "\n".join(linhas)
+
+
+def enviar_foto(img_bytes, caption):
+    """Envia uma imagem (bytes PNG) com legenda HTML ao grupo."""
+    if not ativo():
+        return False
+    url = API.format(token=config.TELEGRAM_BOT_TOKEN, metodo="sendPhoto")
+    try:
+        r = requests.post(url,
+                          data={"chat_id": config.TELEGRAM_CHAT_ID, "caption": caption,
+                                "parse_mode": "HTML"},
+                          files={"photo": ("teaser.png", img_bytes, "image/png")},
+                          timeout=20)
+        if r.status_code != 200:
+            print(f"!! Telegram sendPhoto falhou: {r.status_code} {r.text[:150]}")
+        return r.ok
+    except requests.RequestException as e:
+        print(f"!! Telegram foto erro de rede: {e}")
+        return False
 
 
 def enviar_surebet(sb):

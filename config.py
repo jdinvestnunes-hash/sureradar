@@ -191,3 +191,6 @@ TELEGRAM_MAX_POR_RODADA = int(os.getenv("TELEGRAM_MAX_POR_RODADA", "3"))
 
 # URL do site (usada no rodapé/CTA das mensagens do Telegram).
 SITE_URL = os.getenv("SITE_URL", "https://sureradar.site").strip()
+
+# Fluxo de marketing no grupo (5 posts/dia + prova social). Desligue com PROMO_ATIVO=0.
+PROMO_ATIVO = os.getenv("PROMO_ATIVO", "1") not in ("0", "false", "False", "no")
