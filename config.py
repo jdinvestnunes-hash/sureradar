@@ -116,6 +116,12 @@ APENAS_DUAS_CASAS = True
 FREE_LUCRO_MIN = 0.0
 FREE_LUCRO_MAX = 2.0
 
+# --- Divisão dos planos no painel ---
+# FREE: vê só uma AMOSTRA de entradas de até 1% (as N mais próximas de 1%).
+# PRO:  vê TODAS as entradas com lucro > PRO_LUCRO_MIN (%).
+FREE_MAX_ENTRADAS = 12     # quantas entradas ≤1% o free enxerga
+PRO_LUCRO_MIN = 1.0001     # piso do PRO: só acima de 1%
+
 # Ligas a monitorar (keys da The Odds API). Ajustadas para o que está EM
 # TEMPORADA agora (jul/2026).
 ESPORTES = [
