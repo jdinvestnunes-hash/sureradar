@@ -76,6 +76,10 @@ def formatar_surebet(sb):
     if sb.get("lucro_brl") is not None:
         linhas.append("")
         linhas.append(f"✅ Lucro garantido: <b>{_brl(sb['lucro_brl'])}</b>")
+    if getattr(config, "SITE_URL", ""):
+        linhas.append("")
+        linhas.append("🔓 Entradas de <b>5% a 15%+</b> são exclusivas do PRO")
+        linhas.append(f'👉 <a href="{config.SITE_URL}">{config.SITE_URL}</a>')
     return "\n".join(linhas)
 
 

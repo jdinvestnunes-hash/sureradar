@@ -183,3 +183,11 @@ MIN_CREDITOS_PARAR = 40
 #   TELEGRAM_CHAT_ID=-1001234567890    (ID do grupo; negativo p/ grupos)
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "").strip()
+
+# Grupo FREE do Telegram: recebe as surebets até este lucro (%), no máximo N por
+# ciclo (evita flood). As de maior lucro ficam pro PRO (funil).
+TELEGRAM_LUCRO_MAX = float(os.getenv("TELEGRAM_LUCRO_MAX", "1.0"))
+TELEGRAM_MAX_POR_RODADA = int(os.getenv("TELEGRAM_MAX_POR_RODADA", "3"))
+
+# URL do site (usada no rodapé/CTA das mensagens do Telegram).
+SITE_URL = os.getenv("SITE_URL", "https://sureradar.site").strip()

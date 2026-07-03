@@ -34,6 +34,7 @@ from fastapi.staticfiles import StaticFiles
 import auth
 import config
 import feed
+import notifier
 import pipeline
 
 BASE_DIR = Path(__file__).parent
@@ -483,6 +484,33 @@ def _converter_raspagem(records):
     return contratos
 
 
+_tg_prev_ids = None   # ids da rodada anterior (p/ detectar surebets NOVAS)
+
+
+def _notificar_telegram(contratos):
+    """Manda as surebets NOVAS do grupo FREE (até TELEGRAM_LUCRO_MAX) pro
+    Telegram, no máximo N por ciclo. A 1ª rodada só registra (evita flood)."""
+    global _tg_prev_ids
+    try:
+        if not notifier.ativo():
+            return
+        freebets = [c for c in contratos
+                    if 0 < c.get("profit_pct", 0) <= config.TELEGRAM_LUCRO_MAX]
+        ids_now = {c["id"] for c in freebets}
+        if _tg_prev_ids is None:          # 1º ingest após subir: não floodar
+            _tg_prev_ids = ids_now
+            return
+        novas = [c for c in freebets if c["id"] not in _tg_prev_ids]
+        novas.sort(key=lambda c: c["profit_pct"], reverse=True)
+        for c in novas[: config.TELEGRAM_MAX_POR_RODADA]:
+            notifier.enviar_surebet(c)
+        if novas:
+            print(f">> Telegram: {min(len(novas), config.TELEGRAM_MAX_POR_RODADA)} surebet(s) enviada(s) ao grupo.")
+        _tg_prev_ids = ids_now
+    except Exception as e:
+        print("!! Telegram (ingest) erro:", e)
+
+
 @app.post("/api/ingest")
 def ingest(payload: dict = Body(...)):
     """Recebe surebets raspadas da conta (via navegador) e publica no painel.
@@ -496,6 +524,7 @@ def ingest(payload: dict = Body(...)):
     if contratos:
         # Prioriza a conta real: o robô de teste não sobrescreve por 15 min.
         feed.marcar_ingest()
+        _notificar_telegram(contratos)
 
     # Casas = as que apareceram nas apostas raspadas.
     casas = {}
