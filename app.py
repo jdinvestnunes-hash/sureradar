@@ -290,6 +290,23 @@ def _tipo_casa(nm):
     return "sharp" if re.search(r"pinnacle|betfair|smarkets|marathon|sbobet|betdaq", nm, re.I) else "retail"
 
 
+def _inferir_sport(mercados):
+    """Fallback: adivinha o esporte pelo TEXTO DO MERCADO quando a raspagem não
+    trouxe o esporte (extensão antiga sem a leitura do .booker).
+
+    Só infere onde há alta confiança (mercados típicos de cada esporte). Casos
+    ambíguos ('set', 'período', 'pontos') ficam de fora — melhor '?' que errado.
+    A raspagem nova manda o esporte certo e ignora isto."""
+    m = " ".join(mercados).lower()
+    if "ace" in m or "tie-break" in m or "tiebreak" in m or "aces" in m:
+        return "Tennis"
+    if any(k in m for k in ("escanteio", "córner", "corner", "impedimento", "gol",
+                            "chute", "finaliza", "cartã", "cartao", "cartao",
+                            "/ dnb", " dnb", "dnb")):
+        return "Football"
+    return ""
+
+
 def _converter_raspagem(records):
     """Converte os registros raspados do DOM da surebet.com no contrato do painel."""
     contratos = []
@@ -320,6 +337,8 @@ def _converter_raspagem(records):
             })
         teams = max((l.get("teams", "") for l in legs), key=len)
         sport = _norm_sport(legs[0].get("sport", ""))
+        if sport == "?":   # raspagem sem esporte: tenta deduzir pelo mercado
+            sport = _inferir_sport([l.get("market", "") for l in legs]) or "?"
         start = r.get("start")
         iso = (datetime.fromtimestamp(start, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
                if start else None)
