@@ -9,7 +9,7 @@
 
 const INTERVALO_MS = 10 * 60 * 1000;  // 10 min
 const FETCH_TIMEOUT_MS = 12000;
-const DELAY_PG = 250;
+const DELAY_PG = 1100;                // DEVAGAR: rápido demais o site corta (502)
 const MAX_PAGINAS = 60;               // varre bastante (60 × 25 = 1500 apostas)
 const LOTE_ENVIO = 4;                 // envia a cada 4 páginas (parcial já vale)
 
@@ -93,8 +93,12 @@ async function ciclo() {
 
   while (prox && pag < MAX_PAGINAS) {
     await dorme(DELAY_PG);
-    const doc = await buscarDoc(prox);
-    if (!doc) break;
+    let doc = await buscarDoc(prox);
+    if (!doc) {                         // 502/timeout: espera e tenta 1x de novo
+      await dorme(4000);
+      doc = await buscarDoc(prox);
+      if (!doc) break;
+    }
     if (!add(rasparDoc(doc))) break;   // fim da lista
     prox = linkProximo(doc);
     pag++;
