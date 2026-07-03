@@ -13,10 +13,27 @@ RODAR:  python scraper_pw.py
 Depois que provar aqui, a gente move isso pra um servidor (VPS) que roda 24h.
 """
 
+import json
+import os
 import random
 import time
 import requests
 from playwright.sync_api import sync_playwright
+
+# Cache dos links já resolvidos (redirect do surebet -> URL final na casa).
+# Persiste em arquivo pra não re-resolver a cada varredura.
+CACHE_FILE = "link_cache.json"
+try:
+    LINK_CACHE = json.load(open(CACHE_FILE, encoding="utf-8"))
+except Exception:
+    LINK_CACHE = {}
+
+
+def _salvar_cache():
+    try:
+        json.dump(LINK_CACHE, open(CACHE_FILE, "w", encoding="utf-8"))
+    except Exception:
+        pass
 
 SAAS = "https://web-production-a41df.up.railway.app/api/ingest"
 URL_LISTA = "https://pt.surebet.com/surebets"
@@ -53,6 +70,55 @@ JS_RASPAR = r"""
 """
 
 
+def _e_surebet(u):
+    return bool(u) and "surebet.com" in u
+
+
+def resolver_link(ctx, pg, nav_url):
+    """Segue o redirect do surebet (com a sessão logada) até a URL final da casa.
+    Rápido via request (redirects HTTP); se travar em surebet (redirect via JS),
+    abre a página. Guarda no cache."""
+    if not _e_surebet(nav_url):
+        return nav_url
+    if nav_url in LINK_CACHE:
+        return LINK_CACHE[nav_url]
+    final = nav_url
+    try:
+        resp = ctx.request.get(nav_url, max_redirects=20, timeout=15000)
+        if resp.url and not _e_surebet(resp.url):
+            final = resp.url
+    except Exception:
+        pass
+    if _e_surebet(final):   # ainda no surebet -> resolve via navegação (JS redirect)
+        try:
+            pg.goto(nav_url, wait_until="domcontentloaded", timeout=20000)
+            pg.wait_for_timeout(1500)
+            if not _e_surebet(pg.url):
+                final = pg.url
+        except Exception:
+            pass
+    LINK_CACHE[nav_url] = final
+    return final
+
+
+def resolver_todos(ctx, bets):
+    """Resolve os links de todas as pernas (usa cache; só resolve os novos)."""
+    faltam = [leg for b in bets for leg in b.get("legs", [])
+              if _e_surebet(leg.get("link")) and leg["link"] not in LINK_CACHE]
+    if faltam:
+        print(f"   resolvendo {len(faltam)} link(s) novo(s) das casas… (cache: {len(LINK_CACHE)})")
+    pg = ctx.new_page()
+    try:
+        for b in bets:
+            for leg in b.get("legs", []):
+                if leg.get("link"):
+                    leg["link"] = resolver_link(ctx, pg, leg["link"])
+    finally:
+        pg.close()
+    if faltam:
+        _salvar_cache()
+
+
 def enviar(records, modo="merge"):
     if not records:
         return
@@ -84,7 +150,7 @@ def esperar_login(page):
     return False
 
 
-def uma_varredura(page):
+def uma_varredura(page, ctx):
     page.goto(URL_LISTA, wait_until="domcontentloaded", timeout=60000)
     if not esperar_login(page):
         print("!! Sem lista/login. Faça login na janela e ele tenta no próximo ciclo.")
@@ -135,6 +201,12 @@ def uma_varredura(page):
         except Exception:
             print("   página seguinte não carregou (parcial — envio como merge).")
             break
+    # resolve os links das casas (redirect surebet -> URL final) antes de enviar
+    if todos:
+        try:
+            resolver_todos(ctx, todos)
+        except Exception as e:
+            print("   !! erro ao resolver links:", str(e)[:100])
     # COMPLETO -> snapshot (substitui, remove as que sumiram). PARCIAL -> merge.
     modo = "snapshot" if completo else "merge"
     print(f">> Varredura {'COMPLETA' if completo else 'PARCIAL'}: {len(todos)} apostas em {pag} pág. — enviando ({modo}).")
@@ -159,7 +231,7 @@ def main():
         print("=" * 60)
         while True:
             try:
-                uma_varredura(page)
+                uma_varredura(page, ctx)
             except Exception as e:
                 print("!! erro na varredura:", str(e)[:150])
             print(f">> Próxima varredura em {CICLO_MIN} min.\n")

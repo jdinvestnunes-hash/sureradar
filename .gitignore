@@ -11,3 +11,7 @@ venv/
 
 # temporários / raspagens
 *.crdownload
+
+pw_profile/
+scraper_pw log
+link_cache.json
