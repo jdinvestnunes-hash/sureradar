@@ -75,6 +75,8 @@ body {
 .user-name { font-size: 13px; font-weight: 600; max-width: 120px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .user-plan { font-size: 10px; font-weight: 800; letter-spacing: .05em; padding: 2px 8px; border-radius: 999px; background: rgba(34,211,238,.14); color: var(--cyan); }
 .user-plan.pro { background: rgba(251,191,36,.14); color: var(--amber); }
+.user-perfil { background: var(--surface-2); border: 1px solid var(--border); color: var(--cyan); font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer; padding: 5px 11px; border-radius: 999px; white-space: nowrap; transition: 0.15s; }
+.user-perfil:hover { background: var(--cyan); color: #04240f; border-color: var(--cyan); }
 .user-out { background: none; border: none; color: var(--text-mute); font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer; padding: 4px 8px; }
 .user-out:hover { color: var(--red); }
 

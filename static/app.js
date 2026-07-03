@@ -8,6 +8,7 @@ let filtros = load(FILTERS_KEY, {});
 let banca = load(BANK_KEY, []);
 let SUREBETS = [];
 let LOCKED = [];    // entradas reais de alto lucro (>1%) borradas para o FREE
+let PLANO = "free"; // plano do usuário logado (free | pro)
 
 // Ícones SVG de traço (estilo profissional, sem emoji)
 const SVG = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
@@ -123,6 +124,7 @@ async function carregar() {
   setStatus(data.status);
   SUREBETS = data.surebets || [];
   LOCKED = data.locked || [];
+  PLANO = data.plano || "free";
   render();
 }
 
@@ -163,11 +165,13 @@ function render() {
   list.innerHTML = "";
   $("#count-label").textContent = visible.length + (visible.length === 1 ? " oportunidade" : " oportunidades");
 
-  // Banner de upgrade + teasers só aparecem pro FREE que tem entradas altas travadas.
+  // Teasers de upgrade só pro FREE: mostra as entradas REAIS de alto lucro (>1%)
+  // borradas; se não houver nenhuma no momento, usa uma amostra pra manter o incentivo.
   const promo = $("#promo"); promo.innerHTML = "";
-  if (LOCKED.length) {
+  if (PLANO === "free") {
+    const teasers = LOCKED.length ? LOCKED : TEASERS;
     promo.appendChild(bannerEl());
-    LOCKED.forEach((t) => list.appendChild(teaserEl(t)));   // entradas REAIS borradas
+    teasers.forEach((t) => list.appendChild(teaserEl(t)));
   }
 
   if (!visible.length) {
@@ -406,7 +410,7 @@ async function initUser() {
     $("#user-avatar").style.cursor = "pointer";
     $("#user-name").style.cursor = "pointer";
     $("#user-avatar").title = $("#user-name").title = "Ver perfil";
-    $("#user-avatar").onclick = $("#user-name").onclick = () => location.href = "/perfil";
+    $("#user-avatar").onclick = $("#user-name").onclick = $("#user-perfil").onclick = () => location.href = "/perfil";
     const plan = $("#user-plan");
     plan.textContent = me.plano === "pro" ? "PRO" : "FREE";
     plan.classList.toggle("pro", me.plano === "pro");
