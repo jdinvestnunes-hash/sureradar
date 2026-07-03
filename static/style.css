@@ -218,6 +218,12 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 17p
 .bank-row { display: grid; grid-template-columns: 1fr auto auto auto auto; align-items: center; gap: 14px; background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--radius); padding: 13px 16px; }
 .bank-ev { font-weight: 700; font-size: 14px; }
 .bank-ev small { display: block; color: var(--text-mute); font-weight: 500; font-size: 11.5px; margin-top: 3px; }
+.bank-legs { display: flex; flex-direction: column; gap: 5px; margin-top: 9px; }
+.bank-leg { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--bg); border: 1px solid var(--border-soft); border-radius: 8px; padding: 6px 10px; }
+.bank-leg-info { min-width: 0; display: flex; flex-direction: column; }
+.bank-leg-book { font-size: 12px; font-weight: 700; color: var(--cyan); }
+.bank-leg-out { font-size: 11px; color: var(--text-dim); font-weight: 500; margin-top: 1px; }
+.bank-leg-stake { font-size: 13.5px; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .bank-col { text-align: right; }
 .bank-col .k { font-size: 10.5px; color: var(--text-mute); text-transform: uppercase; letter-spacing: 0.04em; }
 .bank-col .v { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; margin-top: 2px; }

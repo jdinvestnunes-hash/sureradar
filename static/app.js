@@ -418,13 +418,29 @@ function renderBanca() {
     const row = el("div", "bank-row");
     const ev = el("div", "bank-ev"); ev.appendChild(document.createTextNode(e.event));
     ev.appendChild(el("small", null, e.market + " · " + sportUI(e.sport).label + " · " + e.created));
+    // Pernas: casa onde apostar + quanto em cada uma
+    if (e.legs && e.legs.length) {
+      const legsBox = el("div", "bank-legs");
+      e.legs.forEach((l) => {
+        const leg = el("div", "bank-leg");
+        const info = el("div", "bank-leg-info");
+        info.appendChild(el("span", "bank-leg-book", l.book || l.bookmaker || "—"));
+        info.appendChild(el("span", "bank-leg-out", (l.outcome || "") + "  @ " + Number(l.odd).toFixed(2)));
+        leg.appendChild(info);
+        leg.appendChild(el("div", "bank-leg-stake", brl(l.stake || 0)));
+        legsBox.appendChild(leg);
+      });
+      ev.appendChild(legsBox);
+    }
     row.appendChild(ev);
     const stakeCol = el("div", "bank-col"); stakeCol.appendChild(el("div", "k", "Apostado"));
     const inp = el("input", "bank-edit"); inp.type = "number"; inp.value = e.total.toFixed(2); inp.step = "10";
     inp.addEventListener("change", () => {
       const nv = parseFloat(inp.value) || 0;
-      const { lucro } = calcStakes({ legs: e.legs.map((l) => ({ odd: l.odd })) }, nv);
-      e.total = nv; e.expected = lucro; saveBanca(); renderBanca();
+      const { stakes, lucro } = calcStakes({ legs: e.legs.map((l) => ({ odd: l.odd })) }, nv);
+      e.total = nv; e.expected = lucro;
+      e.legs.forEach((l, i) => { l.stake = stakes[i]; });   // atualiza o valor por casa
+      saveBanca(); renderBanca();
     });
     stakeCol.appendChild(inp); row.appendChild(stakeCol);
     const profCol = el("div", "bank-col"); profCol.appendChild(el("div", "k", "Lucro")); profCol.appendChild(el("div", "v green", "+" + brl(e.expected))); row.appendChild(profCol);
