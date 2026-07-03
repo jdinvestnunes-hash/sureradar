@@ -44,6 +44,7 @@ _lock = threading.Lock()
 _surebets: list = []          # <- ZERADO. O pipeline preenche isto depois.
 _ultima_atualizacao: str = None
 _ultima_ts: float = 0          # unix time da última atualização (p/ o timer)
+_ingest_ts: float = 0          # unix time do último INGEST REAL (extensão/conta)
 
 
 # ---------------------------------------------------------------------------
@@ -111,6 +112,27 @@ def set_surebets(lista, quando=None):
         _surebets = list(lista)
         _ultima_atualizacao = quando
         _ultima_ts = time.time()
+
+
+def marcar_ingest():
+    """Registra que a EXTENSÃO (conta paga real) acabou de alimentar o feed.
+
+    O agendador de teste consulta `ingest_recente()` antes de escrever, e PULA
+    a rodada se houver ingest recente — assim os dados reais não são
+    sobrescritos pelos dados de teste (≤1%)."""
+    global _ingest_ts
+    with _lock:
+        _ingest_ts = time.time()
+
+
+def ingest_recente(janela_seg=900):
+    """True se a extensão alimentou o feed nos últimos `janela_seg` segundos
+    (padrão 15 min). Enquanto True, o robô de teste NÃO sobrescreve.
+
+    Se a extensão parar (navegador fechado) por mais que a janela, volta False
+    e o teste reassume como backup — o painel nunca fica vazio."""
+    with _lock:
+        return _ingest_ts > 0 and (time.time() - _ingest_ts) < janela_seg
 
 
 def atualizar_do_provedor():

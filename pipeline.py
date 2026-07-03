@@ -138,6 +138,11 @@ _ids_anteriores = set()
 def rodar_uma_vez():
     """Coleta, publica no feed e alerta no Telegram as surebets NOVAS."""
     global _ids_anteriores
+    # Se a EXTENSÃO (conta paga real) alimentou o feed há pouco, NÃO sobrescreve
+    # com os dados de teste (≤1%). O teste só reassume se a conta parar >15 min.
+    if feed.ingest_recente():
+        print(">> Ingest recente da conta — agendador de teste PULA esta rodada.")
+        return -1
     surebets = coletar()
     feed.set_surebets(surebets, quando=_agora_iso())
 

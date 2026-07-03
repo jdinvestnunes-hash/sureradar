@@ -87,6 +87,18 @@ def _usuario(request: Request):
     return auth.usuario_da_sessao(request.cookies.get(COOKIE))
 
 
+def _eh_dono(user):
+    """True se o usuário é DONO (e-mail em OWNER_EMAILS) — sempre PRO."""
+    return bool(user) and (user.get("email", "").strip().lower() in config.OWNER_EMAILS)
+
+
+def _plano_efetivo(user):
+    """Plano considerando o dono como PRO. 'free' para deslogado."""
+    if not user:
+        return "free"
+    return "pro" if _eh_dono(user) else user["plano"]
+
+
 def _com_sessao(resp: Response, user_id: int):
     token = auth.criar_sessao(user_id)
     resp.set_cookie(COOKIE, token, httponly=True, samesite="lax",
@@ -198,7 +210,7 @@ def me(request: Request):
     user = _usuario(request)
     if not user:
         return JSONResponse({"erro": "não autenticado"}, status_code=401)
-    return {"nome": user["nome"], "email": user["email"], "plano": user["plano"],
+    return {"nome": user["nome"], "email": user["email"], "plano": _plano_efetivo(user),
             "dias": auth.dias_restantes(user)}
 
 
@@ -341,6 +353,9 @@ def ingest(payload: dict = Body(...)):
     global INGESTED_BOOKS, INGESTED_SPORTS, INGESTED_PROFIT
     contratos = _converter_raspagem(payload.get("records", []))
     feed.set_surebets(contratos, quando=pipeline._agora_iso() + " (conta)")
+    if contratos:
+        # Prioriza a conta real: o robô de teste não sobrescreve por 15 min.
+        feed.marcar_ingest()
 
     # Casas = as que apareceram nas apostas raspadas.
     casas = {}
@@ -404,7 +419,7 @@ def surebets(
 
     # Regra de plano: conta FREE só vê entradas de até 1% (trava no SERVIDOR).
     user = _usuario(request)
-    is_free = (not user) or user["plano"] == "free"
+    is_free = _plano_efetivo(user) == "free"
     teto = max_profit if max_profit > 0 else None
     if is_free:
         teto = min(teto, 1.0) if teto is not None else 1.0
@@ -432,7 +447,7 @@ def surebets(
         "surebets": resultados,
         "locked": locked,
         "status": feed.status(),
-        "plano": user["plano"] if user else "free",
+        "plano": _plano_efetivo(user),
     }
 
 
