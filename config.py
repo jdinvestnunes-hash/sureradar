@@ -14,6 +14,12 @@ ODDS_API_KEY = os.getenv("ODDS_API_KEY", "").strip()
 API_BASE_URL = "https://api.the-odds-api.com/v4"
 
 # ---------------------------------------------------------------------------
+# Login com Google (OAuth). Credenciais do Google Cloud Console.
+# ---------------------------------------------------------------------------
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "").strip()
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "").strip()
+
+# ---------------------------------------------------------------------------
 # FONTE DE DADOS
 #   "surebet"    -> surebet.com / apostasseguras (casas BR + mercados exóticos:
 #                   escanteios, cartões, faltas... Já entrega a surebet PRONTA)

@@ -93,6 +93,25 @@ def criar_usuario(nome: str, email: str, senha: str):
     return {"id": uid, "nome": nome, "email": email, "plano": "free", "plano_expira": None}, None
 
 
+def pegar_ou_criar_google(email: str, nome: str):
+    """Login com Google: acha o usuário pelo e-mail ou cria um novo (plano free).
+    Usuários do Google não têm senha utilizável (hash aleatório)."""
+    email = (email or "").strip().lower()
+    nome = (nome or "").strip() or email.split("@")[0]
+    with _conn() as c:
+        row = c.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
+        if row:
+            return _perfil(row)
+    salt = secrets.token_bytes(16)
+    with _conn() as c:
+        cur = c.execute(
+            "INSERT INTO users(nome,email,hash,salt,plano,criado) VALUES(?,?,?,?,?,?)",
+            (nome, email, _hash(secrets.token_hex(24), salt), salt, "free", time.time()),
+        )
+        uid = cur.lastrowid
+    return {"id": uid, "nome": nome, "email": email, "plano": "free", "plano_expira": None}
+
+
 def autenticar(email: str, senha: str):
     """Retorna user_dict ou None."""
     email = (email or "").strip().lower()

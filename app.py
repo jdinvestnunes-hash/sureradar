@@ -115,6 +115,65 @@ def logout(request: Request):
     return resp
 
 
+# --- Login com Google (OAuth) ---
+def _base_url(request: Request) -> str:
+    """URL pública correta mesmo atrás do proxy do Railway (https + host real)."""
+    host = request.headers.get("x-forwarded-host") or request.headers.get("host", "")
+    proto = request.headers.get("x-forwarded-proto", "https")
+    return f"{proto}://{host}"
+
+
+@app.get("/auth/google")
+def google_login(request: Request):
+    import secrets as _s
+    from urllib.parse import urlencode
+    if not config.GOOGLE_CLIENT_ID:
+        return RedirectResponse("/login?erro=google_off", status_code=302)
+    state = _s.token_urlsafe(16)
+    params = urlencode({
+        "client_id": config.GOOGLE_CLIENT_ID,
+        "redirect_uri": _base_url(request) + "/auth/callback",
+        "response_type": "code",
+        "scope": "openid email profile",
+        "state": state,
+        "access_type": "online",
+        "prompt": "select_account",
+    })
+    resp = RedirectResponse("https://accounts.google.com/o/oauth2/v2/auth?" + params, status_code=302)
+    resp.set_cookie("g_state", state, max_age=600, httponly=True, samesite="lax", path="/")
+    return resp
+
+
+@app.get("/auth/callback")
+def google_callback(request: Request, code: str = "", state: str = ""):
+    import requests
+    if not code or not state or state != request.cookies.get("g_state"):
+        return RedirectResponse("/login?erro=google", status_code=302)
+    redirect_uri = _base_url(request) + "/auth/callback"
+    try:
+        tok = requests.post("https://oauth2.googleapis.com/token", timeout=15, data={
+            "code": code,
+            "client_id": config.GOOGLE_CLIENT_ID,
+            "client_secret": config.GOOGLE_CLIENT_SECRET,
+            "redirect_uri": redirect_uri,
+            "grant_type": "authorization_code",
+        }).json()
+        at = tok.get("access_token")
+        if not at:
+            return RedirectResponse("/login?erro=google", status_code=302)
+        info = requests.get("https://www.googleapis.com/oauth2/v2/userinfo", timeout=15,
+                            headers={"Authorization": f"Bearer {at}"}).json()
+    except requests.RequestException:
+        return RedirectResponse("/login?erro=google", status_code=302)
+    email = info.get("email")
+    if not email:
+        return RedirectResponse("/login?erro=google", status_code=302)
+    user = auth.pegar_ou_criar_google(email, info.get("name", ""))
+    resp = RedirectResponse("/app", status_code=302)
+    resp.delete_cookie("g_state", path="/")
+    return _com_sessao(resp, user["id"])
+
+
 @app.get("/api/me")
 def me(request: Request):
     user = _usuario(request)
