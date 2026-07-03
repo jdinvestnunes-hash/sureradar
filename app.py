@@ -41,8 +41,14 @@ STATIC_DIR = BASE_DIR / "static"
 
 @asynccontextmanager
 async def lifespan(app):
-    """Ao subir o servidor, prepara o banco de usuários e liga o agendador."""
-    auth.init()
+    """Ao subir o servidor, prepara o banco de usuários e liga o agendador.
+    Se o banco falhar, o site NÃO cai (só a parte de login fica indisponível)."""
+    try:
+        auth.init()
+        print(f">> Banco pronto ({'Postgres' if auth.PG else 'SQLite'}).")
+    except Exception as e:
+        print(f"!! FALHA ao conectar no banco: {e}\n"
+              "   O site sobe, mas login/cadastro ficam indisponíveis até corrigir o DATABASE_URL.")
     pipeline.iniciar_agendador()
     yield
     pipeline.parar_agendador()
