@@ -63,16 +63,52 @@ async function buscarDoc(url) {
   try {
     const r = await fetch(url, { credentials: "include", signal: ctrl.signal });
     if (!r.ok) {
-      console.warn(`[SureRadar] página respondeu HTTP ${r.status} (rate-limit?)`);
+      console.warn(`[SureRadar] fetch respondeu HTTP ${r.status}`);
       return null;
     }
     return new DOMParser().parseFromString(await r.text(), "text/html");
   } catch (e) {
-    console.warn("[SureRadar] falha ao buscar:", e);
+    console.warn("[SureRadar] falha no fetch:", e);
     return null;
   } finally {
     clearTimeout(t);
   }
+}
+
+// Plano B: o site às vezes BLOQUEIA o fetch (403) mas aceita navegação normal.
+// Um iframe invisível É uma navegação normal — carrega a página com a sessão
+// e a gente lê o conteúdo (mesma origem).
+function buscarViaIframe(url) {
+  return new Promise((resolve) => {
+    const f = document.createElement("iframe");
+    f.style.cssText = "position:absolute;width:2px;height:2px;left:-9999px;top:-9999px;visibility:hidden;";
+    let fim = (val) => { fim = () => {}; try { f.remove(); } catch (e) {} resolve(val); };
+    const timer = setTimeout(() => fim(null), FETCH_TIMEOUT_MS + 8000);
+    f.onload = () => {
+      clearTimeout(timer);
+      try {
+        const html = f.contentDocument && f.contentDocument.documentElement.outerHTML;
+        fim(html ? new DOMParser().parseFromString(html, "text/html") : null);
+      } catch (e) {
+        console.warn("[SureRadar] iframe inacessível:", e);
+        fim(null);
+      }
+    };
+    f.src = url;
+    (document.body || document.documentElement).appendChild(f);
+  });
+}
+
+// Busca uma página: tenta fetch (rápido); se o site barrar, vai de iframe.
+async function obterPagina(url) {
+  let doc = await buscarDoc(url);
+  if (doc) return doc;
+  console.warn("[SureRadar] fetch barrado — tentando via iframe (navegação real)…");
+  doc = await buscarViaIframe(url);
+  if (doc && doc.querySelectorAll("tbody.surebet_record").length === 0) {
+    console.warn("[SureRadar] iframe carregou mas sem registros (bloqueio?)");
+  }
+  return doc;
 }
 
 function enviar(records, label) {
@@ -98,11 +134,11 @@ async function ciclo() {
 
   while (prox && pag < MAX_PAGINAS) {
     await dorme(DELAY_PG);
-    let doc = await buscarDoc(prox);
-    if (!doc) {                         // 502/timeout: espera BEM e tenta de novo
+    let doc = await obterPagina(prox);
+    if (!doc) {                         // bloqueio/timeout: espera BEM e tenta de novo
       console.warn(`[SureRadar] p${pag + 1} cortada; esperando ${RETRY_ESPERA_MS / 1000}s pra tentar de novo…`);
       await dorme(RETRY_ESPERA_MS);
-      doc = await buscarDoc(prox);
+      doc = await obterPagina(prox);
       if (!doc) { motivo = `cortado pelo site na página ${pag + 1}`; break; }
     }
     if (!add(rasparDoc(doc))) { motivo = "fim da lista"; break; }
