@@ -498,34 +498,30 @@ def ingest(payload: dict = Body(...)):
     """
     global INGESTED_BOOKS, INGESTED_SPORTS, INGESTED_PROFIT
     contratos = _converter_raspagem(payload.get("records", []))
-    feed.set_surebets(contratos, quando=pipeline._agora_iso() + " (conta)")
+    # MESCLA (não substitui): cada ingest é uma view parcial (≤1% OU PRO); elas
+    # se somam no feed e as antigas expiram sozinhas.
+    feed.merge_surebets(contratos, quando=pipeline._agora_iso() + " (conta)")
     if contratos:
-        # Prioriza a conta real: o robô de teste não sobrescreve por 15 min.
         feed.marcar_ingest()
-        # (O envio ao Telegram agora é AGENDADO pelo promo.py — 5 posts/dia —
-        #  em vez de disparar a cada ingest. Ver promo.iniciar() no startup.)
+        # (O envio ao Telegram é AGENDADO pelo promo.py — 5 posts/dia.)
 
-    # Casas = as que apareceram nas apostas raspadas.
-    casas = {}
-    esportes = {}
-    for c in contratos:
+    # Casas / esportes / faixa de lucro ESPELHAM TODO o feed vivo (não só este
+    # ingest, que é parcial).
+    todos = feed.get_surebets()
+    casas, esportes = {}, {}
+    for c in todos:
         esportes[c["sport"]] = SPORT_LABELS_PT.get(c["sport"], c["sport"])
         for l in c["legs"]:
             casas[l["bookmaker"]] = l["bookmaker_label"]
     INGESTED_BOOKS = [{"key": k, "label": v} for k, v in sorted(casas.items(), key=lambda x: x[1].lower())]
-    # Futebol SEMPRE primeiro; depois em ordem alfabética.
     INGESTED_SPORTS = [{"key": k, "label": v} for k, v in
                        sorted(esportes.items(), key=lambda x: (x[0] != "Football", x[1]))]
-
-    # Faixa de lucro (se o navegador mandar; senão deriva do min/max das apostas).
-    prof = payload.get("profit") or {}
-    if prof.get("min") is not None or prof.get("max") is not None:
-        INGESTED_PROFIT = {"min": prof.get("min", 0), "max": prof.get("max", 0)}
-    elif contratos:
-        vals = [c["profit_pct"] for c in contratos]
+    if todos:
+        vals = [c["profit_pct"] for c in todos]
         INGESTED_PROFIT = {"min": 0, "max": round(max(vals) + 0.5, 1)}
 
-    return {"ingeridas": len(contratos), "casas": len(INGESTED_BOOKS), "esportes": len(INGESTED_SPORTS)}
+    return {"ingeridas": len(contratos), "no_feed": len(todos),
+            "casas": len(INGESTED_BOOKS), "esportes": len(INGESTED_SPORTS)}
 
 
 SPORT_LABELS_PT = {

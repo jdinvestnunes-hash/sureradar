@@ -41,10 +41,20 @@ import config
 # Armazém em memória. Protegido por lock porque o pipeline futuro vai escrever
 # de outra thread enquanto o servidor lê.
 _lock = threading.Lock()
-_surebets: list = []          # <- ZERADO. O pipeline preenche isto depois.
+# id -> (surebet_dict, last_seen_ts). Guardamos por id + carimbo de tempo para
+# poder MESCLAR raspagens parciais (ex.: view "≤1%" e view "PRO" vêm em ingests
+# separados) sem uma apagar a outra, e EXPIRAR as que sumiram da fonte.
+_bets: dict = {}
+_EXPIRY_SEG = 720             # 12 min sem reaparecer -> a surebet é removida
 _ultima_atualizacao: str = None
 _ultima_ts: float = 0          # unix time da última atualização (p/ o timer)
 _ingest_ts: float = 0          # unix time do último INGEST REAL (extensão/conta)
+
+
+def _validos(now=None):
+    """Surebets ainda 'vivas' (vistas há menos de _EXPIRY_SEG)."""
+    now = now or time.time()
+    return [b for (b, ts) in _bets.values() if now - ts <= _EXPIRY_SEG]
 
 
 # ---------------------------------------------------------------------------
@@ -61,7 +71,7 @@ def get_surebets(min_profit=0.0, max_profit=None, bookmakers=None, sports=None):
     sports      : lista de IDs de esporte, ou None = todos.
     """
     with _lock:
-        dados = list(_surebets)
+        dados = _validos()
 
     sel = set(bookmakers) if bookmakers else None
     esportes = set(sports) if sports else None
@@ -92,7 +102,7 @@ def status():
         else:
             conectado = bool(config.ODDS_API_KEY)
         return {
-            "total": len(_surebets),
+            "total": len(_validos()),
             "ultima_atualizacao": _ultima_atualizacao,
             "updated_ts": _ultima_ts,
             "conectado": conectado,
@@ -103,15 +113,30 @@ def status():
 # ESCRITA (usada pelo pipeline/API no futuro)
 # ---------------------------------------------------------------------------
 def set_surebets(lista, quando=None):
-    """
-    Substitui todo o conjunto atual de surebets. É isto que o pipeline chama a
-    cada rodada de coleta de odds.
-    """
-    global _surebets, _ultima_atualizacao, _ultima_ts
+    """SUBSTITUI todo o conjunto (usado pelo agendador de teste)."""
+    global _bets, _ultima_atualizacao, _ultima_ts
+    now = time.time()
     with _lock:
-        _surebets = list(lista)
+        _bets = {b["id"]: (b, now) for b in lista}
         _ultima_atualizacao = quando
-        _ultima_ts = time.time()
+        _ultima_ts = now
+
+
+def merge_surebets(lista, quando=None):
+    """MESCLA no conjunto atual (usado pela extensão): adiciona/atualiza por id e
+    EXPIRA as que não reaparecem. Assim a raspagem da view '≤1%' e da view 'PRO'
+    (ingests separados) se SOMAM, e uma raspagem parcial não zera o resto."""
+    global _ultima_atualizacao, _ultima_ts
+    now = time.time()
+    with _lock:
+        for b in lista:
+            if b.get("id"):
+                _bets[b["id"]] = (b, now)
+        mortos = [k for k, (b, ts) in _bets.items() if now - ts > _EXPIRY_SEG]
+        for k in mortos:
+            del _bets[k]
+        _ultima_atualizacao = quando
+        _ultima_ts = now
 
 
 def marcar_ingest():

@@ -1,20 +1,24 @@
 // SureRadar Bridge — content script.
-// Roda na aba logada da surebet.com. A cada 10 min (e uma vez ao carregar):
-//   1) envia JÁ as apostas da página atual (preenche o painel na hora);
-//   2) varre as demais páginas (seguindo o cursor "próximo") e reenvia o
-//      conjunto COMPLETO — assim o PRO recebe todas as >1% e o FREE as ≤1%.
+// Roda na aba logada da surebet.com. A cada 10 min (e uma vez ao carregar),
+// raspa DUAS views e manda pro painel (o servidor MESCLA as duas):
+//   • FREE : lucro ATÉ 1%  -> pega as ~50 melhores (grupo/plano grátis)
+//   • PRO  : lucro >= 2%   -> pega todas (poucas, as boas)
 //
-// Envio incremental + timeout por página: se a varredura estiver lenta ou
-// travar, a página 1 já foi entregue e o painel não fica vazio.
+// Por que assim: a fonte tem MILHARES de surebets. Paginar do topo (maiores)
+// nunca chega nas ≤1%. Usando o filtro de lucro na URL, cada view já vem pronta.
 
-const INTERVALO_MS = 10 * 60 * 1000; // 10 minutos
-const MAX_PAGINAS = 30;              // teto de segurança (30 × 25 = 750 apostas)
-const FETCH_TIMEOUT_MS = 12000;      // corta um fetch que travar
-const DELAY_ENTRE_PAGINAS = 250;     // respiro entre páginas (não martelar o site)
+const INTERVALO_MS = 10 * 60 * 1000;  // 10 min
+const FETCH_TIMEOUT_MS = 12000;
+const DELAY_PG = 220;
+
+const BASE = "https://pt.surebet.com/surebets";
+const VIEW_FREE = BASE + "?selector%5Bmin_profit%5D=0&selector%5Bmax_profit%5D=1&selector%5Border%5D=profit_desc";
+const VIEW_PRO  = BASE + "?selector%5Bmin_profit%5D=2&selector%5Border%5D=profit_desc";
+const MAX_PG_FREE = 2;   // ~50 entradas ≤1%
+const MAX_PG_PRO  = 6;   // as boas (>1%), poucas páginas
 
 const dorme = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// Extrai as surebets de um Document (a página ao vivo OU uma buscada).
 function rasparDoc(doc) {
   return [...doc.querySelectorAll("tbody.surebet_record")].map((rec) => {
     const legs = [...rec.querySelectorAll("tr")].map((tr) => {
@@ -27,16 +31,14 @@ function rasparDoc(doc) {
       if (!book || !va) return null;
       const odd = parseFloat(va.textContent.trim());
       if (!(odd > 0)) return null;
-      const nomeCasa = book.textContent.trim();
-      // Esporte: no .booker vem "<Casa> ... <Esporte>" (ex.: "Betano (BR)\nTênis").
+      const nome = book.textContent.trim();
       let sport = "";
       if (bk) {
-        const partes = bk.textContent.split("\n").map((s) => s.trim())
-          .filter((s) => s && s !== nomeCasa);
-        sport = partes.length ? partes[partes.length - 1] : "";
+        const p = bk.textContent.split("\n").map((s) => s.trim()).filter((s) => s && s !== nome);
+        sport = p.length ? p[p.length - 1] : "";
       }
       return {
-        bookmaker: nomeCasa,
+        bookmaker: nome,
         market: co ? co.textContent.trim() : "",
         odd,
         teams: ev ? ((ev.querySelector("a") || ev).textContent || "").trim() : "",
@@ -54,9 +56,47 @@ function rasparDoc(doc) {
 }
 
 function linkProximo(doc) {
-  const a = [...doc.querySelectorAll("a")].find((x) =>
-    /pr[oó]ximo|next/i.test(x.textContent));
+  const a = [...doc.querySelectorAll("a")].find((x) => /pr[oó]ximo|next/i.test(x.textContent));
   return a ? a.href : null;
+}
+
+async function buscarDoc(url) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const r = await fetch(url, { credentials: "include", signal: ctrl.signal });
+    if (!r.ok) return null;
+    return new DOMParser().parseFromString(await r.text(), "text/html");
+  } catch (e) {
+    console.warn("[SureRadar] falha ao buscar:", e);
+    return null;
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+// Varre uma view (seguindo "próximo »") até maxPag, deduplicando por id.
+async function varrerView(startUrl, maxPag) {
+  const vistos = new Set();
+  const todos = [];
+  const add = (recs) => {
+    let n = 0;
+    for (const r of recs) if (r.id && !vistos.has(r.id)) { vistos.add(r.id); todos.push(r); n++; }
+    return n;
+  };
+  let doc = await buscarDoc(startUrl);
+  if (!doc) return todos;
+  add(rasparDoc(doc));
+  let prox = linkProximo(doc), pag = 1;
+  while (prox && pag < maxPag) {
+    await dorme(DELAY_PG);
+    doc = await buscarDoc(prox);
+    if (!doc) break;
+    if (!add(rasparDoc(doc))) break;
+    prox = linkProximo(doc);
+    pag++;
+  }
+  return todos;
 }
 
 function enviar(records, label) {
@@ -65,55 +105,17 @@ function enviar(records, label) {
   console.log(`[SureRadar] enviadas ${records.length} surebets (${label})`);
 }
 
-async function buscarDoc(url) {
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
-  try {
-    const resp = await fetch(url, { credentials: "include", signal: ctrl.signal });
-    if (!resp.ok) return null;
-    return new DOMParser().parseFromString(await resp.text(), "text/html");
-  } catch (e) {
-    console.warn("[SureRadar] falha ao buscar página:", e);
-    return null;
-  } finally {
-    clearTimeout(t);
-  }
-}
-
 async function ciclo() {
-  const vistos = new Set();
-  const todos = [];
-  const add = (recs) => {
-    let n = 0;
-    for (const r of recs) {
-      if (r.id && !vistos.has(r.id)) { vistos.add(r.id); todos.push(r); n++; }
-    }
-    return n;
-  };
-
-  // 1) Página atual — envia IMEDIATAMENTE (painel enche na hora).
-  add(rasparDoc(document));
-  enviar(todos.slice(), "página 1");
-
-  // 2) Varre o resto seguindo o cursor e reenvia o conjunto completo.
-  let prox = linkProximo(document);
-  let pag = 1;
-  while (prox && pag < MAX_PAGINAS) {
-    await dorme(DELAY_ENTRE_PAGINAS);
-    const doc = await buscarDoc(prox);
-    if (!doc) break;
-    const novos = add(rasparDoc(doc));
-    if (!novos) break;              // sem novidades = fim (ou laço)
-    prox = linkProximo(doc);
-    pag++;
-  }
-
-  // Se a varredura trouxe páginas além da 1ª, reenvia o conjunto completo.
-  if (pag > 1) {
-    enviar(todos, `varredura completa (${pag} págs)`);
+  try {
+    const free = await varrerView(VIEW_FREE, MAX_PG_FREE);   // ≤1%
+    enviar(free.slice(0, 50), "FREE ≤1%");                   // 50 melhores
+    const pro = await varrerView(VIEW_PRO, MAX_PG_PRO);      // >1% (boas)
+    enviar(pro, "PRO >1%");
+  } catch (e) {
+    console.warn("[SureRadar] erro no ciclo:", e);
   }
 }
 
-// Primeira coleta ~6s após carregar; depois a cada 10 min.
-setTimeout(ciclo, 6000);
+// Primeira coleta ~4s após carregar; depois a cada 10 min.
+setTimeout(ciclo, 4000);
 setInterval(ciclo, INTERVALO_MS);
