@@ -13,7 +13,8 @@ const DELAY_PG = 220;
 
 const BASE = "https://pt.surebet.com/surebets";
 const VIEW_FREE = BASE + "?selector%5Bmin_profit%5D=0&selector%5Bmax_profit%5D=1&selector%5Border%5D=profit_desc";
-const VIEW_PRO  = BASE + "?selector%5Bmin_profit%5D=2&selector%5Border%5D=profit_desc";
+// teto de 30% exclui "surebets" bugadas (ex.: 394% de escanteios com odd errada)
+const VIEW_PRO  = BASE + "?selector%5Bmin_profit%5D=2&selector%5Bmax_profit%5D=30&selector%5Border%5D=profit_desc";
 const MAX_PG_FREE = 2;   // ~50 entradas ≤1%
 const MAX_PG_PRO  = 6;   // as boas (>1%), poucas páginas
 
