@@ -180,6 +180,19 @@ def google_callback(request: Request, code: str = "", state: str = ""):
     return _com_sessao(resp, user["id"])
 
 
+@app.get("/api/health")
+def health():
+    """Diagnóstico: qual banco está em uso e se a conexão funciona (sem expor segredos)."""
+    info = {"db_type": "postgres" if auth.PG else "sqlite", "db_ok": False}
+    try:
+        with auth._db() as c:
+            c.execute("SELECT 1")
+        info["db_ok"] = True
+    except Exception as e:
+        info["erro"] = type(e).__name__ + ": " + str(e)[:120]
+    return info
+
+
 @app.get("/api/me")
 def me(request: Request):
     user = _usuario(request)
