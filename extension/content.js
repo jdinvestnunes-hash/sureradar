@@ -19,6 +19,7 @@ function rasparDoc(doc) {
   return [...doc.querySelectorAll("tbody.surebet_record")].map((rec) => {
     const legs = [...rec.querySelectorAll("tr")].map((tr) => {
       const book = tr.querySelector(".bookmaker-name");
+      const bk = tr.querySelector(".booker");
       const co = tr.querySelector(".coeff");
       const va = tr.querySelector(".value");
       const ev = tr.querySelector(".event");
@@ -26,12 +27,20 @@ function rasparDoc(doc) {
       if (!book || !va) return null;
       const odd = parseFloat(va.textContent.trim());
       if (!(odd > 0)) return null;
+      const nomeCasa = book.textContent.trim();
+      // Esporte: no .booker vem "<Casa> ... <Esporte>" (ex.: "Betano (BR)\nTênis").
+      let sport = "";
+      if (bk) {
+        const partes = bk.textContent.split("\n").map((s) => s.trim())
+          .filter((s) => s && s !== nomeCasa);
+        sport = partes.length ? partes[partes.length - 1] : "";
+      }
       return {
-        bookmaker: book.textContent.trim(),
+        bookmaker: nomeCasa,
         market: co ? co.textContent.trim() : "",
         odd,
         teams: ev ? ((ev.querySelector("a") || ev).textContent || "").trim() : "",
-        sport: "",
+        sport,
         link: vl ? vl.href : null,
       };
     }).filter(Boolean);
