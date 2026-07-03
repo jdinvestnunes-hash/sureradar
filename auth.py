@@ -129,27 +129,39 @@ def dias_restantes(user):
 
 
 def _normalizar_plano(c, row):
-    """Regras automáticas de plano — o BANCO é a fonte da verdade.
+    """Regra automática — o BANCO é a fonte da verdade: plano 'pro' com
+    expiração VENCIDA volta pra 'free' sozinho.
 
-    - plano 'pro' SEM expiração (ativação manual direto no banco) -> liga 30 dias
-      a partir de agora e registra um pagamento manual (aí o perfil mostra certo).
-    - plano 'pro' com expiração VENCIDA -> volta pra 'free' sozinho.
-
-    Recebe a conexão aberta `c` e a row do usuário; devolve (plano, expira) já
-    aplicados (e persiste a mudança no banco quando houver)."""
+    (Ativar/renovar PRO com a DURAÇÃO que você escolher é pelo painel admin, via
+    `ativar_pro`, que SOMA nos dias restantes ao renovar.)"""
     plano = row["plano"]
     exp = row["plano_expira"]
-    uid = row["id"]
-    agora = time.time()
-    if plano == "pro" and not exp:
-        exp = agora + 30 * 86400
-        c.execute(_q("UPDATE users SET plano_expira=? WHERE id=?"), (exp, uid))
-        c.execute(_q("INSERT INTO pagamentos(user_id,valor,plano,metodo,criado) VALUES(?,?,?,?,?)"),
-                  (uid, 0.0, "pro", "ativação manual (banco)", agora))
-    elif plano == "pro" and exp and exp < agora:
+    if plano == "pro" and exp and exp < time.time():
         plano = "free"
-        c.execute(_q("UPDATE users SET plano='free' WHERE id=?"), (uid,))
+        c.execute(_q("UPDATE users SET plano='free' WHERE id=?"), (row["id"],))
     return plano, exp
+
+
+def pegar_por_email(email):
+    email = (email or "").strip().lower()
+    with _db() as c:
+        row = c.execute(_q("SELECT * FROM users WHERE email=?"), (email,)).fetchone()
+    return _perfil(row) if row else None
+
+
+def listar_usuarios():
+    """Todos os usuários (para o painel admin), do mais novo ao mais antigo."""
+    with _db() as c:
+        rows = c.execute(
+            "SELECT id, nome, email, plano, plano_expira, criado FROM users ORDER BY criado DESC"
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def voltar_free(user_id: int):
+    """Tira o PRO na marra (volta pra free, zera a expiração)."""
+    with _db() as c:
+        c.execute(_q("UPDATE users SET plano='free', plano_expira=NULL WHERE id=?"), (user_id,))
 
 
 # ---------------------------------------------------------------------------

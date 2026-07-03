@@ -82,6 +82,7 @@
   </a>
   <div class="navlinks">
     <a href="/app" class="nlk">← Painel</a>
+    <a href="/admin" id="lk-admin" class="nlk" style="display:none">🛠️ Admin</a>
     <a href="#" id="sair" class="nlk out">Sair</a>
   </div>
 </div></nav>
@@ -137,6 +138,7 @@ async function load(){
   $("#nm").textContent = d.nome;
   $("#em").textContent = d.email;
 
+  if (d.admin) $("#lk-admin").style.display = "";
   const pro = d.plano === "pro";
   const badge = $("#plan-badge"), chip = $("#plan-chip");
   badge.textContent = pro ? "Pro" : "Grátis";
@@ -148,9 +150,15 @@ async function load(){
   const db = $("#days-box");
   if (pro && d.dias != null){
     const pct = Math.min(100, Math.round(d.dias / (d.dias>60?365:30) * 100));
+    const aviso = d.aviso_renovar
+      ? `<div style="margin-top:12px;background:rgba(255,201,77,.12);border:1px solid rgba(255,201,77,.4);border-radius:11px;padding:12px 14px;font-size:13.5px;color:#ffdb8a">
+           ⏳ <b>Seu plano vence em ${d.dias} dia(s).</b> Renove para não perder o acesso às entradas de maior lucro.
+           <button onclick="location.href='/planos'" style="margin-top:9px;display:block;width:100%;background:linear-gradient(112deg,#2ee6a8,#38d4f5);color:#052015;border:none;border-radius:9px;padding:10px;font-weight:800;cursor:pointer">Renovar agora</button>
+         </div>`
+      : "";
     db.innerHTML = `<div class="big">${d.dias} <span style="font-size:16px;color:var(--dim)">dias</span></div>
       <div class="lb">restantes no seu plano · expira em ${data_br(d.expira)}</div>
-      <div class="bar"><i style="width:${pct}%"></i></div>`;
+      <div class="bar"><i style="width:${pct}%"></i></div>${aviso}`;
   } else {
     db.innerHTML = `<div class="lb" style="margin-top:6px">Você está no plano grátis — vê só entradas de até 1% de lucro.</div>`;
   }

@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin — SureRadar</title>
+  <meta name="robots" content="noindex" />
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg" />
+  <style>
+    :root{
+      --bg:#05070d; --card:#0e1421; --card2:#121a2b; --line:#1b2740; --line2:#27395c;
+      --text:#f2f6fc; --dim:#a3b1c9; --mute:#5e6b85;
+      --green:#2ee6a8; --cyan:#38d4f5; --gold:#ffc94d; --red:#ff6b6b;
+      --grad:linear-gradient(112deg,#2ee6a8 10%,#38d4f5 90%);
+      --font:"Inter",system-ui,sans-serif;
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh}
+    a{color:inherit;text-decoration:none}
+    .wrap{max-width:1000px;margin:0 auto;padding:24px}
+    nav{display:flex;align-items:center;justify-content:space-between;height:60px;border-bottom:1px solid var(--line);margin-bottom:24px}
+    .brand{font-weight:800;font-size:19px}
+    .brand span{background:var(--grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+    .back{font-size:14px;color:var(--dim);padding:8px 14px;border-radius:9px}
+    .back:hover{background:var(--card);color:var(--text)}
+    h1{font-size:24px;font-weight:800;margin-bottom:4px}
+    .sub{color:var(--dim);font-size:14px;margin-bottom:22px}
+    .search{width:100%;background:var(--card);border:1px solid var(--line2);border-radius:11px;padding:12px 14px;color:var(--text);font-size:14px;margin-bottom:18px}
+    .u{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:12px;display:flex;flex-wrap:wrap;align-items:center;gap:14px}
+    .u-info{flex:1;min-width:220px}
+    .u-nome{font-weight:700;font-size:15px}
+    .u-email{color:var(--dim);font-size:13px}
+    .badge{font-size:11px;font-weight:800;letter-spacing:.04em;padding:3px 9px;border-radius:999px;text-transform:uppercase}
+    .b-free{background:rgba(94,107,133,.2);color:var(--mute)}
+    .b-pro{background:rgba(46,230,168,.16);color:var(--green)}
+    .b-warn{background:rgba(255,201,77,.16);color:var(--gold)}
+    .dias{font-size:13px;color:var(--dim);margin-top:3px}
+    .ctrl{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+    .ctrl input{width:70px;background:var(--card2);border:1px solid var(--line2);border-radius:9px;padding:9px;color:var(--text);font-size:14px;text-align:center}
+    .btn{border:none;border-radius:9px;padding:9px 13px;font-weight:700;font-size:13px;cursor:pointer;font-family:var(--font);transition:.15s}
+    .btn:hover{filter:brightness(1.08)}
+    .b-pro-act{background:var(--grad);color:#052015}
+    .b-preset{background:rgba(255,255,255,.05);color:var(--text);border:1px solid var(--line2)}
+    .b-free-act{background:transparent;color:var(--red);border:1px solid rgba(255,107,107,.4)}
+    .toast{position:fixed;left:50%;bottom:30px;transform:translateX(-50%) translateY(20px);opacity:0;background:var(--card2);border:1px solid var(--line2);border-radius:12px;padding:14px 20px;font-size:14px;font-weight:600;box-shadow:0 20px 50px rgba(0,0,0,.5);transition:.25s;z-index:50}
+    .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+    .toast b{color:var(--green)}
+    .empty{color:var(--mute);text-align:center;padding:40px}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <nav>
+    <div class="brand">Sure<span>Radar</span> · Admin</div>
+    <a href="/app" class="back">← Voltar ao painel</a>
+  </nav>
+
+  <h1>Gerenciar assinaturas</h1>
+  <p class="sub">Dê ou renove o PRO com a duração que quiser. Renovar <b>soma</b> nos dias que faltam.</p>
+
+  <input id="busca" class="search" placeholder="🔎 Filtrar por nome ou e-mail…" />
+  <div id="lista"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = (s)=>document.querySelector(s);
+const toast = (html)=>{const t=$("#toast");t.innerHTML=html;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),3500);};
+let USERS = [];
+
+function fmtExpira(exp){
+  if(!exp) return "";
+  const d = new Date(exp*1000);
+  return d.toLocaleDateString("pt-BR");
+}
+
+function render(){
+  const q = ($("#busca").value||"").toLowerCase();
+  const lista = $("#lista");
+  const filtrados = USERS.filter(u => (u.nome+" "+u.email).toLowerCase().includes(q));
+  if(!filtrados.length){ lista.innerHTML = '<div class="empty">Nenhum usuário.</div>'; return; }
+  lista.innerHTML = filtrados.map(u=>{
+    const pro = u.plano==="pro";
+    const badge = pro
+      ? (u.aviso_renovar ? '<span class="badge b-warn">PRO · vence</span>' : '<span class="badge b-pro">PRO</span>')
+      : '<span class="badge b-free">FREE</span>';
+    const dias = pro ? `<div class="dias">${u.dias} dia(s) restante(s) · vence ${fmtExpira(u.plano_expira)}</div>` : "";
+    return `<div class="u" data-email="${u.email}">
+      <div class="u-info">
+        <div class="u-nome">${u.nome} ${badge}</div>
+        <div class="u-email">${u.email}</div>
+        ${dias}
+      </div>
+      <div class="ctrl">
+        <button class="btn b-preset" data-dias="30">+30d</button>
+        <button class="btn b-preset" data-dias="365">+365d</button>
+        <input type="number" min="1" max="3650" value="30" class="dias-in" />
+        <button class="btn b-pro-act" data-acao="pro">Ativar / Renovar PRO</button>
+        <button class="btn b-free-act" data-acao="free">Free</button>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+async function carregar(){
+  const r = await fetch("/api/admin/usuarios");
+  if(r.status===403){ document.body.innerHTML='<div class="wrap"><p class="empty">Sem permissão. Só admins.</p></div>'; return; }
+  const j = await r.json();
+  USERS = j.usuarios||[];
+  render();
+}
+
+async function acaoPlano(email, acao, dias){
+  const r = await fetch("/api/admin/plano",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({email,acao,dias})});
+  const j = await r.json();
+  if(!r.ok){ toast("❌ "+(j.erro||"erro")); return; }
+  if(acao==="free") toast(`✅ <b>${email}</b> voltou pra Free`);
+  else toast(`✅ <b>${email}</b> PRO · +${j.dias_adicionados}d = ${j.dias_totais} dias`);
+  await carregar();
+}
+
+document.addEventListener("click",(e)=>{
+  const card = e.target.closest(".u"); if(!card) return;
+  const email = card.dataset.email;
+  if(e.target.dataset.dias){ card.querySelector(".dias-in").value = e.target.dataset.dias; return; }
+  if(e.target.dataset.acao==="pro"){
+    const dias = parseInt(card.querySelector(".dias-in").value)||30;
+    acaoPlano(email,"pro",dias);
+  }
+  if(e.target.dataset.acao==="free"){
+    if(confirm(`Tirar o PRO de ${email}?`)) acaoPlano(email,"free");
+  }
+});
+$("#busca").addEventListener("input", render);
+carregar();
+</script>
+</body>
+</html>

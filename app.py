@@ -90,9 +90,14 @@ def _usuario(request: Request):
 def _plano_efetivo(user):
     """Plano do usuário — o BANCO é a fonte da verdade. 'free' se deslogado.
 
-    (Sem atalho de 'dono': para virar PRO, muda-se plano='pro' no banco; o
-    auth._normalizar_plano liga 30 dias e a expiração automaticamente.)"""
+    (Para virar PRO usa-se o painel /admin, que define a duração e SOMA nos dias
+    restantes ao renovar. Pro vencido volta pra free sozinho — auth._normalizar_plano.)"""
     return user["plano"] if user else "free"
+
+
+def _eh_admin(user):
+    """True se o usuário logado pode usar o painel /admin (config.ADMIN_EMAILS)."""
+    return bool(user) and (user.get("email", "").strip().lower() in config.ADMIN_EMAILS)
 
 
 def _com_sessao(resp: Response, user_id: int):
@@ -201,13 +206,20 @@ def health():
     return info
 
 
+def _aviso_renovar(dias):
+    """True quando faltam poucos dias (<= config.AVISO_RENOVACAO_DIAS) p/ vencer."""
+    return dias is not None and 0 <= dias <= config.AVISO_RENOVACAO_DIAS
+
+
 @app.get("/api/me")
 def me(request: Request):
     user = _usuario(request)
     if not user:
         return JSONResponse({"erro": "não autenticado"}, status_code=401)
+    dias = auth.dias_restantes(user)
     return {"nome": user["nome"], "email": user["email"], "plano": _plano_efetivo(user),
-            "dias": auth.dias_restantes(user)}
+            "dias": dias, "aviso_renovar": _aviso_renovar(dias),
+            "admin": _eh_admin(user)}
 
 
 @app.get("/api/perfil")
@@ -215,12 +227,55 @@ def perfil_dados(request: Request):
     user = _usuario(request)
     if not user:
         return JSONResponse({"erro": "não autenticado"}, status_code=401)
+    dias = auth.dias_restantes(user)
     return {
         "nome": user["nome"], "email": user["email"], "plano": user["plano"],
-        "dias": auth.dias_restantes(user),
+        "dias": dias,
         "expira": user.get("plano_expira"),
+        "aviso_renovar": _aviso_renovar(dias),
+        "admin": _eh_admin(user),
         "pagamentos": auth.listar_pagamentos(user["id"]),
     }
+
+
+# --- Painel ADMIN (dar/renovar PRO com a duração escolhida) ---
+@app.get("/api/admin/usuarios")
+def admin_usuarios(request: Request):
+    user = _usuario(request)
+    if not _eh_admin(user):
+        return JSONResponse({"erro": "sem permissão"}, status_code=403)
+    lista = []
+    for u in auth.listar_usuarios():
+        lista.append({**u, "dias": auth.dias_restantes(u),
+                      "aviso_renovar": _aviso_renovar(auth.dias_restantes(u))})
+    return {"usuarios": lista}
+
+
+@app.post("/api/admin/plano")
+def admin_plano(request: Request, payload: dict = Body(...)):
+    """Admin ativa/renova PRO (com a duração escolhida — SOMA nos dias restantes)
+    ou volta pra Free. Body: {email, acao:'pro'|'free', dias:int}."""
+    user = _usuario(request)
+    if not _eh_admin(user):
+        return JSONResponse({"erro": "sem permissão"}, status_code=403)
+    alvo = auth.pegar_por_email(payload.get("email", ""))
+    if not alvo:
+        return JSONResponse({"erro": "usuário não encontrado"}, status_code=404)
+    acao = payload.get("acao", "pro")
+    if acao == "free":
+        auth.voltar_free(alvo["id"])
+        return {"ok": True, "email": alvo["email"], "plano": "free"}
+    try:
+        dias = int(payload.get("dias", 30))
+    except (TypeError, ValueError):
+        dias = 30
+    dias = max(1, min(dias, 3650))
+    plano_nome = "anual" if dias >= 365 else "mensal"
+    valor = 497.0 if dias >= 365 else 97.0
+    nova_exp = auth.ativar_pro(alvo["id"], plano_nome, dias, valor, metodo="admin")
+    restantes = max(0, int((nova_exp - __import__("time").time()) / 86400))
+    return {"ok": True, "email": alvo["email"], "plano": "pro",
+            "dias_adicionados": dias, "dias_totais": restantes}
 
 
 # ATENÇÃO: ativação de teste do Pro. SÓ funciona com ALLOW_DEV_PRO=1 no ambiente
@@ -556,6 +611,17 @@ def tela_planos(request: Request):
     if not _usuario(request):
         return RedirectResponse("/login", status_code=302)
     return FileResponse(STATIC_DIR / "planos.html")
+
+
+@app.get("/admin")
+def tela_admin(request: Request):
+    """Painel do admin — dar/renovar PRO. Só para e-mails em ADMIN_EMAILS."""
+    user = _usuario(request)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+    if not _eh_admin(user):
+        return RedirectResponse("/app", status_code=302)
+    return FileResponse(STATIC_DIR / "admin.html")
 
 
 @app.get("/app")

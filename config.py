@@ -20,6 +20,19 @@ GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "").strip()
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "").strip()
 
 # ---------------------------------------------------------------------------
+# ADMIN: e-mails que acessam o painel /admin (dar/renovar PRO com os dias que
+# você escolher). NÃO dá PRO automático — só libera o painel. Env ADMIN_EMAILS.
+# ---------------------------------------------------------------------------
+ADMIN_EMAILS = {
+    e.strip().lower()
+    for e in os.getenv("ADMIN_EMAILS", "jdinvestnunes@gmail.com").split(",")
+    if e.strip()
+}
+
+# Avisar no perfil para renovar quando faltar este nº de dias (ou menos).
+AVISO_RENOVACAO_DIAS = 5
+
+# ---------------------------------------------------------------------------
 # FONTE DE DADOS
 #   "surebet"    -> surebet.com / apostasseguras (casas BR + mercados exóticos:
 #                   escanteios, cartões, faltas... Já entrega a surebet PRONTA)
