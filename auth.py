@@ -128,6 +128,30 @@ def dias_restantes(user):
     return max(0, int((exp - time.time()) / 86400))
 
 
+def _normalizar_plano(c, row):
+    """Regras automáticas de plano — o BANCO é a fonte da verdade.
+
+    - plano 'pro' SEM expiração (ativação manual direto no banco) -> liga 30 dias
+      a partir de agora e registra um pagamento manual (aí o perfil mostra certo).
+    - plano 'pro' com expiração VENCIDA -> volta pra 'free' sozinho.
+
+    Recebe a conexão aberta `c` e a row do usuário; devolve (plano, expira) já
+    aplicados (e persiste a mudança no banco quando houver)."""
+    plano = row["plano"]
+    exp = row["plano_expira"]
+    uid = row["id"]
+    agora = time.time()
+    if plano == "pro" and not exp:
+        exp = agora + 30 * 86400
+        c.execute(_q("UPDATE users SET plano_expira=? WHERE id=?"), (exp, uid))
+        c.execute(_q("INSERT INTO pagamentos(user_id,valor,plano,metodo,criado) VALUES(?,?,?,?,?)"),
+                  (uid, 0.0, "pro", "ativação manual (banco)", agora))
+    elif plano == "pro" and exp and exp < agora:
+        plano = "free"
+        c.execute(_q("UPDATE users SET plano='free' WHERE id=?"), (uid,))
+    return plano, exp
+
+
 # ---------------------------------------------------------------------------
 # Cadastro / login
 # ---------------------------------------------------------------------------
@@ -170,11 +194,13 @@ def autenticar(email: str, senha: str):
     email = (email or "").strip().lower()
     with _db() as c:
         row = c.execute(_q("SELECT * FROM users WHERE email=?"), (email,)).fetchone()
-    if not row:
-        return None
-    if not secrets.compare_digest(_hash(senha or "", row["salt"]), bytes(row["hash"])):
-        return None
-    return _perfil(row)
+        if not row:
+            return None
+        if not secrets.compare_digest(_hash(senha or "", row["salt"]), bytes(row["hash"])):
+            return None
+        plano, exp = _normalizar_plano(c, row)
+    return {"id": row["id"], "nome": row["nome"], "email": row["email"],
+            "plano": plano, "plano_expira": exp}
 
 
 # ---------------------------------------------------------------------------
@@ -201,7 +227,9 @@ def usuario_da_sessao(token: str):
         if time.time() - row["s_criado"] > SESSAO_MAX_S:
             c.execute(_q("DELETE FROM sessions WHERE token=?"), (token,))
             return None
-    return _perfil(row)
+        plano, exp = _normalizar_plano(c, row)
+    return {"id": row["id"], "nome": row["nome"], "email": row["email"],
+            "plano": plano, "plano_expira": exp}
 
 
 def encerrar_sessao(token: str):

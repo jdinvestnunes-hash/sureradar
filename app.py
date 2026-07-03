@@ -87,16 +87,12 @@ def _usuario(request: Request):
     return auth.usuario_da_sessao(request.cookies.get(COOKIE))
 
 
-def _eh_dono(user):
-    """True se o usuário é DONO (e-mail em OWNER_EMAILS) — sempre PRO."""
-    return bool(user) and (user.get("email", "").strip().lower() in config.OWNER_EMAILS)
-
-
 def _plano_efetivo(user):
-    """Plano considerando o dono como PRO. 'free' para deslogado."""
-    if not user:
-        return "free"
-    return "pro" if _eh_dono(user) else user["plano"]
+    """Plano do usuário — o BANCO é a fonte da verdade. 'free' se deslogado.
+
+    (Sem atalho de 'dono': para virar PRO, muda-se plano='pro' no banco; o
+    auth._normalizar_plano liga 30 dias e a expiração automaticamente.)"""
+    return user["plano"] if user else "free"
 
 
 def _com_sessao(resp: Response, user_id: int):
@@ -307,6 +303,30 @@ def _inferir_sport(mercados):
     return ""
 
 
+# Assunto padrão do total (Over/Under) quando o surebet.com o omite (mercado
+# principal). Ex.: futebol "Acima 3.5" = gols; basquete = pontos.
+_ASSUNTO_TOTAL = {
+    "Football": "gols", "Basketball": "pontos", "Volleyball": "pontos",
+    "Hockey": "gols", "Handball": "gols",
+}
+
+
+def _mercado_completo(market, sport):
+    """Deixa o mercado claro pra apostar. Quando é um total 'cru' (só
+    'Acima/Abaixo X.X', sem assunto), acrescenta o assunto do esporte
+    (ex.: futebol -> 'Acima 3.5 gols'). Se já traz o assunto (tem '-' ou já cita
+    gols/pontos/etc.), devolve como está."""
+    m = (market or "").strip()
+    if " - " in m:   # já traz o assunto (ex.: "Acima 1.5 - escanteios")
+        return m
+    if not re.match(r"^(acima|abaixo|mais|menos|over|under|total)\b", m, re.I):
+        return m
+    if re.search(r"gol|ponto|game|set|ace|escanteio|falta|chute|cart", m, re.I):
+        return m
+    assunto = _ASSUNTO_TOTAL.get(sport)
+    return f"{m} {assunto}" if assunto else m
+
+
 def _converter_raspagem(records):
     """Converte os registros raspados do DOM da surebet.com no contrato do painel."""
     contratos = []
@@ -349,7 +369,7 @@ def _converter_raspagem(records):
             "sport": sport,
             "sport_label": legs[0].get("champ", "") or SPORT_LABELS_PT.get(sport, sport),
             "market": "raspagem",
-            "market_label": legs[0].get("market", ""),
+            "market_label": _mercado_completo(legs[0].get("market", ""), sport),
             "line": None,
             "profit_pct": round(float(r.get("profit", 0)), 2),
             "banca": banca,

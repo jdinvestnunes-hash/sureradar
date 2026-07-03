@@ -20,16 +20,6 @@ GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "").strip()
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "").strip()
 
 # ---------------------------------------------------------------------------
-# DONO(S) do sistema: e-mails sempre tratados como PRO (acesso total ao painel),
-# independente do plano no banco. Separe por vírgula na env OWNER_EMAILS.
-# ---------------------------------------------------------------------------
-OWNER_EMAILS = {
-    e.strip().lower()
-    for e in os.getenv("OWNER_EMAILS", "jdinvestnunes@gmail.com").split(",")
-    if e.strip()
-}
-
-# ---------------------------------------------------------------------------
 # FONTE DE DADOS
 #   "surebet"    -> surebet.com / apostasseguras (casas BR + mercados exóticos:
 #                   escanteios, cartões, faltas... Já entrega a surebet PRONTA)
