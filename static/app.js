@@ -389,7 +389,7 @@ $("#calc-total").addEventListener("input", computeCalc);
 $("#calc-launch").addEventListener("click", launchToBank);
 $("#calc-overlay").addEventListener("click", (e) => { if (e.target.id === "calc-overlay") closeCalc(); });
 $("#up-close").addEventListener("click", closeUpgrade);
-$("#up-cta").addEventListener("click", closeUpgrade);
+$("#up-cta").addEventListener("click", () => { location.href = "/planos"; });
 $("#up-overlay").addEventListener("click", (e) => { if (e.target.id === "up-overlay") closeUpgrade(); });
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") { closeCalc(); closeUpgrade(); } });
 document.querySelectorAll(".tab").forEach((t) => t.addEventListener("click", () => switchView(t.dataset.view)));

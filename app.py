@@ -487,6 +487,13 @@ def tela_perfil(request: Request):
     return FileResponse(STATIC_DIR / "perfil.html")
 
 
+@app.get("/planos")
+def tela_planos(request: Request):
+    if not _usuario(request):
+        return RedirectResponse("/login", status_code=302)
+    return FileResponse(STATIC_DIR / "planos.html")
+
+
 @app.get("/app")
 def dashboard(request: Request):
     """O painel — só para quem está logado."""
