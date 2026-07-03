@@ -3,8 +3,8 @@
 // O service worker da extensão fala com o localhost sem os bloqueios de
 // "conteúdo misto" / "rede privada" que travam o fetch da página.
 
-// Produção: o painel no ar. Para testar local, troque por http://localhost:8000/api/ingest
-const SAAS_URL = "https://sureradar.site/api/ingest";
+// Produção: o painel no ar (Railway). Para testar local, troque por http://localhost:8000/api/ingest
+const SAAS_URL = "https://web-production-a41df.up.railway.app/api/ingest";
 
 chrome.runtime.onMessage.addListener((msg) => {
   if (msg && msg.tipo === "ingest") {

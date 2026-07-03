@@ -134,7 +134,10 @@ FORMATO_ODDS = "decimal"
 # AGENDADOR (loop de fundo que alimenta o dashboard)
 # ---------------------------------------------------------------------------
 # Liga/desliga o loop automático de coleta. Em plano pago, deixe True.
-AGENDADOR_ATIVO = True
+# Liga/desliga o robô que raspa a FONTE DE TESTE (token surebet.com ≤1%).
+# Em produção, quando a fonte real vem pela EXTENSÃO (conta paga), desligue
+# isto com a variável AGENDADOR_ATIVO=0 no Railway — senão o teste sobrescreve.
+AGENDADOR_ATIVO = os.getenv("AGENDADOR_ATIVO", "1") not in ("0", "false", "False", "no")
 
 # Intervalo entre coletas, em segundos.
 #   - surebet.com (teste): mínimo 60 (a API atualiza no máx. 1x/min no teste).
