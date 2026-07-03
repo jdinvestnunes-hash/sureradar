@@ -531,12 +531,15 @@ def ingest(payload: dict = Body(...)):
     """
     global INGESTED_BOOKS, INGESTED_SPORTS, INGESTED_PROFIT
     contratos = _converter_raspagem(payload.get("records", []))
-    # MESCLA (não substitui): cada ingest é uma view parcial (≤1% OU PRO); elas
-    # se somam no feed e as antigas expiram sozinhas.
-    feed.merge_surebets(contratos, quando=pipeline._agora_iso() + " (conta)")
+    quando = pipeline._agora_iso() + " (conta)"
+    # SNAPSHOT (raspagem completa): SUBSTITUI o feed — o que saiu da conta sai do
+    # site, o que ficou permanece. MERGE (parcial/backup): só soma, não remove.
+    if payload.get("modo") == "snapshot":
+        feed.set_surebets(contratos, quando=quando)
+    else:
+        feed.merge_surebets(contratos, quando=quando)
     if contratos:
         feed.marcar_ingest()
-        # (O envio ao Telegram é AGENDADO pelo promo.py — 5 posts/dia.)
 
     # Casas / esportes / faixa de lucro ESPELHAM TODO o feed vivo (não só este
     # ingest, que é parcial).
