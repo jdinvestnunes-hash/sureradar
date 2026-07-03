@@ -447,6 +447,9 @@ def _converter_raspagem(records):
             continue
         if any(o <= 1 for o in odds):
             continue
+        prof = round(float(r.get("profit", 0)), 2)
+        if not (0 < prof <= config.MAX_LUCRO_SANO):
+            continue   # descarta anomalias (escanteios bugados de 30-400%)
         banca = config.BANCA
         margem = sum(1.0 / o for o in odds)
         pernas = []
@@ -478,7 +481,7 @@ def _converter_raspagem(records):
             "market": "raspagem",
             "market_label": _mercado_completo(legs[0].get("market", ""), sport),
             "line": None,
-            "profit_pct": round(float(r.get("profit", 0)), 2),
+            "profit_pct": prof,
             "banca": banca,
             "commence_utc": iso,
             "commence_br": pipeline._horario_brasilia(iso),

@@ -194,3 +194,7 @@ SITE_URL = os.getenv("SITE_URL", "https://sureradar.site").strip()
 
 # Fluxo de marketing no grupo (5 posts/dia + prova social). Desligue com PROMO_ATIVO=0.
 PROMO_ATIVO = os.getenv("PROMO_ATIVO", "1") not in ("0", "false", "False", "no")
+
+# Teto de lucro "são": surebets acima disso são ANOMALIAS (ex.: escanteios com
+# odd bugada dando 30-400%) e são descartadas na ingestão. Real vai até ~25%.
+MAX_LUCRO_SANO = float(os.getenv("MAX_LUCRO_SANO", "25"))
