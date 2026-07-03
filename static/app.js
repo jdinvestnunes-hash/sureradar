@@ -1,0 +1,429 @@
+// SureRadar — dashboard
+
+const FILTERS_KEY = "sureradar_filtros_v6";
+const BANK_KEY = "sureradar_banca_v1";
+
+let META = null, REFRESH_SEC = 600, LAST_TS = 0;
+let filtros = load(FILTERS_KEY, {});
+let banca = load(BANK_KEY, []);
+let SUREBETS = [];
+let LOCKED = [];    // entradas reais de alto lucro (>1%) borradas para o FREE
+
+// Ícones SVG de traço (estilo profissional, sem emoji)
+const SVG = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+const ICONS = {
+  globe: SVG('<circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a13.5 13.5 0 0 1 0 18a13.5 13.5 0 0 1 0-18z"/>'),
+  football: SVG('<circle cx="12" cy="12" r="9"/><path d="M12 8l3.8 2.8-1.45 4.4h-4.7L8.2 10.8 12 8z"/><path d="M12 3v5M4.7 9.5l3.5 1.3M6.4 17.8l2.85-2.6M14.75 15.2l2.85 2.6M15.8 10.8l3.5-1.3"/>'),
+  tennis: SVG('<circle cx="12" cy="12" r="9"/><path d="M5.2 5.8C8 8 8 16 5.2 18.2M18.8 5.8C16 8 16 16 18.8 18.2"/>'),
+  basketball: SVG('<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3v18M5.8 5.8C8.2 8.2 8.2 15.8 5.8 18.2M18.2 5.8C15.8 8.2 15.8 15.8 18.2 18.2"/>'),
+  volleyball: SVG('<circle cx="12" cy="12" r="9"/><path d="M12 3c1.2 3.6.6 7.2-1.8 9.6M21 12c-3.6 1.2-7.2.6-9.6-1.8M6 18.6c2.4-3 6-4.2 9.6-3"/>'),
+  tabletennis: SVG('<circle cx="17" cy="7" r="2.2"/><path d="M4 20l3.2-3.2M7.2 16.8a6.5 6.5 0 1 1 9.2-9.2 6.5 6.5 0 0 1-9.2 9.2z"/>'),
+  chart: SVG('<path d="M4 19V5M4 19h16"/><path d="M8 15l3.5-4 2.5 2 4.5-5.5"/>'),
+  lock: SVG('<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>'),
+  rocket: SVG('<path d="M12 15c-2 0-5-1-5-1s1.5-6 5-9.5C15.5 8 17 14 17 14s-3 1-5 1z"/><path d="M9 15l-2 4 4-2M15 15l2 4-4-2M12 15v5"/><circle cx="12" cy="9" r="1.4"/>'),
+};
+const SPORTS_UI = {
+  Football: { label: "Futebol", ico: ICONS.football },
+  Tennis: { label: "Tênis", ico: ICONS.tennis },
+  Basketball: { label: "Basquete", ico: ICONS.basketball },
+  Volleyball: { label: "Vôlei", ico: ICONS.volleyball },
+  TableTennis: { label: "Tênis de Mesa", ico: ICONS.tabletennis },
+};
+
+// Teasers premium (borrados) — iscas de alto lucro para o upgrade
+const TEASERS = [
+  { profit_pct: 9.14, event: "★★★★★★ x ★★★★★★", market_label: "Escanteios", sport: "Football", sport_label: "Liga Premium", commence_br: "—",
+    legs: [{ outcome: "Acima 8.5", odd: 2.10, bookmaker_label: "SuperBet" }, { outcome: "Abaixo 8.5", odd: 2.05, bookmaker_label: "Betano" }] },
+  { profit_pct: 8.32, event: "★★★★★ x ★★★★★", market_label: "Cartões", sport: "Football", sport_label: "Liga Premium", commence_br: "—",
+    legs: [{ outcome: "Acima 3.5", odd: 2.30, bookmaker_label: "Novibet" }, { outcome: "Abaixo 3.5", odd: 1.95, bookmaker_label: "Bet365" }] },
+  { profit_pct: 7.86, event: "★★★★ x ★★★★", market_label: "Chutes ao gol", sport: "Tennis", sport_label: "ATP Premium", commence_br: "—",
+    legs: [{ outcome: "Acima 0.5", odd: 2.20, bookmaker_label: "PixBet" }, { outcome: "Abaixo 0.5", odd: 2.00, bookmaker_label: "Betsul" }] },
+];
+
+const $ = (s) => document.querySelector(s);
+const el = (t, c, h) => { const e = document.createElement(t); if (c) e.className = c; if (h !== undefined) e.innerHTML = h; return e; };
+const brl = (v) => "R$ " + Number(v).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+function load(k, def) { try { return JSON.parse(localStorage.getItem(k)) ?? def; } catch { return def; } }
+function saveFiltros() { localStorage.setItem(FILTERS_KEY, JSON.stringify(filtros)); }
+function saveBanca() { localStorage.setItem(BANK_KEY, JSON.stringify(banca)); renderBankBadge(); }
+function sportUI(id) { return SPORTS_UI[id] || { label: id, ico: ICONS.globe }; }
+function dataDe(br) { return br && br.includes(" ") ? br.split(" ")[0] : ""; }        // "dd/mm/yyyy"
+function ddmm(d) { const p = d.split("/"); return p.length >= 2 ? p[0] + "/" + p[1] : d; }
+function shortOutcome(o) { let s = o.split(" - ")[0].split(" (")[0].trim(); return s.length > 20 ? s.slice(0, 19) + "…" : s; }
+
+const ICON_CALC = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="8" y2="10"/><line x1="12" y1="10" x2="12" y2="10"/><line x1="16" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="8" y2="14"/><line x1="12" y1="14" x2="12" y2="14"/><line x1="16" y1="14" x2="16" y2="18"/><line x1="8" y1="18" x2="12" y2="18"/></svg>';
+
+// ---------- Meta ----------
+async function initMeta() {
+  META = await (await fetch("/api/meta")).json();
+  REFRESH_SEC = META.refresh_seg || 600; restante = REFRESH_SEC;
+  if (filtros.min_profit === undefined) filtros.min_profit = 0;
+  if (filtros.max_profit === undefined) filtros.max_profit = 0;
+  // Espelha a conta: marca TODAS as casas por padrão. Só mantém uma seleção
+  // manual se TODAS as casas salvas ainda existem (mesma fonte).
+  const metaKeys = META.bookmakers.map((b) => b.key);
+  const salvasValidas = (filtros.bookmakers || []).filter((k) => metaKeys.includes(k));
+  if (!filtros.bookmakers || salvasValidas.length !== filtros.bookmakers.length || !salvasValidas.length) {
+    filtros.bookmakers = metaKeys.slice(); // fonte nova -> todas
+  } else {
+    filtros.bookmakers = salvasValidas;
+  }
+  if (filtros.sport === undefined) filtros.sport = "";
+  if (filtros.date === undefined) filtros.date = "";
+  saveFiltros();
+  // Faixa dos sliders espelha o lucro da raspagem (ex.: conta de 1% a 15%).
+  if (META.profit && META.profit.max) {
+    const top = Math.max(2, Math.ceil(META.profit.max));
+    $("#min-profit").max = top; $("#max-profit").max = top;
+    if (filtros.max_profit > top) filtros.max_profit = 0;
+  }
+  renderChips(); renderBookmakers();
+  $("#min-profit").value = filtros.min_profit;
+  $("#max-profit").value = filtros.max_profit;
+  updateOutputs();
+}
+
+function renderChips() {
+  const box = $("#sport-chips"); box.innerHTML = "";
+  const chips = [{ key: "", label: "Todos", ico: ICONS.globe }].concat((META.sports || []).map((s) => ({ key: s.key, ...sportUI(s.key) })));
+  chips.forEach((c) => {
+    const chip = el("button", "chip" + (filtros.sport === c.key ? " active" : ""), `<span class="ci">${c.ico}</span> ${c.label}`);
+    chip.addEventListener("click", () => { filtros.sport = c.key; saveFiltros(); renderChips(); carregar(); });
+    box.appendChild(chip);
+  });
+}
+
+function renderBookmakers() {
+  const box = $("#bookmakers-list"); box.innerHTML = "";
+  META.bookmakers.forEach((b) => {
+    const label = el("label", "check");
+    const input = el("input"); input.type = "checkbox"; input.checked = filtros.bookmakers.includes(b.key);
+    input.addEventListener("change", () => {
+      const set = new Set(filtros.bookmakers);
+      input.checked ? set.add(b.key) : set.delete(b.key);
+      filtros.bookmakers = [...set]; saveFiltros(); carregar();
+    });
+    label.appendChild(input); label.appendChild(el("span", null, b.label)); box.appendChild(label);
+  });
+}
+
+function updateOutputs() {
+  $("#min-profit-out").textContent = Number(filtros.min_profit).toFixed(1).replace(/\.0$/, "") + "%";
+  $("#max-profit-out").textContent = filtros.max_profit > 0 ? Number(filtros.max_profit).toFixed(1).replace(/\.0$/, "") + "%" : "sem teto";
+}
+
+// ---------- Carregar ----------
+async function carregar() {
+  const p = new URLSearchParams({
+    min_profit: filtros.min_profit ?? 0, max_profit: filtros.max_profit ?? 0,
+    bookmakers: (filtros.bookmakers || []).join(","), sports: filtros.sport || "",
+  });
+  let data;
+  try { data = await (await fetch("/api/surebets?" + p)).json(); } catch { return; }
+  setStatus(data.status);
+  SUREBETS = data.surebets || [];
+  LOCKED = data.locked || [];
+  render();
+}
+
+function setStatus(status) {
+  const dot = $("#status-dot"), txt = $("#status-text");
+  if (status.conectado) { dot.className = "dot on"; txt.textContent = "Ao vivo"; }
+  else { dot.className = "dot off"; txt.textContent = "Offline"; }
+  if (status.ultima_atualizacao) $("#updated-at").textContent = "fonte: " + status.ultima_atualizacao;
+  if (status.updated_ts) {
+    if (LAST_TS && status.updated_ts > LAST_TS) flashNovas();   // chegou raspagem nova
+    LAST_TS = status.updated_ts;
+  }
+}
+
+function hoje() { const d = new Date(); return String(d.getDate()).padStart(2, "0") + "/" + String(d.getMonth() + 1).padStart(2, "0"); }
+
+function renderDateBar() {
+  const bar = $("#date-bar"); bar.innerHTML = "";
+  const datas = [...new Set(SUREBETS.map((s) => ddmm(dataDe(s.commence_br))).filter(Boolean))].sort((a, b) => {
+    const [da, ma] = a.split("/").map(Number), [db, mb] = b.split("/").map(Number);
+    return ma - mb || da - db;
+  });
+  const hj = hoje();
+  const chips = [{ k: "", l: "Todos" }].concat(datas.map((d) => ({ k: d, l: d === hj ? "Hoje " + d : d })));
+  chips.forEach((c) => {
+    const chip = el("button", "date-chip" + (filtros.date === c.k ? " active" : ""), c.l);
+    chip.addEventListener("click", () => { filtros.date = c.k; saveFiltros(); render(); });
+    bar.appendChild(chip);
+  });
+}
+
+function render() {
+  renderDateBar();
+  let visible = SUREBETS;
+  if (filtros.date) visible = SUREBETS.filter((s) => ddmm(dataDe(s.commence_br)) === filtros.date);
+
+  const list = $("#list"), empty = $("#empty");
+  list.innerHTML = "";
+  $("#count-label").textContent = visible.length + (visible.length === 1 ? " oportunidade" : " oportunidades");
+
+  // Banner de upgrade + teasers só aparecem pro FREE que tem entradas altas travadas.
+  const promo = $("#promo"); promo.innerHTML = "";
+  if (LOCKED.length) {
+    promo.appendChild(bannerEl());
+    LOCKED.forEach((t) => list.appendChild(teaserEl(t)));   // entradas REAIS borradas
+  }
+
+  if (!visible.length) {
+    empty.classList.remove("hidden");
+    const on = META?.status?.conectado;
+    $("#empty-title").textContent = on ? "Nada nos seus filtros agora" : "Aguardando conexão…";
+    $("#empty-text").textContent = on ? "Amplie o lucro, troque o esporte/data ou marque mais casas." : "Assim que a fonte conectar, as entradas aparecem aqui.";
+    $(".empty-icon").textContent = on ? "🔍" : "📡";
+  } else {
+    empty.classList.add("hidden");
+    visible.forEach((sb) => list.appendChild(opEl(sb)));
+  }
+}
+
+function bannerEl() {
+  const b = el("div", "teaser-banner");
+  const info = el("div");
+  info.appendChild(el("div", "tb-t", "Entradas de alto lucro disponíveis no VIP"));
+  info.appendChild(el("div", "tb-s", "Surebets de 8% a 9%+ liberadas só para assinantes."));
+  b.appendChild(info);
+  const btn = el("button", "upgrade-btn", `<span class="ci" style="width:15px;height:15px">${ICONS.rocket}</span> Fazer upgrade`);
+  btn.addEventListener("click", openUpgrade);
+  b.appendChild(btn);
+  return b;
+}
+
+function teaserEl(t) {
+  const wrap = el("div", "teaser");
+  wrap.appendChild(opEl(t, true));
+  const lock = el("div", "teaser-lock");
+  lock.appendChild(el("div", "tl-txt",
+    `<span class="ci" style="width:14px;height:14px;margin-right:6px;vertical-align:-2px">${ICONS.lock}</span>Entrada de <b>+${t.profit_pct.toFixed(2)}%</b> — exclusiva VIP`));
+  const btn = el("button", "upgrade-btn", "Desbloquear");
+  btn.addEventListener("click", openUpgrade);
+  lock.appendChild(btn);
+  wrap.appendChild(lock);
+  return wrap;
+}
+
+// Linha de oportunidade (estilo referência)
+function opEl(sb, teaser) {
+  const op = el("div", "op");
+  const head = el("div", "op-head");
+  const league = el("div", "op-league");
+  league.appendChild(el("span", "ci", sportUI(sb.sport).ico));
+  league.appendChild(el("span", null, (sb.sport_label || sportUI(sb.sport).label).slice(0, 42)));
+  head.appendChild(league);
+  head.appendChild(el("div", "op-time", sb.commence_br || ""));
+  op.appendChild(head);
+
+  const body = el("div", "op-body");
+  const teams = el("div", "op-teams");
+  teams.appendChild(el("div", "op-event", sb.event));
+  teams.appendChild(el("div", "op-market", sb.market_label || ""));
+  body.appendChild(teams);
+
+  const odds = el("div", "op-odds");
+  sb.legs.forEach((l) => {
+    const box = el("div", "op-box");
+    const main = el("div", "op-box-main");
+    main.appendChild(el("div", "op-box-label", l.outcome));
+    const book = el("div", "op-box-book");
+    book.appendChild(el("span", null, l.bookmaker_label || l.bookmaker));
+    if (l.link && !teaser) book.appendChild(el("span", "ext", "↗ ir para a casa"));
+    main.appendChild(book);
+    box.appendChild(main);
+    box.appendChild(el("div", "op-box-odd", Number(l.odd).toFixed(2)));
+    if (l.link && !teaser) box.addEventListener("click", () => window.open(l.link, "_blank", "noopener"));
+    odds.appendChild(box);
+  });
+  body.appendChild(odds);
+  op.appendChild(body);
+
+  const bar = el("div", "op-bar");
+  bar.appendChild(el("div", "op-return",
+    `<span class="ci" style="width:15px;height:15px;margin-right:7px">${ICONS.chart}</span>${Number(sb.profit_pct).toFixed(2)}% RETORNO CERTO`));
+  const calc = el("button", "op-calc", "CALCULAR " + ICON_CALC);
+  if (!teaser) calc.addEventListener("click", () => openCalc(sb));
+  bar.appendChild(calc);
+  op.appendChild(bar);
+  return op;
+}
+
+// ---------- Indicador de atualização ----------
+// Sem contador "00:00": mostra que atualiza a cada 10 min, e pisca "Novas apostas!"
+// quando chega raspagem nova.
+let _flashUntil = 0;
+function tickTimer() {
+  if (Date.now() < _flashUntil) return;              // deixa o "Novas apostas!" na tela
+  $("#timer-text").textContent = "Atualiza a cada 10 min";
+}
+function flashNovas() {
+  $("#timer-text").textContent = "✓ Novas apostas!";
+  _flashUntil = Date.now() + 4000;
+}
+
+// ---------- Upgrade ----------
+function openUpgrade() { $("#up-overlay").classList.remove("hidden"); }
+function closeUpgrade() { $("#up-overlay").classList.add("hidden"); }
+
+// ---------- Calculadora ----------
+let CALC_SB = null;
+function openCalc(sb) {
+  CALC_SB = sb;
+  $("#calc-event").textContent = sb.event;
+  $("#calc-market").textContent = (sb.market_label || "") + "  ·  +" + Number(sb.profit_pct).toFixed(2) + "%";
+  $("#calc-total").value = sb.banca || 1000;
+  computeCalc();
+  $("#calc-launch").textContent = "＋ Lançar na banca";
+  $("#calc-overlay").classList.remove("hidden");
+}
+function closeCalc() { $("#calc-overlay").classList.add("hidden"); CALC_SB = null; }
+
+function calcStakes(sb, total) {
+  const odds = sb.legs.map((l) => Number(l.odd));
+  const margem = odds.reduce((s, o) => s + 1 / o, 0);
+  const stakes = odds.map((o) => total * (1 / o) / margem);
+  const retorno = total / margem;
+  return { stakes, retorno, lucro: retorno - total };
+}
+
+function computeCalc() {
+  if (!CALC_SB) return;
+  const total = parseFloat($("#calc-total").value) || 0;
+  const { stakes, retorno, lucro } = calcStakes(CALC_SB, total);
+  const box = $("#calc-legs"); box.innerHTML = "";
+  CALC_SB.legs.forEach((leg, i) => {
+    const item = el("div", "calc-leg");
+    const t = el("div", "calc-leg-top");
+    const name = el("div");
+    name.appendChild(el("div", "calc-leg-name", leg.outcome));
+    name.appendChild(el("div", "calc-leg-book", leg.bookmaker_label || leg.bookmaker));
+    t.appendChild(name);
+    t.appendChild(el("div", "calc-leg-odd", "@ " + Number(leg.odd).toFixed(2)));
+    item.appendChild(t);
+    const st = el("div", "calc-stake");
+    st.appendChild(el("div", "calc-stake-label", "Apostar"));
+    const v = el("div");
+    v.appendChild(el("div", "calc-stake-val", brl(stakes[i])));
+    v.appendChild(el("div", "calc-stake-ret", "retorno " + brl(stakes[i] * Number(leg.odd))));
+    st.appendChild(v); item.appendChild(st); box.appendChild(item);
+  });
+  $("#calc-return").textContent = brl(retorno);
+  $("#calc-profit").textContent = (lucro >= 0 ? "+" : "") + brl(lucro);
+}
+
+function launchToBank() {
+  if (!CALC_SB) return;
+  const total = parseFloat($("#calc-total").value) || 0;
+  const { stakes, lucro } = calcStakes(CALC_SB, total);
+  banca.push({
+    id: (CALC_SB.id || "t") + "-" + Date.now(),
+    event: CALC_SB.event, market: CALC_SB.market_label || "", sport: CALC_SB.sport,
+    profit_pct: CALC_SB.profit_pct, total, expected: lucro, status: "pendente",
+    legs: CALC_SB.legs.map((l, i) => ({ outcome: l.outcome, odd: l.odd, book: l.bookmaker_label || l.bookmaker, stake: stakes[i] })),
+    created: new Date().toLocaleDateString("pt-BR"),
+  });
+  saveBanca();
+  $("#calc-launch").textContent = "✓ Lançado na banca!";
+  setTimeout(closeCalc, 700);
+}
+
+// ---------- Banca ----------
+function renderBankBadge() { $("#bank-count").textContent = banca.length; }
+function renderBanca() {
+  const list = $("#bank-list"), empty = $("#bank-empty");
+  const apostado = banca.reduce((s, e) => s + e.total, 0);
+  const previsto = banca.reduce((s, e) => s + e.expected, 0);
+  const realizado = banca.filter((e) => e.status === "concluida").reduce((s, e) => s + e.expected, 0);
+  $("#bank-metrics").innerHTML = "";
+  [["Entradas", banca.length, ""], ["Total apostado", brl(apostado), "cyan"], ["Lucro previsto", brl(previsto), "green"], ["Lucro realizado", brl(realizado), "green"]]
+    .forEach(([k, v, cls]) => { const c = el("div", "metric"); c.appendChild(el("div", "metric-label", k)); c.appendChild(el("div", "metric-val " + cls, v)); $("#bank-metrics").appendChild(c); });
+
+  list.innerHTML = "";
+  if (!banca.length) { empty.classList.remove("hidden"); return; }
+  empty.classList.add("hidden");
+  banca.slice().reverse().forEach((e) => {
+    const row = el("div", "bank-row");
+    const ev = el("div", "bank-ev"); ev.appendChild(document.createTextNode(e.event));
+    ev.appendChild(el("small", null, e.market + " · " + sportUI(e.sport).label + " · " + e.created));
+    row.appendChild(ev);
+    const stakeCol = el("div", "bank-col"); stakeCol.appendChild(el("div", "k", "Apostado"));
+    const inp = el("input", "bank-edit"); inp.type = "number"; inp.value = e.total.toFixed(2); inp.step = "10";
+    inp.addEventListener("change", () => {
+      const nv = parseFloat(inp.value) || 0;
+      const { lucro } = calcStakes({ legs: e.legs.map((l) => ({ odd: l.odd })) }, nv);
+      e.total = nv; e.expected = lucro; saveBanca(); renderBanca();
+    });
+    stakeCol.appendChild(inp); row.appendChild(stakeCol);
+    const profCol = el("div", "bank-col"); profCol.appendChild(el("div", "k", "Lucro")); profCol.appendChild(el("div", "v green", "+" + brl(e.expected))); row.appendChild(profCol);
+    const stBtn = el("button", "bank-status" + (e.status === "concluida" ? " done" : ""), e.status === "concluida" ? "✓ Concluída" : "Pendente");
+    stBtn.addEventListener("click", () => { e.status = e.status === "concluida" ? "pendente" : "concluida"; saveBanca(); renderBanca(); });
+    row.appendChild(stBtn);
+    const del = el("button", "bank-del", "🗑"); del.title = "Excluir";
+    del.addEventListener("click", () => { banca = banca.filter((x) => x.id !== e.id); saveBanca(); renderBanca(); });
+    row.appendChild(del); list.appendChild(row);
+  });
+}
+
+// ---------- Abas ----------
+function switchView(v) {
+  document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("active", t.dataset.view === v));
+  $("#view-ops").classList.toggle("hidden", v !== "ops");
+  $("#view-bank").classList.toggle("hidden", v !== "bank");
+  if (v === "bank") renderBanca();
+}
+
+// ---------- Eventos ----------
+$("#min-profit").addEventListener("input", (e) => { filtros.min_profit = parseFloat(e.target.value); updateOutputs(); saveFiltros(); carregar(); });
+$("#max-profit").addEventListener("input", (e) => { filtros.max_profit = parseFloat(e.target.value); updateOutputs(); saveFiltros(); carregar(); });
+$("#sel-all").addEventListener("click", () => { filtros.bookmakers = META.bookmakers.map((b) => b.key); saveFiltros(); renderBookmakers(); carregar(); });
+$("#sel-none").addEventListener("click", () => { filtros.bookmakers = []; saveFiltros(); renderBookmakers(); carregar(); });
+$("#calc-close").addEventListener("click", closeCalc);
+$("#calc-total").addEventListener("input", computeCalc);
+$("#calc-launch").addEventListener("click", launchToBank);
+$("#calc-overlay").addEventListener("click", (e) => { if (e.target.id === "calc-overlay") closeCalc(); });
+$("#up-close").addEventListener("click", closeUpgrade);
+$("#up-cta").addEventListener("click", closeUpgrade);
+$("#up-overlay").addEventListener("click", (e) => { if (e.target.id === "up-overlay") closeUpgrade(); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") { closeCalc(); closeUpgrade(); } });
+document.querySelectorAll(".tab").forEach((t) => t.addEventListener("click", () => switchView(t.dataset.view)));
+
+// ---------- Sessão do usuário ----------
+async function initUser() {
+  let me;
+  try {
+    const r = await fetch("/api/me");
+    if (r.status === 401) { location.href = "/login"; return false; }
+    me = await r.json();
+  } catch { return true; }           // sem rede: deixa o painel abrir
+  const chip = $("#user-chip");
+  if (chip && me && me.nome) {
+    chip.style.display = "flex";
+    $("#user-avatar").textContent = me.nome.trim()[0].toUpperCase();
+    $("#user-name").textContent = me.nome.split(" ")[0];
+    $("#user-avatar").style.cursor = "pointer";
+    $("#user-name").style.cursor = "pointer";
+    $("#user-avatar").title = $("#user-name").title = "Ver perfil";
+    $("#user-avatar").onclick = $("#user-name").onclick = () => location.href = "/perfil";
+    const plan = $("#user-plan");
+    plan.textContent = me.plano === "pro" ? "PRO" : "FREE";
+    plan.classList.toggle("pro", me.plano === "pro");
+    $("#user-out").addEventListener("click", async () => {
+      await fetch("/api/logout", { method: "POST" });
+      location.href = "/login";
+    });
+  }
+  return true;
+}
+
+// ---------- Boot ----------
+(async function () {
+  if (!(await initUser())) return;   // não logado -> /login
+  renderBankBadge();
+  await initMeta();
+  await carregar();
+  setInterval(tickTimer, 1000);      // atualiza o mostrador do timer
+  setInterval(carregar, 30000);      // busca dados novos a cada 30s (pega novas raspagens)
+})();

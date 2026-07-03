@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Entrar — SureRadar</title>
+  <meta name="robots" content="noindex" />
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" media="print" onload="this.media='all'" />
+  <style>
+    :root{
+      --bg:#05070d; --card:#0e1421; --card2:#121a2b; --line:#1b2740; --line2:#27395c;
+      --text:#f2f6fc; --dim:#a3b1c9; --mute:#5e6b85;
+      --green:#2ee6a8; --cyan:#38d4f5; --gold:#ffc94d; --red:#ff6b6b;
+      --grad:linear-gradient(112deg,#2ee6a8 10%,#38d4f5 90%);
+      --font-d:"Sora","Inter",sans-serif; --font-b:"Inter",system-ui,sans-serif;
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:var(--font-b);background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;min-height:100vh}
+    a{color:inherit;text-decoration:none}
+    .grad{background:var(--grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+
+    .page{display:grid;grid-template-columns:1fr 1fr;min-height:100vh}
+
+    /* Painel esquerdo (marca) */
+    .side{position:relative;padding:56px 60px;display:flex;flex-direction:column;justify-content:space-between;background:
+      radial-gradient(60% 50% at 20% 20%,rgba(46,230,168,.12),transparent 70%),
+      radial-gradient(50% 40% at 80% 80%,rgba(56,212,245,.10),transparent 70%),#080c14;border-right:1px solid var(--line)}
+    .brand{display:flex;align-items:center;gap:11px;font-family:var(--font-d);font-weight:800;font-size:22px;letter-spacing:-.02em}
+    .brand svg{width:34px;height:34px}
+    .side h2{font-family:var(--font-d);font-size:clamp(26px,2.6vw,36px);font-weight:800;letter-spacing:-.03em;line-height:1.15;margin-bottom:18px}
+    .side ul{list-style:none;display:flex;flex-direction:column;gap:14px}
+    .side li{display:flex;gap:12px;align-items:flex-start;color:var(--dim);font-size:15px;line-height:1.5}
+    .side li b{color:var(--text)}
+    .side .ck{color:var(--green);font-weight:900;flex-shrink:0}
+    .mini-card{margin-top:34px;background:linear-gradient(168deg,var(--card2),var(--card));border:1px solid var(--line2);border-radius:16px;overflow:hidden;max-width:400px;box-shadow:0 24px 60px rgba(0,0,0,.45)}
+    .mc-h{display:flex;justify-content:space-between;padding:10px 15px;background:rgba(255,255,255,.03);border-bottom:1px solid var(--line);font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--dim)}
+    .mc-h .lv{color:var(--green)}
+    .mc-b{padding:14px 15px}
+    .mc-ev{font-family:var(--font-d);font-weight:700;font-size:14.5px}
+    .mc-mk{color:var(--cyan);font-size:11.5px;font-weight:700;margin:3px 0 10px}
+    .mc-l{display:flex;justify-content:space-between;background:rgba(5,7,13,.55);border:1px solid var(--line);border-radius:9px;padding:8px 11px;margin-bottom:7px;font-size:12px}
+    .mc-l b{font-family:var(--font-d);font-size:15px}
+    .mc-ret{background:linear-gradient(90deg,#0fbe83,var(--green));color:#052015;font-weight:800;font-style:italic;font-size:11.5px;padding:9px 13px;border-radius:8px;margin-top:9px}
+    .side .foot{font-size:12px;color:var(--mute)}
+
+    /* Painel direito (formulário) */
+    .form-side{display:flex;align-items:center;justify-content:center;padding:44px 24px}
+    .box{width:100%;max-width:440px}
+    .tabs{display:flex;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:5px;margin-bottom:28px}
+    .tab{flex:1;text-align:center;padding:11px;border-radius:10px;font-weight:700;font-size:14.5px;color:var(--dim);cursor:pointer;border:none;background:none;font-family:var(--font-b);transition:.15s}
+    .tab.active{background:var(--grad);color:#052015}
+    h1{font-family:var(--font-d);font-size:27px;font-weight:800;letter-spacing:-.02em}
+    .sub{color:var(--dim);font-size:14.5px;margin:8px 0 26px;line-height:1.55}
+    .sub b{color:var(--green)}
+    .field{margin-bottom:16px}
+    .field label{display:block;font-size:13px;font-weight:600;color:var(--dim);margin-bottom:8px}
+    .field input{width:100%;background:var(--card);border:1px solid var(--line2);border-radius:12px;padding:14px 16px;font-family:var(--font-b);font-size:15px;color:var(--text);outline:none;transition:.15s}
+    .field input:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(46,230,168,.14)}
+    .field input::placeholder{color:var(--mute)}
+    .erro{display:none;background:rgba(255,107,107,.1);border:1px solid rgba(255,107,107,.35);color:var(--red);font-size:13.5px;font-weight:600;border-radius:11px;padding:12px 15px;margin-bottom:16px}
+    .btn{width:100%;display:flex;align-items:center;justify-content:center;gap:9px;font-weight:800;font-size:15.5px;padding:16px;border-radius:13px;cursor:pointer;border:none;font-family:var(--font-b);background:var(--grad);color:#052015;box-shadow:0 12px 30px rgba(46,230,168,.28);transition:.16s;margin-top:6px}
+    .btn:hover{transform:translateY(-1px);filter:brightness(1.06)}
+    .btn:disabled{opacity:.6;cursor:wait;transform:none}
+    .swap{margin-top:20px;text-align:center;font-size:14px;color:var(--dim)}
+    .swap a{color:var(--green);font-weight:700;cursor:pointer}
+    .terms{margin-top:16px;text-align:center;font-size:11.5px;color:var(--mute);line-height:1.6}
+    .back{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:600;color:var(--mute);margin-bottom:26px}
+    .back:hover{color:var(--text)}
+
+    @media(max-width:900px){
+      .page{grid-template-columns:1fr}
+      .side{display:none}
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ESQUERDA: marca -->
+  <aside class="side">
+    <a class="brand" href="/">
+      <svg viewBox="0 0 32 32" fill="none"><defs><linearGradient id="g" x1="0" y1="0" x2="32" y2="32"><stop stop-color="#2EE6A8"/><stop offset="1" stop-color="#38D4F5"/></linearGradient></defs><circle cx="16" cy="16" r="13" stroke="url(#g)" stroke-width="2.4" opacity=".35"/><circle cx="16" cy="16" r="7.5" stroke="url(#g)" stroke-width="2.4" opacity=".7"/><circle cx="16" cy="16" r="2.5" fill="url(#g)"/><path d="M16 16 L27 8" stroke="url(#g)" stroke-width="2.4" stroke-linecap="round"/></svg>
+      Sure<span class="grad">Radar</span>
+    </a>
+
+    <div>
+      <h2>Do outro lado dessa tela tem <span class="grad">lucro travado</span> te esperando.</h2>
+      <ul>
+        <li><span class="ck">✓</span><span><b>Entradas prontas</b> nas casas do Brasil, com o lucro na cara</span></li>
+        <li><span class="ck">✓</span><span><b>Calculadora automática</b> — divide os valores e trava o ganho</span></li>
+        <li><span class="ck">✓</span><span><b>Novas entradas a cada 10 min</b>, direto das casas</span></li>
+      </ul>
+
+      <div class="mini-card">
+        <div class="mc-h"><span>🎾 WTA · Wimbledon</span><span class="lv">● ao vivo</span></div>
+        <div class="mc-b">
+          <div class="mc-ev">Kalinskaya × Bouzkova</div>
+          <div class="mc-mk">Tie-break na partida · Sim/Não</div>
+          <div class="mc-l"><span>Tie-break: Sim — <span style="color:var(--cyan)">SportsBet</span></span><b>3.35</b></div>
+          <div class="mc-l"><span>Tie-break: Não — <span style="color:var(--cyan)">SuperBet</span></span><b>1.60</b></div>
+          <div class="mc-ret">📈 8,28% RETORNO CERTO — R$ 1.000 → R$ 1.082,80</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="foot">🔒 Seus dados ficam seguros. Senha criptografada, sem spam.</div>
+  </aside>
+
+  <!-- DIREITA: formulário -->
+  <main class="form-side">
+    <div class="box">
+      <a href="/" class="back">← Voltar ao site</a>
+
+      <div class="tabs">
+        <button class="tab" id="tab-login" onclick="modo('login')">Entrar</button>
+        <button class="tab" id="tab-cad" onclick="modo('cadastro')">Criar conta grátis</button>
+      </div>
+
+      <div id="head-cad">
+        <h1>Crie sua conta <span class="grad">grátis</span></h1>
+        <p class="sub">Em <b>30 segundos</b> você vê as entradas de hoje. Sem cartão de crédito.</p>
+      </div>
+      <div id="head-login" style="display:none">
+        <h1>Bem-vindo de volta 👊</h1>
+        <p class="sub">As entradas de hoje já estão no painel te esperando.</p>
+      </div>
+
+      <div class="erro" id="erro"></div>
+
+      <form id="form" autocomplete="on">
+        <div class="field" id="f-nome">
+          <label for="nome">Seu nome</label>
+          <input type="text" id="nome" placeholder="Como podemos te chamar?" autocomplete="name" />
+        </div>
+        <div class="field">
+          <label for="email">E-mail</label>
+          <input type="email" id="email" placeholder="voce@email.com" autocomplete="email" required />
+        </div>
+        <div class="field">
+          <label for="senha">Senha</label>
+          <input type="password" id="senha" placeholder="Mínimo 6 caracteres" autocomplete="current-password" required minlength="6" />
+        </div>
+        <button class="btn" id="btn" type="submit">Criar conta e ver entradas →</button>
+      </form>
+
+      <div class="swap" id="swap-cad">Já tem conta? <a onclick="modo('login')">Entrar</a></div>
+      <div class="swap" id="swap-login" style="display:none">Ainda não tem conta? <a onclick="modo('cadastro')">Criar grátis</a></div>
+
+      <p class="terms">Ao continuar, você confirma ter 18+ anos e concorda com os termos de uso.<br>Jogue com responsabilidade.</p>
+    </div>
+  </main>
+</div>
+
+<script>
+let MODO = 'cadastro';
+const $ = s => document.querySelector(s);
+
+function modo(m){
+  MODO = m;
+  const cad = m === 'cadastro';
+  $('#tab-cad').classList.toggle('active', cad);
+  $('#tab-login').classList.toggle('active', !cad);
+  $('#f-nome').style.display = cad ? '' : 'none';
+  $('#head-cad').style.display = cad ? '' : 'none';
+  $('#head-login').style.display = cad ? 'none' : '';
+  $('#swap-cad').style.display = cad ? '' : 'none';
+  $('#swap-login').style.display = cad ? 'none' : '';
+  $('#btn').textContent = cad ? 'Criar conta e ver entradas →' : 'Entrar no painel →';
+  $('#erro').style.display = 'none';
+  history.replaceState(null, '', cad ? '/cadastro' : '/login');
+}
+
+// modo inicial: pela URL (/login ou /cadastro)
+modo(location.pathname.includes('login') ? 'login' : 'cadastro');
+
+// guarda o plano escolhido na landing (ex.: /cadastro?plano=anual) p/ checkout futuro
+const plano = new URLSearchParams(location.search).get('plano');
+if (plano) localStorage.setItem('sr_plano_escolhido', plano);
+
+$('#form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = $('#btn'), erro = $('#erro');
+  erro.style.display = 'none';
+  btn.disabled = true;
+  const body = { email: $('#email').value, senha: $('#senha').value };
+  if (MODO === 'cadastro') body.nome = $('#nome').value;
+  try {
+    const r = await fetch(MODO === 'cadastro' ? '/api/register' : '/api/login', {
+      method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body)
+    });
+    const j = await r.json();
+    if (!r.ok) { erro.textContent = j.erro || 'Algo deu errado. Tente de novo.'; erro.style.display = 'block'; btn.disabled = false; return; }
+    location.href = '/app';
+  } catch {
+    erro.textContent = 'Falha de conexão. Tente novamente.';
+    erro.style.display = 'block';
+    btn.disabled = false;
+  }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+# NUNCA versionar segredos nem dados
+.env
+*.db
+sureradar.db
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# temporários / raspagens
+*.crdownload

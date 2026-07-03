@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "surebet-preview",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["serve_preview.py"],
+      "port": 8000
+    }
+  ]
+}

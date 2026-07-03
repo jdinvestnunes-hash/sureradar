@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SureRadar — Apostas certas: lucre de 1% a 15% por entrada | Casas do Brasil</title>
+  <meta name="description" content="Encontre apostas certas (surebets) com lucro garantido: de 1% a 15% por entrada, nas casas do Brasil (Bet365, Betano, SuperBet...). Calculadora automática e conta grátis." />
+  <meta name="keywords" content="apostas certas, surebet, surebets, arbitragem esportiva, lucro garantido, apostas casas do brasil, bet365, betano, superbet, calculadora surebet, matched betting" />
+  <meta name="robots" content="index, follow, max-image-preview:large" />
+  <meta name="author" content="SureRadar" />
+  <meta name="theme-color" content="#05070d" />
+  <link rel="canonical" href="https://sureradar.com.br/" />
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg" />
+  <link rel="apple-touch-icon" href="/static/favicon.svg" />
+
+  <!-- Open Graph (Facebook, WhatsApp, LinkedIn) -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="SureRadar" />
+  <meta property="og:locale" content="pt_BR" />
+  <meta property="og:url" content="https://sureradar.com.br/" />
+  <meta property="og:title" content="SureRadar — Lucre de 1% a 15% por entrada. Não por mês." />
+  <meta property="og:description" content="Apostas certas com lucro garantido nas casas do Brasil. Comece grátis e veja as entradas de hoje." />
+  <meta property="og:image" content="https://sureradar.com.br/static/og.svg" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+
+  <!-- Twitter / X -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="SureRadar — Lucre de 1% a 15% por entrada" />
+  <meta name="twitter:description" content="Apostas certas com lucro garantido nas casas do Brasil. Conta grátis." />
+  <meta name="twitter:image" content="https://sureradar.com.br/static/og.svg" />
+
+  <!-- Dados estruturados (Google) -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "SureRadar",
+    "applicationCategory": "FinanceApplication",
+    "operatingSystem": "Web",
+    "description": "Plataforma de apostas certas (surebets) com lucro garantido de 1% a 15% por entrada, nas casas de aposta do Brasil.",
+    "offers": [
+      {"@type": "Offer", "name": "Grátis", "price": "0", "priceCurrency": "BRL"},
+      {"@type": "Offer", "name": "Pro Mensal", "price": "97", "priceCurrency": "BRL"},
+      {"@type": "Offer", "name": "Pro Anual", "price": "497", "priceCurrency": "BRL"}
+    ],
+    "aggregateRating": {"@type": "AggregateRating", "ratingValue": "4.8", "reviewCount": "312"}
+  }
+  </script>
+
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" media="print" onload="this.media='all'" />
+  <style>
+    :root{
+      --bg:#05070d; --bg2:#090d16; --card:#0e1421; --card2:#121a2b; --line:#1b2740; --line2:#27395c;
+      --text:#f2f6fc; --dim:#a3b1c9; --mute:#5e6b85;
+      --green:#2ee6a8; --green-dk:#0fbe83; --cyan:#38d4f5; --gold:#ffc94d;
+      --grad:linear-gradient(112deg,#2ee6a8 10%,#38d4f5 90%);
+      --font-d:"Sora","Inter",sans-serif; --font-b:"Inter",system-ui,sans-serif;
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html{scroll-behavior:smooth}
+    body{font-family:var(--font-b);background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;line-height:1.55;overflow-x:hidden}
+    a{color:inherit;text-decoration:none}
+    .wrap{max-width:1140px;margin:0 auto;padding:0 24px}
+    .grad{background:var(--grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+    .gold{color:var(--gold)}
+    h1,h2,h3,.price,.roi-num{font-family:var(--font-d)}
+
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;font-weight:800;font-size:15.5px;padding:16px 30px;border-radius:14px;cursor:pointer;border:none;font-family:var(--font-b);transition:.18s;letter-spacing:.01em}
+    .btn-primary{background:var(--grad);color:#031a10;box-shadow:0 12px 34px rgba(46,230,168,.32),inset 0 1px 0 rgba(255,255,255,.35)}
+    .btn-primary:hover{transform:translateY(-2px);box-shadow:0 16px 44px rgba(46,230,168,.42)}
+    .btn-ghost{background:rgba(255,255,255,.04);color:var(--text);border:1px solid var(--line2)}
+    .btn-ghost:hover{border-color:var(--cyan);background:rgba(56,212,245,.06)}
+
+    /* NAV */
+    nav{position:sticky;top:0;z-index:40;background:rgba(5,7,13,.78);backdrop-filter:blur(14px);border-bottom:1px solid rgba(27,39,64,.7)}
+    .navin{display:flex;align-items:center;justify-content:space-between;height:68px}
+    .brand{display:flex;align-items:center;gap:11px;font-family:var(--font-d);font-weight:800;font-size:21px;letter-spacing:-.02em}
+    .brand svg{width:33px;height:33px}
+    .navlinks{display:flex;align-items:center;gap:26px;font-size:14px;font-weight:600;color:var(--dim)}
+    .navlinks a:hover{color:var(--text)}
+
+    /* HERO */
+    .hero{position:relative;padding:74px 0 40px}
+    .hero::before{content:"";position:absolute;inset:-40% -10% auto;height:120%;background:
+      radial-gradient(56% 46% at 24% 30%,rgba(46,230,168,.13),transparent 70%),
+      radial-gradient(48% 42% at 78% 22%,rgba(56,212,245,.12),transparent 70%),
+      radial-gradient(30% 30% at 60% 70%,rgba(255,201,77,.05),transparent 70%);pointer-events:none}
+    .hero-grid{position:relative;display:grid;grid-template-columns:1.06fr .94fr;gap:56px;align-items:center}
+    .pill{display:inline-flex;align-items:center;gap:9px;font-size:12.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--green);background:rgba(46,230,168,.08);border:1px solid rgba(46,230,168,.3);padding:8px 16px;border-radius:999px;margin-bottom:24px}
+    .pill .dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 0 4px rgba(46,230,168,.16);animation:pl 2s infinite}
+    @keyframes pl{50%{opacity:.4}}
+    h1{font-size:clamp(36px,4.6vw,58px);font-weight:800;letter-spacing:-.035em;line-height:1.04}
+    .sub{font-size:17.5px;color:var(--dim);margin-top:22px;line-height:1.65;max-width:520px}
+    .sub b{color:var(--text)}
+    .cta-row{display:flex;gap:14px;flex-wrap:wrap;margin-top:32px}
+    .micro{display:flex;gap:22px;margin-top:20px;font-size:13px;color:var(--mute);flex-wrap:wrap}
+    .micro span{display:flex;align-items:center;gap:7px}
+    .micro b{color:var(--green)}
+
+    /* Hero card (entrada ao vivo) */
+    .hero-card{position:relative}
+    .hero-card::before{content:"";position:absolute;inset:-24px;background:radial-gradient(60% 60% at 50% 40%,rgba(46,230,168,.14),transparent 70%);filter:blur(8px);pointer-events:none}
+    .livecard{position:relative;background:linear-gradient(168deg,var(--card2),var(--card));border:1px solid var(--line2);border-radius:22px;overflow:hidden;box-shadow:0 40px 90px rgba(0,0,0,.55)}
+    .lc-head{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;background:rgba(255,255,255,.03);border-bottom:1px solid var(--line);font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--dim)}
+    .lc-live{display:flex;align-items:center;gap:7px;color:var(--green)}
+    .lc-live i{width:7px;height:7px;border-radius:50%;background:var(--green);animation:pl 1.6s infinite}
+    .lc-body{padding:20px}
+    .lc-ev{font-family:var(--font-d);font-weight:700;font-size:19px;letter-spacing:-.01em}
+    .lc-mk{color:var(--cyan);font-weight:700;font-size:13px;margin:5px 0 16px}
+    .lc-leg{display:flex;justify-content:space-between;align-items:center;background:rgba(5,7,13,.6);border:1px solid var(--line);border-radius:12px;padding:13px 15px;margin-bottom:10px}
+    .lc-leg .o{font-weight:700;font-size:14px}
+    .lc-leg .b{font-size:11.5px;color:var(--cyan);font-weight:700;margin-top:3px}
+    .lc-leg .v{font-family:var(--font-d);font-weight:800;font-size:22px}
+    .lc-bar{display:flex;align-items:stretch}
+    .lc-ret{flex:1;display:flex;align-items:center;gap:8px;background:linear-gradient(90deg,var(--green-dk),var(--green));color:#052015;font-weight:800;font-style:italic;font-size:14px;padding:13px 18px;clip-path:polygon(0 0,100% 0,calc(100% - 14px) 100%,0 100%)}
+    .lc-calc{background:#0a1120;color:#fff;font-weight:800;font-style:italic;font-size:12.5px;display:flex;align-items:center;padding:0 18px;letter-spacing:.04em}
+    .lc-profit-tag{position:absolute;top:-14px;right:22px;background:var(--gold);color:#3a2800;font-family:var(--font-d);font-weight:800;font-size:14px;padding:7px 16px;border-radius:999px;box-shadow:0 10px 26px rgba(255,201,77,.35)}
+
+    /* TICKER */
+    .ticker{border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--bg2);overflow:hidden;padding:13px 0;margin-top:56px}
+    .tk{display:flex;gap:48px;white-space:nowrap;animation:tk 36s linear infinite;width:max-content}
+    @keyframes tk{to{transform:translateX(-50%)}}
+    .tk span{font-size:13.5px;color:var(--dim);font-weight:600}
+    .tk b{color:var(--green);font-weight:800}
+
+    /* SECTIONS */
+    section{padding:84px 0;position:relative}
+    .eyebrow{font-size:12.5px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--cyan);text-align:center}
+    h2{font-size:clamp(28px,3.6vw,42px);font-weight:800;letter-spacing:-.03em;text-align:center;margin-top:14px;line-height:1.12}
+    .lead{color:var(--dim);text-align:center;max-width:640px;margin:18px auto 0;font-size:16.5px;line-height:1.65}
+    .lead b{color:var(--text)}
+
+    /* CASAS */
+    .casas{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:40px;max-width:900px;margin-left:auto;margin-right:auto}
+    .casa{font-size:13.5px;font-weight:700;color:var(--dim);background:var(--card);border:1px solid var(--line);border-radius:999px;padding:9px 18px;transition:.15s}
+    .casa:hover{color:var(--text);border-color:var(--green);transform:translateY(-1px)}
+
+    /* ROI */
+    .roi-box{display:grid;grid-template-columns:1fr 1fr;gap:0;margin-top:48px;background:var(--card);border:1px solid var(--line2);border-radius:24px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.4)}
+    .roi-l{padding:38px 36px;border-right:1px solid var(--line)}
+    .roi-l h3{font-size:21px;font-weight:700;letter-spacing:-.01em}
+    .roi-l p{font-size:14px;color:var(--dim);margin-top:8px}
+    .ctl{margin-top:26px}
+    .ctl label{display:flex;justify-content:space-between;font-size:13.5px;font-weight:600;color:var(--dim);margin-bottom:10px}
+    .ctl output{color:var(--text);font-weight:800;font-variant-numeric:tabular-nums}
+    input[type=range]{width:100%;-webkit-appearance:none;height:6px;border-radius:99px;background:var(--card2);outline:none}
+    input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:var(--grad);border:3px solid var(--card);cursor:pointer;box-shadow:0 3px 10px rgba(0,0,0,.45)}
+    .roi-r{padding:38px 36px;background:linear-gradient(160deg,rgba(46,230,168,.09),transparent 60%);display:flex;flex-direction:column;justify-content:center;gap:22px}
+    .roi-item .k{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--mute)}
+    .roi-num{font-size:clamp(30px,3vw,40px);font-weight:800;letter-spacing:-.02em;margin-top:4px}
+    .roi-sub{font-size:13px;color:var(--dim);margin-top:2px}
+    .roi-x{display:inline-flex;align-items:center;gap:8px;background:rgba(255,201,77,.1);border:1px solid rgba(255,201,77,.35);color:var(--gold);font-weight:800;font-size:14px;padding:9px 16px;border-radius:12px}
+    .roi-note{font-size:11.5px;color:var(--mute)}
+
+    /* PAGA-SE */
+    .payoff{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:46px}
+    .pay{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:28px 24px;text-align:center;position:relative;overflow:hidden}
+    .pay::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;background:var(--grad)}
+    .pay .t{font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mute)}
+    .pay .v{font-family:var(--font-d);font-size:34px;font-weight:800;margin:10px 0 6px}
+    .pay p{font-size:13.5px;color:var(--dim);line-height:1.6}
+
+    /* ENTRADAS REAIS */
+    .entries{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:48px}
+    .ecard{background:linear-gradient(170deg,var(--card2),var(--card));border:1px solid var(--line);border-radius:18px;overflow:hidden;position:relative;transition:.18s}
+    .ecard:hover{transform:translateY(-4px);border-color:var(--line2);box-shadow:0 24px 60px rgba(0,0,0,.45)}
+    .ecard .eh{display:flex;justify-content:space-between;padding:11px 16px;background:rgba(255,255,255,.025);border-bottom:1px solid var(--line);font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--dim)}
+    .ecard .eb{padding:16px}
+    .ecard .ev{font-family:var(--font-d);font-weight:700;font-size:15.5px;letter-spacing:-.01em}
+    .ecard .mk{color:var(--cyan);font-weight:700;font-size:12.5px;margin:4px 0 13px}
+    .ecard .lg{display:flex;justify-content:space-between;align-items:center;background:rgba(5,7,13,.55);border:1px solid var(--line);border-radius:10px;padding:10px 13px;margin-bottom:8px;font-size:12.5px}
+    .ecard .lg .o{font-weight:700}
+    .ecard .lg .b{color:var(--cyan);font-size:11px;font-weight:700;margin-top:2px}
+    .ecard .lg .v{font-family:var(--font-d);font-weight:800;font-size:18px}
+    .ecard .ret{display:flex;align-items:center;gap:8px;background:linear-gradient(90deg,var(--green-dk),var(--green));color:#052015;font-weight:800;font-style:italic;font-size:12.5px;padding:11px 16px;margin-top:12px;border-radius:10px}
+    .ecard .plantag{position:absolute;top:12px;right:12px;font-size:10px;font-weight:800;letter-spacing:.06em;padding:4px 10px;border-radius:99px}
+    .plantag.free{background:rgba(56,212,245,.14);color:var(--cyan);border:1px solid rgba(56,212,245,.3)}
+    .plantag.pro{background:rgba(255,201,77,.12);color:var(--gold);border:1px solid rgba(255,201,77,.34)}
+    .egain{margin-top:10px;text-align:center;font-size:12.5px;color:var(--dim)}
+    .egain b{color:var(--green)}
+
+    /* STEPS */
+    .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:48px;counter-reset:st}
+    .step{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:30px 26px;position:relative}
+    .step::before{counter-increment:st;content:"0" counter(st);font-family:var(--font-d);font-weight:800;font-size:44px;background:linear-gradient(180deg,rgba(46,230,168,.35),transparent);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;position:absolute;top:18px;right:22px}
+    .step h3{font-size:17.5px;font-weight:700;margin-bottom:9px;letter-spacing:-.01em}
+    .step p{font-size:14px;color:var(--dim);line-height:1.65}
+
+    /* FEATURES */
+    .feats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:48px}
+    .feat{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px;transition:.15s}
+    .feat:hover{border-color:var(--line2)}
+    .feat .ic{width:40px;height:40px;border-radius:11px;background:rgba(46,230,168,.09);border:1px solid rgba(46,230,168,.22);display:flex;align-items:center;justify-content:center;margin-bottom:14px;color:var(--green)}
+    .feat .ic svg{width:20px;height:20px}
+    .feat h3{font-size:14.5px;font-weight:700;margin-bottom:6px}
+    .feat p{font-size:12.5px;color:var(--dim);line-height:1.6}
+
+    /* PRICING */
+    .plans{display:grid;grid-template-columns:1fr 1.12fr 1fr;gap:18px;margin-top:52px;align-items:stretch}
+    .plan{position:relative;background:var(--card);border:1px solid var(--line);border-radius:22px;padding:32px 28px;display:flex;flex-direction:column}
+    .plan.pop{background:linear-gradient(168deg,rgba(46,230,168,.1),var(--card) 55%);border:1.5px solid rgba(46,230,168,.55);box-shadow:0 30px 80px rgba(46,230,168,.12)}
+    .plan .badge{position:absolute;top:-14px;left:50%;transform:translateX(-50%);background:var(--grad);color:#052015;font-size:11.5px;font-weight:800;letter-spacing:.06em;padding:6px 18px;border-radius:999px;white-space:nowrap}
+    .plan .pname{font-size:14px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--dim)}
+    .price{font-size:46px;font-weight:800;letter-spacing:-.03em;margin:14px 0 2px}
+    .price small{font-size:16px;font-weight:700;color:var(--dim);font-family:var(--font-b)}
+    .pnote{font-size:13px;color:var(--mute);min-height:20px}
+    .pnote .save{color:var(--gold);font-weight:800}
+    .plan ul{list-style:none;margin:24px 0;display:flex;flex-direction:column;gap:12px;flex:1}
+    .plan li{font-size:14px;color:var(--dim);display:flex;gap:10px;align-items:flex-start;line-height:1.45}
+    .plan li b{color:var(--text)}
+    .plan li .ck{color:var(--green);font-weight:900;flex-shrink:0}
+    .plan li.off{opacity:.4}
+    .plan .btn{width:100%}
+    .payback{margin-top:14px;font-size:12px;text-align:center;color:var(--gold);font-weight:700}
+    .guarantee{display:flex;align-items:center;gap:16px;max-width:640px;margin:40px auto 0;background:var(--card);border:1px solid rgba(255,201,77,.3);border-radius:18px;padding:20px 24px}
+    .guarantee .sh{width:46px;height:46px;flex-shrink:0;border-radius:50%;background:rgba(255,201,77,.1);display:flex;align-items:center;justify-content:center;color:var(--gold)}
+    .guarantee b{color:var(--text)}
+    .guarantee p{font-size:13.5px;color:var(--dim);line-height:1.6}
+
+    /* FAQ */
+    .faq{max-width:780px;margin:48px auto 0;display:flex;flex-direction:column;gap:12px}
+    details{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+    summary{list-style:none;cursor:pointer;padding:19px 22px;font-weight:700;font-size:15px;display:flex;justify-content:space-between;align-items:center;gap:14px}
+    summary::after{content:"+";font-family:var(--font-d);font-size:20px;color:var(--green);transition:.2s}
+    details[open] summary::after{transform:rotate(45deg)}
+    details p{padding:0 22px 20px;font-size:14px;color:var(--dim);line-height:1.7}
+    details p b{color:var(--text)}
+
+    /* FINAL */
+    .final{text-align:center;position:relative;overflow:hidden}
+    .final::before{content:"";position:absolute;inset:0;background:radial-gradient(50% 70% at 50% 100%,rgba(46,230,168,.13),transparent)}
+    footer{padding:40px 0 46px;text-align:center;color:var(--mute);font-size:12.5px;line-height:1.75;border-top:1px solid var(--line)}
+    footer .disc{max-width:760px;margin:0 auto 16px}
+
+    @media(max-width:960px){
+      .hero-grid{grid-template-columns:1fr;gap:44px}
+      .roi-box{grid-template-columns:1fr}
+      .roi-l{border-right:none;border-bottom:1px solid var(--line)}
+      .feats{grid-template-columns:repeat(2,1fr)}
+      .payoff,.entries,.steps,.plans{grid-template-columns:1fr}
+      .navlinks a:not(.btn){display:none}
+    }
+  </style>
+</head>
+<body>
+
+<nav><div class="wrap navin">
+  <div class="brand">
+    <svg viewBox="0 0 32 32" fill="none"><defs><linearGradient id="g" x1="0" y1="0" x2="32" y2="32"><stop stop-color="#2EE6A8"/><stop offset="1" stop-color="#38D4F5"/></linearGradient></defs><circle cx="16" cy="16" r="13" stroke="url(#g)" stroke-width="2.4" opacity=".35"/><circle cx="16" cy="16" r="7.5" stroke="url(#g)" stroke-width="2.4" opacity=".7"/><circle cx="16" cy="16" r="2.5" fill="url(#g)"/><path d="M16 16 L27 8" stroke="url(#g)" stroke-width="2.4" stroke-linecap="round"/></svg>
+    Sure<span class="grad">Radar</span>
+  </div>
+  <div class="navlinks">
+    <a href="#roi">Quanto rende</a>
+    <a href="#entradas">Entradas reais</a>
+    <a href="#planos">Planos</a>
+    <a href="/login" class="btn btn-ghost" style="padding:11px 20px;font-size:14px">Entrar</a>
+  </div>
+</div></nav>
+
+<!-- HERO -->
+<header class="hero"><div class="wrap">
+  <div class="hero-grid">
+    <div>
+      <div class="pill"><span class="dot"></span> Lucro travado nos dois lados do jogo</div>
+      <h1>A renda fixa te dá 1% <u style="text-decoration-color:#2ee6a8">ao mês</u>.<br>Aqui você faz <span class="grad">até 15%</span> em uma entrada.</h1>
+      <p class="sub">O SureRadar encontra jogos em que as <b>casas do Brasil</b> discordam nas odds. Você aposta nos dois lados, e o lucro fica <b>matematicamente travado</b> — dê no que der. Sem palpite, sem torcida, sem depender de sorte.</p>
+      <div class="cta-row">
+        <a href="/cadastro" class="btn btn-primary">Criar conta grátis →</a>
+        <a href="#roi" class="btn btn-ghost">Quanto posso ganhar?</a>
+      </div>
+      <div class="micro">
+        <span>✓ <b>Grátis</b> pra começar</span>
+        <span>✓ Sem cartão de crédito</span>
+        <span>✓ Entradas novas a cada <b>10 min</b></span>
+      </div>
+    </div>
+
+    <!-- Card de entrada ao vivo -->
+    <div class="hero-card">
+      <div class="lc-profit-tag">+8,63% de lucro</div>
+      <div class="livecard">
+        <div class="lc-head"><span>⚽ Brasileirão · Série A</span><span class="lc-live"><i></i> Entrada ao vivo</span></div>
+        <div class="lc-body">
+          <div class="lc-ev">Fortaleza × Ponte Preta</div>
+          <div class="lc-mk">Total de chutes ao gol · Acima/Abaixo 9.5</div>
+          <div class="lc-leg"><div><div class="o">Acima 9.5 chutes ao gol</div><div class="b">SuperBet</div></div><div class="v">2.10</div></div>
+          <div class="lc-leg"><div><div class="o">Abaixo 9.5 chutes ao gol</div><div class="b">PixBet</div></div><div class="v">2.25</div></div>
+          <div class="lc-bar"><div class="lc-ret">📈 R$ 1.000 viram R$ 1.086 — dê no que der</div><div class="lc-calc">CALCULAR</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Ticker -->
+<div class="ticker"><div class="tk" id="tk">
+  <span><b>+4,76%</b> Chicago Fire × Philadelphia · faltas — KTO vs SuperBet</span>
+  <span><b>+8,28%</b> Kalinskaya × Bouzkova · tie-break — SportsBet vs SuperBet</span>
+  <span><b>+7,70%</b> Monagas × Dynamo · gols 1º tempo — GGBet vs NetBet</span>
+  <span><b>+11,06%</b> Portugal × França · faltas — 1Win vs KTO</span>
+  <span><b>+5,23%</b> Chrudim × Dukla Praga · gols — Betano vs NetBet</span>
+  <span><b>+8,60%</b> Costa Rica × Paraguai · chutes — Betano vs GGBet</span>
+  <span><b>+9,64%</b> Kotov × Wawrinka · duplas faltas — Betano vs Marathon</span>
+  <span><b>+17,60%</b> FCSB × Hunedoara · escanteios — EstrelaBet vs Marathon</span>
+</div></div>
+</header>
+
+<!-- CASAS -->
+<section style="padding:64px 0"><div class="wrap">
+  <div class="eyebrow">Funciona nas casas que você já usa</div>
+  <h2>Só casas do <span class="grad">Brasil</span></h2>
+  <p class="lead">Você marca as casas onde tem conta e o painel só mostra entradas que <b>dá pra executar de verdade</b>.</p>
+  <div class="casas">
+    <span class="casa">Bet365</span><span class="casa">Betano</span><span class="casa">SuperBet</span><span class="casa">Novibet</span><span class="casa">PixBet</span><span class="casa">Betnacional</span><span class="casa">KTO</span><span class="casa">EstrelaBet</span><span class="casa">Esportes da Sorte</span><span class="casa">Betsul</span><span class="casa">Stake</span><span class="casa">VBet</span><span class="casa">BetBoom</span><span class="casa">BetWarrior</span><span class="casa">Aposta Ganha</span><span class="casa">Aposta1</span><span class="casa">BolsaDeAposta</span><span class="casa">Betsson</span><span class="casa">+ novas casas todo mês</span>
+  </div>
+</div></section>
+
+<!-- ROI -->
+<section id="roi" style="background:var(--bg2);border-top:1px solid var(--line);border-bottom:1px solid var(--line)"><div class="wrap">
+  <div class="eyebrow">Faça a conta você mesmo</div>
+  <h2>Quanto a sua banca rende aqui?</h2>
+  <p class="lead">Arrasta os controles e vê o que acontece quando o seu dinheiro para de render <b>1% ao mês</b> e começa a render <b>por entrada</b>.</p>
+
+  <div class="roi-box">
+    <div class="roi-l">
+      <h3>Simule seu cenário</h3>
+      <p>Valores conservadores — muita gente opera bem mais que isso.</p>
+      <div class="ctl">
+        <label>Sua banca <output id="o-banca">R$ 1.000</output></label>
+        <input type="range" id="r-banca" min="500" max="10000" step="250" value="1000">
+      </div>
+      <div class="ctl">
+        <label>Entradas por semana <output id="o-ent">5</output></label>
+        <input type="range" id="r-ent" min="1" max="20" step="1" value="5">
+      </div>
+      <div class="ctl">
+        <label>Lucro médio por entrada <output id="o-tx">3%</output></label>
+        <input type="range" id="r-tx" min="1" max="10" step="0.5" value="3">
+      </div>
+    </div>
+    <div class="roi-r">
+      <div class="roi-item">
+        <div class="k">Lucro estimado por mês</div>
+        <div class="roi-num grad" id="o-mes">R$ 650</div>
+        <div class="roi-sub">vs ~<span id="o-rf">R$ 10</span> na renda fixa com a mesma banca 💀</div>
+      </div>
+      <div class="roi-item">
+        <div class="k">Em 12 meses</div>
+        <div class="roi-num" id="o-ano">R$ 7.800</div>
+      </div>
+      <div><span class="roi-x">⚡ <span id="o-x">6,7×</span>&nbsp;o valor da assinatura — todo mês</span></div>
+      <div class="roi-note">Simulação ilustrativa baseada nos parâmetros acima. Resultado depende da execução das entradas.</div>
+    </div>
+  </div>
+
+  <div class="payoff">
+    <div class="pay"><div class="t">Com 1 entrada de 8%</div><div class="v grad">R$ 80</div><p>de lucro com banca de R$ 1.000. <b>Uma entrada já quase paga o mês inteiro</b> da plataforma.</p></div>
+    <div class="pay"><div class="t">Com 2 entradas de 5%</div><div class="v grad">R$ 100</div><p>você <b>recuperou a assinatura mensal</b> — e o resto do mês é 100% seu.</p></div>
+    <div class="pay"><div class="t">No plano anual</div><div class="v grad">10–30×</div><p>é o retorno comum sobre os R$ 497/ano para quem opera com constância.</p></div>
+  </div>
+</div></section>
+
+<!-- ENTRADAS REAIS -->
+<section id="entradas"><div class="wrap">
+  <div class="eyebrow">É isso que você vai ver lá dentro</div>
+  <h2>Entradas de verdade, prontas pra executar</h2>
+  <p class="lead">Cada card mostra o jogo, o mercado, as duas casas e o lucro travado. <b>Clicou, apostou nos dois lados, lucrou.</b></p>
+  <div class="entries">
+    <div class="ecard"><span class="plantag free">PLANO GRÁTIS</span>
+      <div class="eh"><span>⚽ Argentina · Primera B</span><span>04/07 15:30</span></div>
+      <div class="eb">
+        <div class="ev">Almagro × Atlético Rafaela</div>
+        <div class="mk">Handicap H1 (+0.5)</div>
+        <div class="lg"><div><div class="o">H1 (+0.5)</div><div class="b">Stake</div></div><div class="v">1.34</div></div>
+        <div class="lg"><div><div class="o">Vitória visitante</div><div class="b">Bet365</div></div><div class="v">4.10</div></div>
+        <div class="ret">📈 0,99% RETORNO CERTO</div>
+        <div class="egain">R$ 1.000 → lucro de <b>R$ 9,90</b> garantido</div>
+      </div>
+    </div>
+    <div class="ecard"><span class="plantag pro">PLANO PRO</span>
+      <div class="eh"><span>⚽ MLS · EUA</span><span>03/07 16:30</span></div>
+      <div class="eb">
+        <div class="ev">Chicago Fire × Philadelphia</div>
+        <div class="mk">Faltas sem cartão · Acima/Abaixo 11.5</div>
+        <div class="lg"><div><div class="o">Acima 11.5 faltas</div><div class="b">KTO</div></div><div class="v">2.00</div></div>
+        <div class="lg"><div><div class="o">Abaixo 11.5 faltas</div><div class="b">SuperBet</div></div><div class="v">2.20</div></div>
+        <div class="ret">📈 4,76% RETORNO CERTO</div>
+        <div class="egain">R$ 1.000 → lucro de <b>R$ 47,60</b> garantido</div>
+      </div>
+    </div>
+    <div class="ecard"><span class="plantag pro">PLANO PRO</span>
+      <div class="eh"><span>🎾 WTA · Wimbledon</span><span>02/07 15:18</span></div>
+      <div class="eb">
+        <div class="ev">Kalinskaya × Bouzkova</div>
+        <div class="mk">Tie-break na partida · Sim/Não</div>
+        <div class="lg"><div><div class="o">Tie-break: Sim</div><div class="b">SportsBet</div></div><div class="v">3.35</div></div>
+        <div class="lg"><div><div class="o">Tie-break: Não</div><div class="b">SuperBet</div></div><div class="v">1.60</div></div>
+        <div class="ret">📈 8,28% RETORNO CERTO</div>
+        <div class="egain">R$ 1.000 → lucro de <b>R$ 82,80</b> garantido</div>
+      </div>
+    </div>
+  </div>
+</div></section>
+
+<!-- COMO FUNCIONA -->
+<section style="background:var(--bg2);border-top:1px solid var(--line);border-bottom:1px solid var(--line)"><div class="wrap">
+  <div class="eyebrow">Sem enrolação</div>
+  <h2>Do zero ao lucro em 3 passos</h2>
+  <div class="steps">
+    <div class="step"><h3>Abra o painel</h3><p>As entradas do momento aparecem com o lucro na cara. Filtre pelas casas onde você já tem conta e pelo esporte que preferir.</p></div>
+    <div class="step"><h3>Use a calculadora</h3><p>Diga quanto quer investir (ex.: R$ 1.000) e o sistema divide sozinho o valor exato para cada casa — o lucro fica travado.</p></div>
+    <div class="step"><h3>Aposte nos 2 lados</h3><p>Um clique abre o jogo direto em cada casa. Faz as duas apostas e pronto: ganhe quem ganhar, o lucro é seu.</p></div>
+  </div>
+</div></section>
+
+<!-- FEATURES -->
+<section><div class="wrap">
+  <div class="eyebrow">Tudo incluso</div>
+  <h2>Ferramenta completa de quem vive disso</h2>
+  <div class="feats">
+    <div class="feat"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a13.5 13.5 0 0 1 0 18 13.5 13.5 0 0 1 0-18z"/></svg></div><h3>Casas do Brasil</h3><p>Bet365, Betano, SuperBet, Novibet, PixBet e todas as outras que você já usa.</p></div>
+    <div class="feat"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16M7 12h10M10 18h4"/></svg></div><h3>Filtro por casa</h3><p>Só vê entrada que você consegue fazer — nas casas onde tem conta.</p></div>
+    <div class="feat"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 6h8M8 11h2M14 11h2M8 15h2M14 15v4M8 19h2"/></svg></div><h3>Calculadora automática</h3><p>Divide os valores na proporção certa e trava o lucro pra você.</p></div>
+    <div class="feat"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v18M5 8l7-5 7 5M4 21h16M6 21v-8M18 21v-8"/></svg></div><h3>Gestão de banca</h3><p>Lança as entradas e acompanha o lucro acumulado do mês.</p></div>
+    <div class="feat"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></div><h3>Atualiza a cada 10 min</h3><p>Entradas novas caem no painel o tempo todo, direto das casas.</p></div>
+    <div class="feat"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M13 3l-9 11h6l-1 7 9-11h-6l1-7z"/></svg></div><h3>Link direto do jogo</h3><p>Clicou na entrada, caiu na página exata da aposta na casa.</p></div>
+    <div class="feat"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19V5M4 19h16M8 15l3.5-4 2.5 2 4.5-5.5"/></svg></div><h3>Todos os mercados</h3><p>Escanteios, cartões, faltas, chutes, gols, tie-break, games e mais.</p></div>
+    <div class="feat"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 8l-9 6-9-6M3 8l9-5 9 5v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8z"/></svg></div><h3>Alertas no Telegram</h3><p>As melhores entradas chegam no seu celular na hora (Pro).</p></div>
+  </div>
+</div></section>
+
+<!-- PLANOS -->
+<section id="planos" style="background:var(--bg2);border-top:1px solid var(--line)"><div class="wrap">
+  <div class="eyebrow">Escolha como começar</div>
+  <h2>Planos que se pagam com <span class="grad">1 ou 2 entradas</span></h2>
+  <p class="lead">Entre grátis hoje e veja funcionando. Quando quiser as entradas grandes — de 8%, 10%, 15% — o Pro destrava tudo.</p>
+
+  <div class="plans">
+    <div class="plan">
+      <div class="pname">Grátis</div>
+      <div class="price">R$ 0</div>
+      <div class="pnote">pra sempre · sem cartão</div>
+      <ul>
+        <li><span class="ck">✓</span> Entradas de <b>até 1% de lucro</b></li>
+        <li><span class="ck">✓</span> Todas as casas do Brasil</li>
+        <li><span class="ck">✓</span> Filtro por casa e esporte</li>
+        <li><span class="ck">✓</span> Calculadora + gestão de banca</li>
+        <li class="off"><span class="ck">✗</span> Entradas de 1% a 15%+</li>
+        <li class="off"><span class="ck">✗</span> Alertas no Telegram</li>
+      </ul>
+      <a href="/cadastro" class="btn btn-ghost">Começar grátis</a>
+      <div class="payback">&nbsp;</div>
+    </div>
+
+    <div class="plan pop">
+      <div class="badge">⭐ MAIS ESCOLHIDO · 57% OFF</div>
+      <div class="pname">Pro Anual</div>
+      <div class="price">R$ 497<small>/ano</small></div>
+      <div class="pnote">sai por <b>R$ 41/mês</b> · <span class="save">economize R$ 667</span></div>
+      <ul>
+        <li><span class="ck">✓</span> <b>TODAS as entradas — de 1% a 15%+</b></li>
+        <li><span class="ck">✓</span> Sem limite de entradas por dia</li>
+        <li><span class="ck">✓</span> Alertas prioritários no Telegram</li>
+        <li><span class="ck">✓</span> Todas as casas e todos os mercados</li>
+        <li><span class="ck">✓</span> Calculadora + gestão de banca</li>
+        <li><span class="ck">✓</span> Suporte direto no WhatsApp</li>
+      </ul>
+      <a href="/cadastro?plano=anual" class="btn btn-primary">Quero o anual →</a>
+      <div class="payback">💰 Uma entrada de 5% com banca de R$ 10 mil paga o ano inteiro</div>
+    </div>
+
+    <div class="plan">
+      <div class="pname">Pro Mensal</div>
+      <div class="price">R$ 97<small>/mês</small></div>
+      <div class="pnote">cancele quando quiser</div>
+      <ul>
+        <li><span class="ck">✓</span> <b>TODAS as entradas — de 1% a 15%+</b></li>
+        <li><span class="ck">✓</span> Sem limite de entradas por dia</li>
+        <li><span class="ck">✓</span> Alertas prioritários no Telegram</li>
+        <li><span class="ck">✓</span> Todas as casas e todos os mercados</li>
+        <li><span class="ck">✓</span> Calculadora + gestão de banca</li>
+        <li><span class="ck">✓</span> Suporte direto no WhatsApp</li>
+      </ul>
+      <a href="/cadastro?plano=mensal" class="btn btn-ghost">Assinar mensal</a>
+      <div class="payback">💰 2 entradas de 5% já pagam o mês</div>
+    </div>
+  </div>
+
+  <div class="guarantee">
+    <div class="sh"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l8 3v6c0 4.5-3.2 8-8 9-4.8-1-8-4.5-8-9V6l8-3z"/><path d="M9 12l2 2 4-4"/></svg></div>
+    <p><b>Garantia incondicional de 7 dias.</b> Entra, usa, pega entradas. Se não fizer sentido pra você, devolvemos 100% do valor — sem perguntas.</p>
+  </div>
+</div></section>
+
+<!-- FAQ -->
+<section><div class="wrap">
+  <div class="eyebrow">Sem letra miúda</div>
+  <h2>As dúvidas que todo mundo tem</h2>
+  <div class="faq">
+    <details open><summary>Como o lucro pode ser "garantido"?</summary><p>É matemática, não sorte. Quando duas casas discordam nas odds do mesmo jogo, dá pra apostar <b>nos dois resultados</b> de forma que a soma dos retornos seja maior que o total apostado. Ganhe quem ganhar, você recebe mais do que colocou. Isso se chama <b>arbitragem esportiva</b> — os bancos fazem o mesmo no mercado financeiro há décadas.</p></details>
+    <details><summary>Preciso de muito dinheiro pra começar?</summary><p>Não. Dá pra começar com <b>R$ 200–500</b> de banca. Como o lucro é percentual e a banca volta a cada entrada, você reutiliza o mesmo dinheiro várias vezes por semana e vai crescendo.</p></details>
+    <details><summary>Em quanto tempo recupero a assinatura?</summary><p>Com banca de R$ 1.000: <b>uma entrada de 8% = R$ 80</b>, e <b>duas de 5% = R$ 100</b> — ou seja, 1 ou 2 entradas pagam o mês. No anual (R$ 497), quem opera com constância costuma tirar <b>10 a 30× o valor</b> ao longo do ano.</p></details>
+    <details><summary>Preciso entender de apostas?</summary><p>Não. O painel te entrega a entrada pronta: o jogo, o mercado, as duas casas e as odds. A calculadora divide os valores e o link abre direto na página da aposta. Se você sabe fazer uma aposta simples, sabe usar o SureRadar.</p></details>
+    <details><summary>As casas podem limitar minha conta?</summary><p>Casas de aposta não gostam de quem ganha sempre — isso vale pra qualquer método. Por isso ensinamos boas práticas: variar casas e valores, arredondar stakes e não sacar de forma agressiva. Trabalhar com <b>várias casas do Brasil</b> (e o filtro por casa) existe exatamente pra diluir esse risco.</p></details>
+    <details><summary>E se a odd mudar antes de eu apostar?</summary><p>Acontece — odds se movem. Por isso o painel atualiza a cada 10 minutos e mostra o horário de cada entrada. Se a odd mudou e a entrada deixou de valer, é só pegar a próxima: <b>aparecem dezenas por dia</b>.</p></details>
+    <details><summary>Funciona no celular?</summary><p>Sim. O painel roda no navegador do celular e do computador, e os alertas do plano Pro chegam direto no seu <b>Telegram</b>.</p></details>
+    <details><summary>Isso é legal?</summary><p>Sim. Apostas esportivas são regulamentadas no Brasil (Lei 14.790/2023) e apostar nos dois lados de um jogo em casas diferentes não infringe nenhuma lei. Você só está aproveitando diferenças de preço entre casas.</p></details>
+  </div>
+</div></section>
+
+<!-- TELEGRAM -->
+<section style="border-top:1px solid var(--line)"><div class="wrap">
+  <div style="background:linear-gradient(135deg,rgba(34,158,217,.12),rgba(46,230,168,.05));border:1px solid var(--line2);border-radius:22px;padding:38px 40px;display:flex;align-items:center;justify-content:space-between;gap:26px;flex-wrap:wrap">
+    <div style="min-width:280px;flex:1">
+      <div style="display:inline-flex;align-items:center;gap:8px;font-size:12.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#38d4f5">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M21.9 4.3l-3.3 15.6c-.24 1.1-.9 1.36-1.83.85l-5.05-3.72-2.44 2.35c-.27.27-.5.5-1 .5l.36-5.16 9.4-8.49c.4-.36-.09-.56-.63-.2L4.2 13.1l-5-1.56c-1.08-.34-1.1-1.08.23-1.6L20.5 2.7c.9-.34 1.7.2 1.4 1.6z"/></svg>
+        Comunidade
+      </div>
+      <h3 style="font-family:var(--font-d);font-size:27px;font-weight:800;margin-top:12px;letter-spacing:-.02em">Entre no nosso grupo do Telegram</h3>
+      <p style="color:var(--dim);font-size:15px;margin-top:8px;max-width:520px;line-height:1.6">Entradas selecionadas todos os dias, direto no seu celular. Comunidade ativa e suporte perto de você.</p>
+    </div>
+    <a href="https://t.me/sureradar" target="_blank" rel="noopener" class="btn" style="background:#229ED9;color:#fff;box-shadow:0 12px 30px rgba(34,158,217,.32);white-space:nowrap">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M21.9 4.3l-3.3 15.6c-.24 1.1-.9 1.36-1.83.85l-5.05-3.72-2.44 2.35c-.27.27-.5.5-1 .5l.36-5.16 9.4-8.49c.4-.36-.09-.56-.63-.2L4.2 13.1l-5-1.56c-1.08-.34-1.1-1.08.23-1.6L20.5 2.7c.9-.34 1.7.2 1.4 1.6z"/></svg>
+      Entrar no grupo grátis
+    </a>
+  </div>
+</div></section>
+
+<!-- FINAL -->
+<section class="final"><div class="wrap" style="position:relative">
+  <div class="eyebrow">O próximo jogo já vai começar</div>
+  <h2>Cada dia fora é entrada que você<br>deixou na mesa</h2>
+  <p class="lead">Crie sua conta grátis agora e veja as entradas de hoje. Se gostar do que ver, o Pro destrava as grandes.</p>
+  <div class="cta-row" style="justify-content:center;margin-top:34px">
+    <a href="/cadastro" class="btn btn-primary" style="font-size:17px;padding:18px 38px">Criar minha conta grátis →</a>
+  </div>
+  <div class="micro" style="justify-content:center;margin-top:18px"><span>✓ Sem cartão</span><span>✓ Acesso na hora</span><span>✓ Garantia de 7 dias no Pro</span></div>
+</div></section>
+
+<footer><div class="wrap">
+  <p class="disc">⚠️ Conteúdo para maiores de 18 anos. Apostas envolvem risco: odds mudam, casas podem limitar contas e a execução das entradas depende do usuário. Percentuais e simulações ilustram o potencial da arbitragem esportiva executada corretamente e não constituem promessa de ganho. Jogue com responsabilidade.</p>
+  <p>© 2026 SureRadar · Apostas certas, casas do Brasil.</p>
+</div></footer>
+
+<script>
+// duplica o ticker para o loop ficar contínuo
+const tk = document.getElementById('tk');
+tk.innerHTML += tk.innerHTML;
+
+// calculadora de ROI
+const fmt = v => "R$ " + Math.round(v).toLocaleString("pt-BR");
+function calc(){
+  const banca = +document.getElementById('r-banca').value;
+  const ent = +document.getElementById('r-ent').value;
+  const tx = +document.getElementById('r-tx').value;
+  document.getElementById('o-banca').textContent = fmt(banca);
+  document.getElementById('o-ent').textContent = ent;
+  document.getElementById('o-tx').textContent = String(tx).replace('.',',') + '%';
+  const mes = banca * (tx/100) * ent * 4.33;
+  document.getElementById('o-mes').textContent = fmt(mes);
+  document.getElementById('o-ano').textContent = fmt(mes*12);
+  document.getElementById('o-rf').textContent = fmt(banca*0.01);
+  const x = mes/97;
+  document.getElementById('o-x').textContent = (x>=10 ? Math.round(x) : x.toFixed(1).replace('.',',')) + '×';
+}
+['r-banca','r-ent','r-tx'].forEach(id=>document.getElementById(id).addEventListener('input',calc));
+calc();
+</script>
+</body>
+</html>

@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "SureRadar Bridge",
+  "version": "1.0",
+  "description": "Lê as surebets da sua conta surebet.com e alimenta o painel SureRadar local, a cada 10 minutos.",
+  "permissions": ["storage", "alarms"],
+  "host_permissions": [
+    "http://localhost:8000/*",
+    "http://127.0.0.1:8000/*",
+    "https://pt.surebet.com/*",
+    "https://en.surebet.com/*",
+    "https://*.apostasseguras.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://pt.surebet.com/*",
+        "https://en.surebet.com/*",
+        "https://*.apostasseguras.com/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "background": { "service_worker": "background.js" }
+}

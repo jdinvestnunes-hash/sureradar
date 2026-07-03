@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Meu perfil — SureRadar</title>
+  <meta name="robots" content="noindex" />
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" media="print" onload="this.media='all'" />
+  <style>
+    :root{
+      --bg:#05070d; --card:#0e1421; --card2:#121a2b; --line:#1b2740; --line2:#27395c;
+      --text:#f2f6fc; --dim:#a3b1c9; --mute:#5e6b85;
+      --green:#2ee6a8; --cyan:#38d4f5; --gold:#ffc94d;
+      --grad:linear-gradient(112deg,#2ee6a8 10%,#38d4f5 90%);
+      --font-d:"Sora","Inter",sans-serif; --font-b:"Inter",system-ui,sans-serif;
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:var(--font-b);background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;min-height:100vh}
+    a{color:inherit;text-decoration:none}
+    .grad{background:var(--grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+    .wrap{max-width:920px;margin:0 auto;padding:0 24px}
+
+    nav{border-bottom:1px solid var(--line);background:rgba(5,7,13,.8);backdrop-filter:blur(12px);position:sticky;top:0;z-index:10}
+    .navin{display:flex;align-items:center;justify-content:space-between;height:64px}
+    .brand{display:flex;align-items:center;gap:11px;font-family:var(--font-d);font-weight:800;font-size:20px}
+    .brand svg{width:31px;height:31px}
+    .navlinks{display:flex;gap:10px}
+    .nlk{font-size:14px;font-weight:600;color:var(--dim);padding:9px 15px;border-radius:10px}
+    .nlk:hover{color:var(--text);background:var(--card)}
+    .nlk.out{color:var(--mute)} .nlk.out:hover{color:#ff6b6b}
+
+    h1{font-family:var(--font-d);font-size:30px;font-weight:800;letter-spacing:-.02em;margin:38px 0 6px}
+    .h-sub{color:var(--dim);font-size:15px;margin-bottom:32px}
+
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:26px}
+    .card.full{grid-column:1/-1}
+    .ct{font-size:12px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--mute);margin-bottom:18px}
+
+    .who{display:flex;align-items:center;gap:16px}
+    .av{width:58px;height:58px;border-radius:50%;background:var(--grad);color:#052015;font-family:var(--font-d);font-weight:800;font-size:24px;display:flex;align-items:center;justify-content:center}
+    .who .nm{font-family:var(--font-d);font-size:20px;font-weight:700}
+    .who .em{color:var(--dim);font-size:14px;margin-top:2px}
+
+    .plan-row{display:flex;align-items:center;justify-content:space-between}
+    .plan-badge{font-family:var(--font-d);font-size:22px;font-weight:800}
+    .plan-badge.free{color:var(--cyan)} .plan-badge.pro{color:var(--gold)}
+    .chip{font-size:11px;font-weight:800;letter-spacing:.05em;padding:4px 11px;border-radius:99px}
+    .chip.free{background:rgba(56,212,245,.14);color:var(--cyan)}
+    .chip.pro{background:rgba(255,201,77,.14);color:var(--gold)}
+    .days{margin-top:20px}
+    .days .big{font-family:var(--font-d);font-size:38px;font-weight:800;letter-spacing:-.02em}
+    .days .lb{font-size:13px;color:var(--dim);margin-top:2px}
+    .bar{height:8px;border-radius:99px;background:var(--card2);margin-top:14px;overflow:hidden}
+    .bar i{display:block;height:100%;background:var(--grad);border-radius:99px}
+
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-weight:800;font-size:14.5px;padding:13px 22px;border-radius:12px;cursor:pointer;border:none;font-family:var(--font-b);transition:.15s}
+    .btn-primary{background:var(--grad);color:#052015;box-shadow:0 10px 26px rgba(46,230,168,.26);width:100%}
+    .btn-primary:hover{filter:brightness(1.06);transform:translateY(-1px)}
+    .btn-ghost{background:transparent;border:1px solid var(--line2);color:var(--text)}
+    .btn-ghost:hover{border-color:var(--cyan)}
+
+    .up-benes{list-style:none;margin:16px 0 20px;display:flex;flex-direction:column;gap:9px}
+    .up-benes li{font-size:13.5px;color:var(--dim);display:flex;gap:9px}
+    .up-benes .ck{color:var(--green);font-weight:900}
+
+    table{width:100%;border-collapse:collapse}
+    th,td{text-align:left;padding:12px 10px;font-size:13.5px;border-bottom:1px solid var(--line)}
+    th{color:var(--mute);font-weight:700;font-size:11.5px;letter-spacing:.05em;text-transform:uppercase}
+    td .v{font-family:var(--font-d);font-weight:700}
+    .empty{text-align:center;color:var(--mute);font-size:14px;padding:30px 0}
+
+    @media(max-width:760px){.grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+<nav><div class="wrap navin">
+  <a class="brand" href="/app">
+    <svg viewBox="0 0 32 32" fill="none"><defs><linearGradient id="g" x1="0" y1="0" x2="32" y2="32"><stop stop-color="#2EE6A8"/><stop offset="1" stop-color="#38D4F5"/></linearGradient></defs><circle cx="16" cy="16" r="13" stroke="url(#g)" stroke-width="2.4" opacity=".35"/><circle cx="16" cy="16" r="7.5" stroke="url(#g)" stroke-width="2.4" opacity=".7"/><circle cx="16" cy="16" r="2.5" fill="url(#g)"/><path d="M16 16 L27 8" stroke="url(#g)" stroke-width="2.4" stroke-linecap="round"/></svg>
+    Sure<span class="grad">Radar</span>
+  </a>
+  <div class="navlinks">
+    <a href="/app" class="nlk">← Painel</a>
+    <a href="#" id="sair" class="nlk out">Sair</a>
+  </div>
+</div></nav>
+
+<div class="wrap">
+  <h1>Meu perfil</h1>
+  <div class="h-sub">Gerencie sua conta, seu plano e seus pagamentos.</div>
+
+  <div class="grid">
+    <!-- Conta -->
+    <div class="card">
+      <div class="ct">Conta</div>
+      <div class="who">
+        <div class="av" id="av">?</div>
+        <div><div class="nm" id="nm">—</div><div class="em" id="em">—</div></div>
+      </div>
+      <div style="margin-top:22px;font-size:13px;color:var(--mute)" id="membro"></div>
+    </div>
+
+    <!-- Plano -->
+    <div class="card">
+      <div class="ct">Plano</div>
+      <div class="plan-row">
+        <span class="plan-badge" id="plan-badge">—</span>
+        <span class="chip" id="plan-chip">—</span>
+      </div>
+      <div class="days" id="days-box"></div>
+    </div>
+
+    <!-- Assinatura / upgrade -->
+    <div class="card full" id="sub-card"></div>
+
+    <!-- Pagamentos -->
+    <div class="card full">
+      <div class="ct">Histórico de pagamentos</div>
+      <div id="pgs"></div>
+    </div>
+  </div>
+  <div style="height:50px"></div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const brl = v => "R$ " + Number(v).toLocaleString("pt-BR",{minimumFractionDigits:2});
+const data_br = ts => new Date(ts*1000).toLocaleDateString("pt-BR");
+
+async function load(){
+  let d;
+  try { const r = await fetch("/api/perfil"); if(r.status===401){location.href="/login";return;} d = await r.json(); }
+  catch { return; }
+
+  $("#av").textContent = (d.nome||"?").trim()[0].toUpperCase();
+  $("#nm").textContent = d.nome;
+  $("#em").textContent = d.email;
+
+  const pro = d.plano === "pro";
+  const badge = $("#plan-badge"), chip = $("#plan-chip");
+  badge.textContent = pro ? "Pro" : "Grátis";
+  badge.className = "plan-badge " + (pro?"pro":"free");
+  chip.textContent = pro ? "ATIVO" : "LIMITADO A 1%";
+  chip.className = "chip " + (pro?"pro":"free");
+
+  // dias
+  const db = $("#days-box");
+  if (pro && d.dias != null){
+    const pct = Math.min(100, Math.round(d.dias / (d.dias>60?365:30) * 100));
+    db.innerHTML = `<div class="big">${d.dias} <span style="font-size:16px;color:var(--dim)">dias</span></div>
+      <div class="lb">restantes no seu plano · expira em ${data_br(d.expira)}</div>
+      <div class="bar"><i style="width:${pct}%"></i></div>`;
+  } else {
+    db.innerHTML = `<div class="lb" style="margin-top:6px">Você está no plano grátis — vê só entradas de até 1% de lucro.</div>`;
+  }
+
+  // card de assinatura
+  const sc = $("#sub-card");
+  if (pro){
+    sc.innerHTML = `<div class="ct">Assinatura</div>
+      <p style="color:var(--dim);font-size:14px;margin-bottom:16px">Seu Pro está ativo. Você tem acesso a todas as entradas, de 1% a 15%+.</p>
+      <button class="btn btn-ghost" onclick="location.href='/app'">Ir para o painel →</button>`;
+  } else {
+    sc.innerHTML = `<div class="ct">Vire Pro e destrave as entradas de maior lucro</div>
+      <ul class="up-benes">
+        <li><span class="ck">✓</span> Todas as entradas — de 1% a 15%+</li>
+        <li><span class="ck">✓</span> Sem limite de entradas por dia</li>
+        <li><span class="ck">✓</span> Alertas prioritários no Telegram</li>
+      </ul>
+      <button class="btn btn-primary" id="up-anual">Assinar Pro Anual — R$ 497/ano (economize 57%)</button>
+      <div style="height:10px"></div>
+      <button class="btn btn-ghost" id="up-mensal" style="width:100%">Assinar Pro Mensal — R$ 97/mês</button>
+      <p style="font-size:12px;color:var(--mute);margin-top:12px;text-align:center">🔒 Pagamento seguro · Garantia de 7 dias</p>`;
+    // ATENÇÃO: botões de teste (sem checkout real ainda)
+    $("#up-anual").onclick = ()=>ativar("anual");
+    $("#up-mensal").onclick = ()=>ativar("mensal");
+  }
+
+  // pagamentos
+  const pgs = $("#pgs");
+  if (!d.pagamentos || !d.pagamentos.length){
+    pgs.innerHTML = `<div class="empty">Nenhum pagamento ainda.</div>`;
+  } else {
+    pgs.innerHTML = `<table><thead><tr><th>Data</th><th>Plano</th><th>Método</th><th style="text-align:right">Valor</th></tr></thead><tbody>${
+      d.pagamentos.map(p=>`<tr><td>${data_br(p.criado)}</td><td>${p.plano}</td><td>${p.metodo||"—"}</td><td style="text-align:right"><span class="v">${brl(p.valor)}</span></td></tr>`).join("")
+    }</tbody></table>`;
+  }
+}
+
+async function ativar(plano){
+  // provisório: ativa o Pro pra teste. Trocar pelo checkout real (Kirvano/Stripe).
+  await fetch("/api/dev/ativar-pro",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({plano})});
+  load();
+}
+
+$("#sair").onclick = async e => { e.preventDefault(); await fetch("/api/logout",{method:"POST"}); location.href="/login"; };
+load();
+</script>
+</body>
+</html>

@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1200" y2="630">
+      <stop stop-color="#2EE6A8"/><stop offset="1" stop-color="#38D4F5"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="30%" cy="20%" r="60%">
+      <stop stop-color="#2EE6A8" stop-opacity=".18"/><stop offset="1" stop-color="#2EE6A8" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1200" height="630" fill="#05070d"/>
+  <rect width="1200" height="630" fill="url(#glow)"/>
+  <g transform="translate(80,74)">
+    <circle cx="26" cy="26" r="24" fill="none" stroke="url(#g)" stroke-width="4" opacity=".4"/>
+    <circle cx="26" cy="26" r="14" fill="none" stroke="url(#g)" stroke-width="4" opacity=".8"/>
+    <circle cx="26" cy="26" r="5" fill="url(#g)"/>
+    <path d="M26 26 L48 12" stroke="url(#g)" stroke-width="4" stroke-linecap="round"/>
+    <text x="72" y="38" font-family="Inter,Arial,sans-serif" font-size="38" font-weight="800" fill="#fff">Sure<tspan fill="#2EE6A8">Radar</tspan></text>
+  </g>
+  <text x="80" y="300" font-family="Inter,Arial,sans-serif" font-size="84" font-weight="800" fill="#fff" letter-spacing="-2">Lucre de <tspan fill="#2EE6A8">1% a 15%</tspan></text>
+  <text x="80" y="392" font-family="Inter,Arial,sans-serif" font-size="84" font-weight="800" fill="#fff" letter-spacing="-2">por entrada. Não por mês.</text>
+  <text x="80" y="470" font-family="Inter,Arial,sans-serif" font-size="34" font-weight="500" fill="#a3b1c9">Apostas certas com lucro garantido — nas casas do Brasil.</text>
+  <g transform="translate(80,520)">
+    <rect width="290" height="66" rx="14" fill="url(#g)"/>
+    <text x="145" y="42" font-family="Inter,Arial,sans-serif" font-size="26" font-weight="800" fill="#052015" text-anchor="middle">Criar conta grátis →</text>
+  </g>
+  <text x="80" y="612" font-family="Inter,Arial,sans-serif" font-size="20" fill="#5e6b85">sureradar.com.br · +18 · Jogue com responsabilidade</text>
+</svg>
