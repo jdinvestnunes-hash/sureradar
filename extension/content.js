@@ -1,23 +1,24 @@
-// SureRadar Bridge — content script.
-// Roda na aba logada da surebet.com. A cada 10 min (e ao carregar), raspa a
-// LISTA INTEIRA (todas as páginas, seguindo "próximo »") e manda pro painel.
-// O servidor divide: 0–1% (25 primeiras) = FREE, ≥4% = PRO, e descarta as
-// bugadas (>25%). Mescla ingests, então mandamos em lotes (parcial já conta).
+// SureRadar Bridge — content script v4 (NAVEGAÇÃO REAL).
 //
-// Obs.: NÃO usamos o filtro de lucro da surebet.com (exige plano pago). Por isso
-// varremos tudo e dividimos por lucro aqui no nosso lado.
+// O surebet.com bloqueia (403) buscas de página feitas por script (fetch e
+// iframe). Então o robô agora FOLHEIA DE VERDADE: navega esta própria aba pelo
+// link "próximo »", raspa cada página que carrega e envia ao painel. Para o
+// site, é indistinguível de um humano paginando.
+//
+// A varredura sobrevive às navegações guardando o estado no sessionStorage.
+// Ao terminar, volta para a página inicial (o filtro do usuário fica intacto —
+// paginar não mexe em filtro). Roda a cada 10 min.
+//
+// ⚠️ Esta aba vira a "aba do robô": deixe-a aberta no filtro certo e não
+// navegue nela manualmente.
 
-const INTERVALO_MS = 10 * 60 * 1000;  // 10 min
-const FETCH_TIMEOUT_MS = 15000;
-const DELAY_PG = 3500;                // BEM devagar: o site corta (502) se apressar
-const RETRY_ESPERA_MS = 15000;        // cortou? espera 15s e tenta de novo
-const MAX_PAGINAS = 60;               // varre bastante (60 × 25 = 1500 apostas)
-const LOTE_ENVIO = 4;                 // envia a cada 4 páginas (parcial já vale)
+const CICLO_MS = 10 * 60 * 1000;   // intervalo entre varreduras
+const MAX_PAGINAS = 40;            // teto de segurança (40 × 25 = 1000 apostas)
+const DELAY_HUMANO = () => 2500 + Math.random() * 2500;  // 2,5–5s por página
 
-const dorme = (ms) => new Promise((r) => setTimeout(r, ms));
-
-function rasparDoc(doc) {
-  return [...doc.querySelectorAll("tbody.surebet_record")].map((rec) => {
+// ---------- raspagem da página atual ----------
+function rasparPagina() {
+  return [...document.querySelectorAll("tbody.surebet_record")].map((rec) => {
     const legs = [...rec.querySelectorAll("tr")].map((tr) => {
       const book = tr.querySelector(".bookmaker-name");
       const bk = tr.querySelector(".booker");
@@ -52,64 +53,18 @@ function rasparDoc(doc) {
   }).filter((r) => r.legs.length === 2);
 }
 
-function linkProximo(doc) {
-  const a = [...doc.querySelectorAll("a")].find((x) => /pr[oó]ximo|next/i.test(x.textContent));
+function linkProximo() {
+  const a = [...document.querySelectorAll("a")].find((x) => /pr[oó]ximo|next/i.test(x.textContent));
   return a ? a.href : null;
 }
 
-async function buscarDoc(url) {
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
-  try {
-    const r = await fetch(url, { credentials: "include", signal: ctrl.signal });
-    if (!r.ok) {
-      console.warn(`[SureRadar] fetch respondeu HTTP ${r.status}`);
-      return null;
-    }
-    return new DOMParser().parseFromString(await r.text(), "text/html");
-  } catch (e) {
-    console.warn("[SureRadar] falha no fetch:", e);
-    return null;
-  } finally {
-    clearTimeout(t);
-  }
-}
-
-// Plano B: o site às vezes BLOQUEIA o fetch (403) mas aceita navegação normal.
-// Um iframe invisível É uma navegação normal — carrega a página com a sessão
-// e a gente lê o conteúdo (mesma origem).
-function buscarViaIframe(url) {
-  return new Promise((resolve) => {
-    const f = document.createElement("iframe");
-    f.style.cssText = "position:absolute;width:2px;height:2px;left:-9999px;top:-9999px;visibility:hidden;";
-    let fim = (val) => { fim = () => {}; try { f.remove(); } catch (e) {} resolve(val); };
-    const timer = setTimeout(() => fim(null), FETCH_TIMEOUT_MS + 8000);
-    f.onload = () => {
-      clearTimeout(timer);
-      try {
-        const html = f.contentDocument && f.contentDocument.documentElement.outerHTML;
-        fim(html ? new DOMParser().parseFromString(html, "text/html") : null);
-      } catch (e) {
-        console.warn("[SureRadar] iframe inacessível:", e);
-        fim(null);
-      }
-    };
-    f.src = url;
-    (document.body || document.documentElement).appendChild(f);
-  });
-}
-
-// Busca uma página: tenta fetch (rápido); se o site barrar, vai de iframe.
-async function obterPagina(url) {
-  let doc = await buscarDoc(url);
-  if (doc) return doc;
-  console.warn("[SureRadar] fetch barrado — tentando via iframe (navegação real)…");
-  doc = await buscarViaIframe(url);
-  if (doc && doc.querySelectorAll("tbody.surebet_record").length === 0) {
-    console.warn("[SureRadar] iframe carregou mas sem registros (bloqueio?)");
-  }
-  return doc;
-}
+// ---------- estado (sobrevive às navegações da varredura) ----------
+const S = {
+  get scan() { try { return JSON.parse(sessionStorage.getItem("sr_scan")); } catch (e) { return null; } },
+  set scan(v) { v ? sessionStorage.setItem("sr_scan", JSON.stringify(v)) : sessionStorage.removeItem("sr_scan"); },
+  get lastTs() { return parseInt(localStorage.getItem("sr_last_scan") || "0"); },
+  set lastTs(v) { localStorage.setItem("sr_last_scan", String(v)); },
+};
 
 function enviar(records, label) {
   if (!records.length) return;
@@ -117,42 +72,58 @@ function enviar(records, label) {
   console.log(`[SureRadar] enviadas ${records.length} surebets (${label})`);
 }
 
-async function ciclo() {
-  const vistos = new Set();
-  let lote = [];       // acumula desde o último envio
-  const add = (recs) => {
-    let n = 0;
-    for (const r of recs) if (r.id && !vistos.has(r.id)) { vistos.add(r.id); lote.push(r); n++; }
-    return n;
-  };
+// ---------- um passo da varredura (roda a cada página carregada) ----------
+function passo() {
+  const scan = S.scan;
+  if (!scan || !scan.ativo) return;
 
-  // página 1 = DOM ao vivo (rápido)
-  add(rasparDoc(document));
-  let prox = linkProximo(document);
-  let pag = 1;
-  let motivo = "sem link próximo na página";
+  const recs = rasparPagina();
+  const vistos = new Set(scan.ids || []);
+  const novos = recs.filter((r) => r.id && !vistos.has(r.id));
+  novos.forEach((r) => vistos.add(r.id));
+  scan.ids = [...vistos];
+  scan.pag = (scan.pag || 0) + 1;
 
-  while (prox && pag < MAX_PAGINAS) {
-    await dorme(DELAY_PG);
-    let doc = await obterPagina(prox);
-    if (!doc) {                         // bloqueio/timeout: espera BEM e tenta de novo
-      console.warn(`[SureRadar] p${pag + 1} cortada; esperando ${RETRY_ESPERA_MS / 1000}s pra tentar de novo…`);
-      await dorme(RETRY_ESPERA_MS);
-      doc = await obterPagina(prox);
-      if (!doc) { motivo = `cortado pelo site na página ${pag + 1}`; break; }
+  // envia JÁ o que achou nesta página (o servidor mescla; nada se perde)
+  enviar(novos, `página ${scan.pag}`);
+
+  const prox = linkProximo();
+  const fim = !prox || scan.pag >= MAX_PAGINAS || (scan.pag > 1 && novos.length === 0);
+
+  if (fim) {
+    const motivo = !prox ? "fim da lista" : (scan.pag >= MAX_PAGINAS ? "cap de páginas" : "sem novidade");
+    console.log(`[SureRadar] varredura concluída: ${scan.ids.length} apostas em ${scan.pag} página(s) — ${motivo}. Voltando ao início…`);
+    const volta = scan.volta;
+    S.scan = null;
+    S.lastTs = Date.now();
+    if (volta && location.href !== volta) {
+      setTimeout(() => { location.href = volta; }, 1500);
     }
-    if (!add(rasparDoc(doc))) { motivo = "fim da lista"; break; }
-    prox = linkProximo(doc);
-    pag++;
-    motivo = prox ? motivo : "fim da lista";
-    if (pag % LOTE_ENVIO === 0) {       // envia parcial (o servidor mescla)
-      enviar(lote.splice(0), `parcial p${pag}`);
-    }
+    return;
   }
-  if (pag >= MAX_PAGINAS) motivo = "cap de páginas";
-  enviar(lote.splice(0), `final (${pag} págs — ${motivo})`);
+
+  S.scan = scan;
+  setTimeout(() => { location.href = prox; }, DELAY_HUMANO());
 }
 
-// Primeira coleta ~4s após carregar; depois a cada 10 min.
-setTimeout(ciclo, 4000);
-setInterval(ciclo, INTERVALO_MS);
+function iniciarScan() {
+  if (!document.querySelector("tbody.surebet_record")) return;  // página sem lista
+  console.log("[SureRadar] iniciando varredura (navegação real)…");
+  S.scan = { ativo: true, pag: 0, ids: [], volta: location.href };
+  passo();
+}
+
+// ---------- agendador ----------
+(function aoCarregar() {
+  const scan = S.scan;
+  if (scan && scan.ativo) {
+    // estamos no meio de uma varredura: continua nesta página
+    setTimeout(passo, 1800);
+    return;
+  }
+  const check = () => {
+    if (Date.now() - S.lastTs >= CICLO_MS) iniciarScan();
+  };
+  setTimeout(check, 6000);          // primeira chance ao abrir
+  setInterval(check, 60 * 1000);    // re-checa a cada minuto
+})();
