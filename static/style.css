@@ -265,6 +265,9 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 17p
 .calc-round-btn:hover { border-color: var(--cyan); }
 .calc-round-btn.alt { color: var(--cyan); }
 .calc-hint { font-size: 11.5px; color: var(--text-mute); padding: 8px 22px 0; line-height: 1.45; }
+.calc-odd-edit { display: flex; align-items: center; gap: 4px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 4px 9px; }
+.calc-odd-at { color: var(--text-mute); font-weight: 700; font-size: 12px; }
+.calc-odd-input { width: 62px; background: none; border: none; outline: none; color: var(--text); font-size: 15px; font-weight: 800; font-family: inherit; text-align: right; font-variant-numeric: tabular-nums; }
 .calc-stake-edit { display: flex; align-items: center; gap: 6px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; }
 .calc-stake-cur { color: var(--text-dim); font-weight: 700; font-size: 14px; }
 .calc-stake-input { width: 92px; background: none; border: none; outline: none; color: var(--cyan); font-size: 18px; font-weight: 800; font-family: inherit; text-align: right; font-variant-numeric: tabular-nums; }
