@@ -46,7 +46,39 @@ const el = (t, c, h) => { const e = document.createElement(t); if (c) e.classNam
 const brl = (v) => "R$ " + Number(v).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 function load(k, def) { try { return JSON.parse(localStorage.getItem(k)) ?? def; } catch { return def; } }
 function saveFiltros() { localStorage.setItem(FILTERS_KEY, JSON.stringify(filtros)); }
-function saveBanca() { localStorage.setItem(BANK_KEY, JSON.stringify(banca)); renderBankBadge(); }
+// Banca: salva no navegador (cache) E no SERVIDOR (banco de dados) — assim as
+// entradas sobrevivem a troca de PC/celular e limpeza do navegador.
+let _bancaSyncTimer = null;
+function saveBanca() {
+  localStorage.setItem(BANK_KEY, JSON.stringify(banca));
+  renderBankBadge();
+  clearTimeout(_bancaSyncTimer);            // debounce: agrupa edições rápidas
+  _bancaSyncTimer = setTimeout(() => {
+    fetch("/api/banca", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ entradas: banca }) }).catch(() => {});
+  }, 600);
+}
+
+// Ao abrir: puxa a banca do servidor. Se o servidor estiver vazio e o navegador
+// tiver entradas antigas (localStorage), MIGRA elas pro banco.
+async function syncBancaDoServidor() {
+  try {
+    const r = await fetch("/api/banca");
+    if (!r.ok) return;
+    const j = await r.json();
+    const doServidor = j.entradas || [];
+    if (doServidor.length) {
+      banca = doServidor;
+      localStorage.setItem(BANK_KEY, JSON.stringify(banca));
+    } else if (banca.length) {
+      // migração: primeiras entradas (do localStorage) sobem pro banco
+      fetch("/api/banca", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ entradas: banca }) }).catch(() => {});
+    }
+    renderBankBadge();
+  } catch { /* offline: segue com o localStorage */ }
+}
+syncBancaDoServidor();
 function sportUI(id) { return SPORTS_UI[id] || { label: id, ico: ICONS.globe }; }
 function dataDe(br) { return br && br.includes(" ") ? br.split(" ")[0] : ""; }        // "dd/mm/yyyy"
 function ddmm(d) { const p = d.split("/"); return p.length >= 2 ? p[0] + "/" + p[1] : d; }

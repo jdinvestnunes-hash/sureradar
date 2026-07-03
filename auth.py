@@ -128,6 +128,12 @@ def init():
             plano TEXT NOT NULL,
             metodo TEXT,
             criado {_NUM} NOT NULL)""")
+        # Banca do usuário (entradas lançadas) — 1 linha por usuário, JSON com a
+        # lista completa (espelha o formato do front; simples e suficiente).
+        c.execute(f"""CREATE TABLE IF NOT EXISTS user_banca(
+            user_id BIGINT PRIMARY KEY,
+            dados TEXT NOT NULL,
+            atualizado {_NUM} NOT NULL)""")
         if not PG:  # migração leve do SQLite antigo
             try:
                 c.execute("ALTER TABLE users ADD COLUMN plano_expira REAL")
@@ -191,6 +197,37 @@ def voltar_free(user_id: int):
     with _db() as c:
         c.execute(_q("UPDATE users SET plano='free', plano_expira=NULL WHERE id=?"), (user_id,))
     limpar_cache_sessoes()
+
+
+# ---------------------------------------------------------------------------
+# Banca (entradas lançadas pelo usuário) — persistida no banco
+# ---------------------------------------------------------------------------
+def banca_get(user_id: int):
+    import json
+    with _db() as c:
+        row = c.execute(_q("SELECT dados FROM user_banca WHERE user_id=?"), (user_id,)).fetchone()
+    if not row:
+        return []
+    try:
+        dados = json.loads(row["dados"])
+        return dados if isinstance(dados, list) else []
+    except Exception:
+        return []
+
+
+def banca_set(user_id: int, entradas: list):
+    import json
+    dados = json.dumps(entradas or [], ensure_ascii=False)
+    agora = time.time()
+    with _db() as c:
+        if PG:
+            c.execute(_q(
+                """INSERT INTO user_banca(user_id, dados, atualizado) VALUES(?,?,?)
+                   ON CONFLICT (user_id) DO UPDATE SET dados=EXCLUDED.dados,
+                   atualizado=EXCLUDED.atualizado"""), (user_id, dados, agora))
+        else:
+            c.execute("INSERT OR REPLACE INTO user_banca(user_id, dados, atualizado) VALUES(?,?,?)",
+                      (user_id, dados, agora))
 
 
 # ---------------------------------------------------------------------------

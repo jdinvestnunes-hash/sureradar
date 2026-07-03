@@ -228,6 +228,27 @@ def health():
     return info
 
 
+# --- Banca (entradas do usuário) persistida no banco ---
+@app.get("/api/banca")
+def banca_ler(request: Request):
+    user = _usuario(request)
+    if not user:
+        return JSONResponse({"erro": "não autenticado"}, status_code=401)
+    return {"entradas": auth.banca_get(user["id"])}
+
+
+@app.post("/api/banca")
+def banca_salvar(request: Request, payload: dict = Body(...)):
+    user = _usuario(request)
+    if not user:
+        return JSONResponse({"erro": "não autenticado"}, status_code=401)
+    entradas = payload.get("entradas")
+    if not isinstance(entradas, list) or len(entradas) > 500:
+        return JSONResponse({"erro": "formato inválido"}, status_code=400)
+    auth.banca_set(user["id"], entradas)
+    return {"ok": True, "salvas": len(entradas)}
+
+
 def _aviso_renovar(dias):
     """True quando faltam poucos dias (<= config.AVISO_RENOVACAO_DIAS) p/ vencer."""
     return dias is not None and 0 <= dias <= config.AVISO_RENOVACAO_DIAS
