@@ -95,55 +95,87 @@ def _fonte(sz, bold=True):
 
 
 def gerar_teaser(sb):
-    """PNG (bytes) de um card estilo 'print' da entrada, com o mercado e a casa
-    borrados — só o lucro, o jogo e as odds ficam à mostra."""
+    """PNG (bytes) que REPLICA fielmente o card do painel (mesmo layout, cores e
+    a barra verde 'RETORNO CERTO') — parece um print do site. Só o MERCADO e a
+    CASA ficam BORRADOS; jogo, lucro e odds à mostra (gera desejo)."""
     from PIL import Image, ImageDraw, ImageFilter
-    W, H = 900, 500
-    GREEN, CYAN, GOLD = (46, 230, 168), (56, 212, 245), (255, 201, 77)
-    WHITE, DIM, CARD, LINE = (242, 246, 252), (150, 165, 190), (14, 20, 33), (39, 57, 92)
-    img = Image.new("RGB", (W, H), (5, 7, 13))
+
+    # cores EXATAS do style.css
+    BG, SURF, SURF2 = (10, 14, 23), (19, 27, 43), (24, 34, 54)
+    BORDER, BSOFT = (34, 48, 73), (26, 37, 55)
+    TEXT, DIM, MUTE = (238, 242, 248), (154, 167, 189), (100, 116, 139)
+    CYAN, GREEN, BARBG = (34, 211, 238), (61, 220, 151), (11, 23, 48)
+
+    W, H = 768, 492
+    x0, y0, cardW = 24, 24, 720
+    x1, yB = x0 + cardW, 468
+    img = Image.new("RGB", (W, H), BG)
     d = ImageDraw.Draw(img)
-
-    # marca
-    d.text((44, 34), "Sure", font=_fonte(34), fill=WHITE)
-    wsure = d.textlength("Sure", font=_fonte(34))
-    d.text((44 + wsure, 34), "Radar", font=_fonte(34), fill=GREEN)
-    # selo VIP
-    d.rounded_rectangle([W - 210, 34, W - 44, 80], 22, fill=(38, 28, 6), outline=GOLD, width=2)
-    d.text((W - 188, 46), "ENTRADA VIP", font=_fonte(20), fill=GOLD)
-
-    # lucro gigante
-    d.text((44, 112), f"+{float(sb['profit_pct']):.2f}%", font=_fonte(96), fill=GOLD)
-    d.text((48, 222), "DE LUCRO GARANTIDO", font=_fonte(28), fill=GREEN)
-
-    # jogo (visível)
-    d.text((44, 278), str(sb.get("event", ""))[:44], font=_fonte(26), fill=WHITE)
-
-    # pernas — mercado e casa BORRADOS; odd à mostra
     blur = []
-    y = 322
+
+    # card
+    d.rounded_rectangle([x0, y0, x1, yB], radius=26, fill=SURF, outline=BSOFT, width=2)
+
+    # ---- cabeçalho (liga + horário) ----
+    hH = 54
+    d.rectangle([x0 + 2, y0 + 2, x1 - 2, y0 + hH], fill=SURF2)
+    d.line([x0 + 2, y0 + hH, x1 - 2, y0 + hH], fill=BSOFT, width=2)
+    cx, cy = x0 + 28, y0 + hH // 2 + 1
+    d.ellipse([cx - 9, cy - 9, cx + 9, cy + 9], outline=CYAN, width=2)
+    d.ellipse([cx - 3, cy - 3, cx + 3, cy + 3], fill=CYAN)
+    liga = str(sb.get("sport_label") or sb.get("sport") or "FUTEBOL").upper()[:34]
+    d.text((x0 + 48, y0 + hH // 2 - 10), liga, font=_fonte(19), fill=DIM)
+    tt = str(sb.get("commence_br", "") or "")
+    if tt:
+        tw = d.textlength(tt, font=_fonte(18, False))
+        d.text((x1 - 26 - tw, y0 + hH // 2 - 9), tt, font=_fonte(18, False), fill=MUTE)
+
+    # ---- corpo ----
+    bx = x0 + 28
+    y = y0 + hH + 22
+    d.text((bx, y), str(sb.get("event", ""))[:40], font=_fonte(30), fill=TEXT)
+    y += 46
+    # mercado (BORRADO)
+    mkt = str(sb.get("market_label", "") or (sb.get("legs", [{}])[0].get("outcome", "")))
+    d.text((bx, y), mkt[:44], font=_fonte(24), fill=CYAN)
+    blur.append((bx - 4, y - 4, bx + 540, y + 32))
+    y += 44
+
+    # ---- 2 caixas de aposta ----
     for leg in sb.get("legs", [])[:2]:
-        d.rounded_rectangle([44, y, W - 44, y + 68], 14, fill=CARD, outline=LINE, width=1)
-        d.text((66, y + 10), str(leg.get("outcome", ""))[:36], font=_fonte(21), fill=DIM)
-        blur.append((60, y + 6, 600, y + 38))
-        d.text((66, y + 40), str(leg.get("bookmaker_label", leg.get("bookmaker", ""))), font=_fonte(18, False), fill=DIM)
-        blur.append((60, y + 38, 340, y + 64))
-        try:
-            odd = f"@ {float(leg.get('odd', 0)):.2f}"
-        except Exception:
-            odd = "@ ?"
-        d.text((W - 190, y + 20), odd, font=_fonte(28), fill=CYAN)
-        y += 80
+        boxT, boxB = y, y + 90
+        d.rounded_rectangle([bx, boxT, x1 - 28, boxB], 18, fill=BG, outline=BORDER, width=2)
+        # outcome (mercado) BORRADO — cobre até antes da odd
+        d.text((bx + 22, boxT + 17), str(leg.get("outcome", ""))[:34], font=_fonte(25), fill=TEXT)
+        blur.append((bx + 14, boxT + 12, x1 - 150, boxT + 46))
+        # casa BORRADA
+        casa = str(leg.get("bookmaker_label", leg.get("bookmaker", "")))
+        d.text((bx + 22, boxT + 52), casa, font=_fonte(21), fill=CYAN)
+        blur.append((bx + 14, boxT + 48, bx + 300, boxT + 82))
+        # odd (À MOSTRA)
+        odd = f"{float(leg.get('odd', 0)):.2f}"
+        ow = d.textlength(odd, font=_fonte(40))
+        d.text((x1 - 50 - ow, boxT + 24), odd, font=_fonte(40), fill=TEXT)
+        y = boxB + 16
 
-    # barra de CTA
-    d.rounded_rectangle([44, H - 58, W - 44, H - 16], 12, fill=(8, 28, 20), outline=GREEN, width=1)
-    d.text((66, H - 48), "Assine o PRO e destrave a entrada completa  -  sureradar.site", font=_fonte(20), fill=GREEN)
+    # ---- barra "RETORNO CERTO" (ancorada no rodapé do card) ----
+    barB = yB - 3
+    barT = barB - 52
+    gx2 = int(x0 + cardW * 0.60)
+    d.polygon([(x0 + 3, barT), (gx2, barT), (gx2 - 16, barB), (x0 + 3, barB)], fill=GREEN)
+    d.text((x0 + 22, barT + 14), f"{float(sb['profit_pct']):.2f}% RETORNO CERTO",
+           font=_fonte(23), fill=(255, 255, 255))
+    d.rectangle([gx2 - 15, barT, x1 - 3, barB], fill=BARBG)
+    d.text((gx2 + 28, barT + 15), "CALCULAR", font=_fonte(22), fill=(255, 255, 255))
 
-    # aplica o desfoque nas regioes do mercado + casa
-    for (x1, y1, x2, y2) in blur:
-        x2, y2 = min(x2, W), min(y2, H)
-        reg = img.crop((x1, y1, x2, y2)).filter(ImageFilter.GaussianBlur(6))
-        img.paste(reg, (x1, y1))
+    # ---- aplica o desfoque no mercado + casa ----
+    for (a, b, c, e) in blur:
+        a, b, c, e = max(0, a), max(0, b), min(W, c), min(H, e)
+        reg = img.crop((a, b, c, e)).filter(ImageFilter.GaussianBlur(7))
+        img.paste(reg, (a, b))
+
+    # redesenha a borda arredondada por cima (corners limpos)
+    d.rounded_rectangle([x0, y0, x1, yB], radius=26, outline=BSOFT, width=2)
 
     buf = io.BytesIO()
     img.save(buf, "PNG")
