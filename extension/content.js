@@ -1,22 +1,17 @@
 // SureRadar Bridge — content script.
-// Roda na aba logada da surebet.com. A cada 10 min (e uma vez ao carregar),
-// raspa DUAS views e manda pro painel (o servidor MESCLA as duas):
-//   • FREE : lucro ATÉ 1%  -> pega as ~50 melhores (grupo/plano grátis)
-//   • PRO  : lucro >= 2%   -> pega todas (poucas, as boas)
+// Roda na aba logada da surebet.com. A cada 10 min (e ao carregar), raspa a
+// LISTA INTEIRA (todas as páginas, seguindo "próximo »") e manda pro painel.
+// O servidor divide: 0–1% (25 primeiras) = FREE, ≥4% = PRO, e descarta as
+// bugadas (>25%). Mescla ingests, então mandamos em lotes (parcial já conta).
 //
-// Por que assim: a fonte tem MILHARES de surebets. Paginar do topo (maiores)
-// nunca chega nas ≤1%. Usando o filtro de lucro na URL, cada view já vem pronta.
+// Obs.: NÃO usamos o filtro de lucro da surebet.com (exige plano pago). Por isso
+// varremos tudo e dividimos por lucro aqui no nosso lado.
 
 const INTERVALO_MS = 10 * 60 * 1000;  // 10 min
 const FETCH_TIMEOUT_MS = 12000;
-const DELAY_PG = 220;
-
-const BASE = "https://pt.surebet.com/surebets";
-const VIEW_FREE = BASE + "?selector%5Bmin_profit%5D=0&selector%5Bmax_profit%5D=1&selector%5Border%5D=profit_desc";
-// teto de 25% exclui "surebets" bugadas (ex.: 394% de escanteios com odd errada)
-const VIEW_PRO  = BASE + "?selector%5Bmin_profit%5D=2&selector%5Bmax_profit%5D=25&selector%5Border%5D=profit_desc";
-const MAX_PG_FREE = 2;   // ~50 entradas ≤1%
-const MAX_PG_PRO  = 6;   // as boas (>1%), poucas páginas
+const DELAY_PG = 250;
+const MAX_PAGINAS = 60;               // varre bastante (60 × 25 = 1500 apostas)
+const LOTE_ENVIO = 4;                 // envia a cada 4 páginas (parcial já vale)
 
 const dorme = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -76,30 +71,6 @@ async function buscarDoc(url) {
   }
 }
 
-// Varre uma view (seguindo "próximo »") até maxPag, deduplicando por id.
-async function varrerView(startUrl, maxPag) {
-  const vistos = new Set();
-  const todos = [];
-  const add = (recs) => {
-    let n = 0;
-    for (const r of recs) if (r.id && !vistos.has(r.id)) { vistos.add(r.id); todos.push(r); n++; }
-    return n;
-  };
-  let doc = await buscarDoc(startUrl);
-  if (!doc) return todos;
-  add(rasparDoc(doc));
-  let prox = linkProximo(doc), pag = 1;
-  while (prox && pag < maxPag) {
-    await dorme(DELAY_PG);
-    doc = await buscarDoc(prox);
-    if (!doc) break;
-    if (!add(rasparDoc(doc))) break;
-    prox = linkProximo(doc);
-    pag++;
-  }
-  return todos;
-}
-
 function enviar(records, label) {
   if (!records.length) return;
   chrome.runtime.sendMessage({ tipo: "ingest", records });
@@ -107,14 +78,31 @@ function enviar(records, label) {
 }
 
 async function ciclo() {
-  try {
-    const free = await varrerView(VIEW_FREE, MAX_PG_FREE);   // ≤1%
-    enviar(free.slice(0, 50), "FREE ≤1%");                   // 50 melhores
-    const pro = await varrerView(VIEW_PRO, MAX_PG_PRO);      // >1% (boas)
-    enviar(pro, "PRO >1%");
-  } catch (e) {
-    console.warn("[SureRadar] erro no ciclo:", e);
+  const vistos = new Set();
+  let lote = [];       // acumula desde o último envio
+  const add = (recs) => {
+    let n = 0;
+    for (const r of recs) if (r.id && !vistos.has(r.id)) { vistos.add(r.id); lote.push(r); n++; }
+    return n;
+  };
+
+  // página 1 = DOM ao vivo (rápido)
+  add(rasparDoc(document));
+  let prox = linkProximo(document);
+  let pag = 1;
+
+  while (prox && pag < MAX_PAGINAS) {
+    await dorme(DELAY_PG);
+    const doc = await buscarDoc(prox);
+    if (!doc) break;
+    if (!add(rasparDoc(doc))) break;   // fim da lista
+    prox = linkProximo(doc);
+    pag++;
+    if (pag % LOTE_ENVIO === 0) {       // envia parcial (o servidor mescla)
+      enviar(lote.splice(0), `parcial p${pag}`);
+    }
   }
+  enviar(lote.splice(0), `final (${pag} págs)`);
 }
 
 // Primeira coleta ~4s após carregar; depois a cada 10 min.
