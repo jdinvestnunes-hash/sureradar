@@ -1,17 +1,20 @@
 // SureRadar Bridge — content script.
-// Roda na aba logada da surebet.com. A cada 10 min (e uma vez ao carregar),
-// VARRE TODAS as páginas de apostas (seguindo o cursor "próximo") e manda a
-// lista completa pro service worker, que envia ao painel.
+// Roda na aba logada da surebet.com. A cada 10 min (e uma vez ao carregar):
+//   1) envia JÁ as apostas da página atual (preenche o painel na hora);
+//   2) varre as demais páginas (seguindo o cursor "próximo") e reenvia o
+//      conjunto COMPLETO — assim o PRO recebe todas as >1% e o FREE as ≤1%.
 //
-// Por que varrer tudo: a surebet.com pagina de 25 em 25 (são centenas de
-// apostas). Se raspássemos só a página atual, o PRO perderia entradas >1% que
-// estão em outras páginas e o FREE nem teria as ≤1%. Então seguimos o cursor
-// até acabar (com um teto de segurança de páginas).
+// Envio incremental + timeout por página: se a varredura estiver lenta ou
+// travar, a página 1 já foi entregue e o painel não fica vazio.
 
 const INTERVALO_MS = 10 * 60 * 1000; // 10 minutos
-const MAX_PAGINAS = 40;              // teto de segurança (40 × 25 = 1000 apostas)
+const MAX_PAGINAS = 30;              // teto de segurança (30 × 25 = 750 apostas)
+const FETCH_TIMEOUT_MS = 12000;      // corta um fetch que travar
+const DELAY_ENTRE_PAGINAS = 250;     // respiro entre páginas (não martelar o site)
 
-// Extrai as surebets de um Document (a página ao vivo OU uma página buscada).
+const dorme = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Extrai as surebets de um Document (a página ao vivo OU uma buscada).
 function rasparDoc(doc) {
   return [...doc.querySelectorAll("tbody.surebet_record")].map((rec) => {
     const legs = [...rec.querySelectorAll("tr")].map((tr) => {
@@ -41,61 +44,67 @@ function rasparDoc(doc) {
   }).filter((r) => r.legs.length === 2);
 }
 
-// Acha o link "próximo »" dentro de um Document.
 function linkProximo(doc) {
   const a = [...doc.querySelectorAll("a")].find((x) =>
     /pr[oó]ximo|next/i.test(x.textContent));
   return a ? a.href : null;
 }
 
-// Varre da página atual até o fim, deduplicando por id.
-async function rasparTudo() {
+function enviar(records, label) {
+  if (!records.length) return;
+  chrome.runtime.sendMessage({ tipo: "ingest", records });
+  console.log(`[SureRadar] enviadas ${records.length} surebets (${label})`);
+}
+
+async function buscarDoc(url) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const resp = await fetch(url, { credentials: "include", signal: ctrl.signal });
+    if (!resp.ok) return null;
+    return new DOMParser().parseFromString(await resp.text(), "text/html");
+  } catch (e) {
+    console.warn("[SureRadar] falha ao buscar página:", e);
+    return null;
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+async function ciclo() {
   const vistos = new Set();
   const todos = [];
   const add = (recs) => {
-    let novos = 0;
+    let n = 0;
     for (const r of recs) {
-      if (r.id && !vistos.has(r.id)) { vistos.add(r.id); todos.push(r); novos++; }
+      if (r.id && !vistos.has(r.id)) { vistos.add(r.id); todos.push(r); n++; }
     }
-    return novos;
+    return n;
   };
 
-  add(rasparDoc(document));                 // página ao vivo
+  // 1) Página atual — envia IMEDIATAMENTE (painel enche na hora).
+  add(rasparDoc(document));
+  enviar(todos.slice(), "página 1");
+
+  // 2) Varre o resto seguindo o cursor e reenvia o conjunto completo.
   let prox = linkProximo(document);
   let pag = 1;
-
   while (prox && pag < MAX_PAGINAS) {
-    let doc;
-    try {
-      const resp = await fetch(prox, { credentials: "include" });
-      if (!resp.ok) break;
-      doc = new DOMParser().parseFromString(await resp.text(), "text/html");
-    } catch (e) {
-      console.warn("[SureRadar] falha ao buscar página:", e);
-      break;
-    }
+    await dorme(DELAY_ENTRE_PAGINAS);
+    const doc = await buscarDoc(prox);
+    if (!doc) break;
     const novos = add(rasparDoc(doc));
-    if (!novos) break;                       // sem novidades = fim (ou laço)
+    if (!novos) break;              // sem novidades = fim (ou laço)
     prox = linkProximo(doc);
     pag++;
   }
 
-  return todos;
-}
-
-async function ciclo() {
-  let records = [];
-  try {
-    records = await rasparTudo();
-  } catch (e) {
-    console.warn("[SureRadar] erro na varredura:", e);
-    return;
+  // Se a varredura trouxe páginas além da 1ª, reenvia o conjunto completo.
+  if (pag > 1) {
+    enviar(todos, `varredura completa (${pag} págs)`);
   }
-  if (!records.length) return;
-  chrome.runtime.sendMessage({ tipo: "ingest", records });
-  console.log(`[SureRadar] enviadas ${records.length} surebets (varredura completa) ao painel`);
 }
 
-// Primeira coleta ~6s após carregar (dá tempo dos dados aparecerem), depois a cada 10 min.
+// Primeira coleta ~6s após carregar; depois a cada 10 min.
 setTimeout(ciclo, 6000);
 setInterval(ciclo, INTERVALO_MS);
