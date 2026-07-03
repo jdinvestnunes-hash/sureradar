@@ -1,12 +1,11 @@
 """
 promo.py — fluxo de marketing automático no grupo FREE do Telegram.
 
-Estratégia (definida pelo usuário):
-- 5 posts de aposta por dia, em horários fixos de Brasília: 08, 12, 15, 18, 21h.
-  * 4 são surebets REAIS de até 1% (com os links das casas) — valor de graça.
-  * 1 (um slot que gira a cada dia) é um TEASER VIP: uma entrada de 4-10% com
-    IMAGEM "printada" e o MERCADO + a CASA BORRADOS — gera desejo -> vai pro site.
-- Entre os posts, mensagens de PROVA SOCIAL / FOMO puxando para o PRO.
+Estratégia (definida pelo usuário, 03/07/2026):
+- 2 entradas REAIS por dia (10h e 19h de Brasília), com lucro entre 3% e 8%,
+  e SOMENTE nas casas: Betano, Bet365, SuperBet, Stake e Novibet.
+  Vão completas (com links) — é a amostra grátis que prova o valor.
+- Entre elas, mensagens de PROVA SOCIAL / FOMO puxando para o PRO.
 
 Roda numa thread de fundo iniciada pelo app.py no startup.
 """
@@ -25,10 +24,27 @@ import config
 import feed
 import notifier
 
-# Horários (Brasília). 4 viram surebet ≤1%; 1 (gira por dia) vira teaser VIP.
-SLOTS = ["08:00", "12:00", "15:00", "18:00", "21:00"]
+# Horários (Brasília) das 2 entradas do dia.
+SLOTS = ["10:00", "19:00"]
 # Prova social entre os posts.
-SOCIAL_TIMES = ["10:00", "13:30", "16:30", "19:30"]
+SOCIAL_TIMES = ["13:00", "16:30", "21:00"]
+
+# Regras da entrada que vai pro grupo:
+LUCRO_MIN, LUCRO_MAX = 3.0, 8.0
+# Só estas casas podem aparecer (as 2 pernas). Casa por slug/nome normalizado.
+import re as _re
+_CASAS_OK = _re.compile(r"^(betano|bet365|superbet|stake|novibet)", _re.I)
+
+
+def _casas_permitidas(sb):
+    """True se TODAS as pernas são de casas permitidas (Betano/Bet365/SuperBet/
+    Stake/Novibet — inclui variações '(BR)')."""
+    for leg in sb.get("legs", []):
+        nome = str(leg.get("bookmaker_label") or leg.get("bookmaker") or "")
+        nome = nome.replace(" ", "").replace("(BR)", "").strip()
+        if not _CASAS_OK.match(nome):
+            return False
+    return True
 
 SOCIAL_MSGS = [
     "🔥 Mais um dia de green no automático pra quem é PRO.",
@@ -55,11 +71,6 @@ def _reset_dia(dia):
     _estado.update({"dia": dia, "slots": set(), "social": set(), "postados": set()})
 
 
-def _slot_vip(agora):
-    """Qual slot do dia é o teaser VIP (gira todo dia)."""
-    return SLOTS[agora.timetuple().tm_yday % len(SLOTS)]
-
-
 def _pegar(cands):
     for c in cands:
         if c["id"] not in _estado["postados"]:
@@ -67,15 +78,15 @@ def _pegar(cands):
     return None
 
 
-def _pegar_low():
-    return _pegar(feed.get_surebets(min_profit=0.0, max_profit=1.0))
-
-
-def _pegar_vip():
-    alvo = feed.get_surebets(min_profit=4.0, max_profit=10.0)
-    if not alvo:                        # sem 4-10% agora: pega a maior >1%
-        alvo = feed.get_surebets(min_profit=1.0001)
-    return _pegar(alvo)
+def _pegar_bet():
+    """Entrada do grupo: lucro 3-8%, só nas casas permitidas, ainda não postada.
+    Fallback: se não houver nenhuma na faixa agora, relaxa o lucro (1-8%)."""
+    cands = [s for s in feed.get_surebets(min_profit=LUCRO_MIN, max_profit=LUCRO_MAX)
+             if _casas_permitidas(s)]
+    if not cands:
+        cands = [s for s in feed.get_surebets(min_profit=1.0001, max_profit=LUCRO_MAX)
+                 if _casas_permitidas(s)]
+    return _pegar(cands)
 
 
 # ---------------------------------------------------------------------------
@@ -185,9 +196,11 @@ def gerar_teaser(sb):
 # ---------------------------------------------------------------------------
 # Posts
 # ---------------------------------------------------------------------------
-def postar_low():
-    sb = _pegar_low()
+def postar_bet():
+    """Posta a entrada do dia (3-8%, casas permitidas), completa com links."""
+    sb = _pegar_bet()
     if not sb:
+        print(">> promo: sem entrada 3-8% nas casas permitidas agora.")
         return False
     notifier.enviar_surebet(sb)      # já leva os links das casas + CTA no rodapé
     _estado["postados"].add(sb["id"])
@@ -195,7 +208,8 @@ def postar_low():
 
 
 def postar_vip():
-    sb = _pegar_vip()
+    """(Fora do fluxo diário — mantido p/ uso manual/futuro.) Teaser borrado."""
+    sb = _pegar(feed.get_surebets(min_profit=8.0))
     if not sb:
         return False
     cap = (
@@ -238,10 +252,7 @@ def _loop():
             if notifier.ativo():
                 if hhmm in SLOTS and hhmm not in _estado["slots"]:
                     _estado["slots"].add(hhmm)
-                    if hhmm == _slot_vip(a):
-                        postar_vip()
-                    else:
-                        postar_low()
+                    postar_bet()
                 elif hhmm in SOCIAL_TIMES and hhmm not in _estado["social"]:
                     _estado["social"].add(hhmm)
                     postar_social()
