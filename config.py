@@ -127,7 +127,7 @@ FREE_LUCRO_MAX = 2.0
 # FREE: vê só uma AMOSTRA de entradas de até 1% (as N mais próximas de 1%).
 # PRO:  vê TODAS as entradas com lucro > PRO_LUCRO_MIN (%).
 FREE_MAX_ENTRADAS = 25     # FREE vê as 25 primeiras de 0 a 1%
-PRO_LUCRO_MIN = 4.0        # PRO vê as de 4% pra cima
+PRO_LUCRO_MIN = 1.0001     # PRO vê TUDO acima de 1% (até o teto são de 25%)
 
 # Ligas a monitorar (keys da The Odds API). Ajustadas para o que está EM
 # TEMPORADA agora (jul/2026).
@@ -197,4 +197,4 @@ PROMO_ATIVO = os.getenv("PROMO_ATIVO", "1") not in ("0", "false", "False", "no")
 
 # Teto de lucro "são": surebets acima disso são ANOMALIAS (ex.: escanteios com
 # odd bugada dando 30-400%) e são descartadas na ingestão. Real vai até ~25%.
-MAX_LUCRO_SANO = float(os.getenv("MAX_LUCRO_SANO", "15"))
+MAX_LUCRO_SANO = float(os.getenv("MAX_LUCRO_SANO", "25"))
