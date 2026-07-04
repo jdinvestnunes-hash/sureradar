@@ -166,7 +166,7 @@ async function pagar(plano, metodo, btn){
     const j = await r.json().catch(()=>({}));
     if (r.ok && j.url) { location.href = j.url; return; }
     if (r.status === 401) { toast('🔒 Faça login pra assinar.'); setTimeout(()=>location.href='/login?plano='+plano, 1200); return; }
-    toast('❌ ' + (j.erro || 'Não foi possível iniciar o pagamento agora.'));
+    toast('❌ ' + (j.erro || 'Não foi possível iniciar o pagamento agora.') + (j.detalhe ? ' — ' + j.detalhe : ''));
   } catch (e) { toast('❌ Erro de conexão. Tente de novo.'); }
   btn.textContent = txt; btn.disabled = false;
 }
