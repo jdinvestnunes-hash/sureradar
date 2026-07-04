@@ -219,6 +219,10 @@ ABACATEPAY_WEBHOOK_SECRET = os.getenv("ABACATEPAY_WEBHOOK_SECRET", "").strip()
 RESEND_API_KEY = os.getenv("RESEND_API_KEY", "").strip()
 # Fluxo de nutrição por e-mail (boas-vindas + nudges pró p/ quem não comprou).
 LIFECYCLE_ATIVO = os.getenv("LIFECYCLE_ATIVO", "1") not in ("0", "false", "False", "no")
+
+# Segredo do /api/ingest: só o robô (que sabe o token) pode publicar surebets.
+# VAZIO = endpoint aberto (compatível com o robô atual). Setar p/ exigir o token.
+INGEST_TOKEN = os.getenv("INGEST_TOKEN", "").strip()
 # Remetente. Precisa ser de um domínio verificado no Resend (ex.: sureradar.site).
 # Enquanto não verificar o domínio, use "SureRadar <onboarding@resend.dev>" (teste).
 EMAIL_FROM = os.getenv("EMAIL_FROM", "SureRadar <nao-responda@sureradar.site>").strip()

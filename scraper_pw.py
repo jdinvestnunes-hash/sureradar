@@ -119,11 +119,16 @@ def resolver_todos(ctx, bets):
         _salvar_cache()
 
 
+INGEST_TOKEN = os.getenv("INGEST_TOKEN", "").strip()   # mesmo valor do Railway
+
+
 def enviar(records, modo="merge"):
     if not records:
         return
+    headers = {"X-Ingest-Token": INGEST_TOKEN} if INGEST_TOKEN else {}
     try:
-        r = requests.post(SAAS, json={"records": records, "modo": modo}, timeout=25)
+        r = requests.post(SAAS, json={"records": records, "modo": modo},
+                          headers=headers, timeout=25)
         print(f"   -> enviadas {len(records)} ao painel ({modo}, HTTP {r.status_code})")
     except Exception as e:
         print("   !! erro ao enviar:", e)

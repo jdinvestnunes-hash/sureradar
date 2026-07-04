@@ -96,10 +96,13 @@ app.add_middleware(
 
 @app.middleware("http")
 async def _private_network(request, call_next):
-    """Acrescenta o header de Private Network Access do Chrome a toda resposta
-    (o preflight OPTIONS é montado pelo CORSMiddleware; aqui só anexamos o PNA)."""
+    """Acrescenta o header de Private Network Access do Chrome + headers de
+    segurança (anti-clickjacking, anti-sniff, referrer)."""
     resp = await call_next(request)
     resp.headers["Access-Control-Allow-Private-Network"] = "true"
+    resp.headers["X-Frame-Options"] = "DENY"                # anti-clickjacking
+    resp.headers["X-Content-Type-Options"] = "nosniff"
+    resp.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     return resp
 
 # Filtros descobertos via ingestão (raspagem da conta). Espelham a surebet.com.
@@ -981,12 +984,17 @@ def _converter_raspagem(records):
 
 
 @app.post("/api/ingest")
-def ingest(payload: dict = Body(...)):
+def ingest(request: Request, payload: dict = Body(...)):
     """Recebe surebets raspadas da conta (via navegador) e publica no painel.
 
     Os filtros do painel (casas, esportes, lucro) passam a ESPELHAR o que veio
     na raspagem — nada de casas/esportes que não estão na sua conta.
     """
+    # Se INGEST_TOKEN estiver setado, exige o mesmo token (header ou body).
+    if config.INGEST_TOKEN:
+        enviado = request.headers.get("x-ingest-token") or payload.get("token", "")
+        if enviado != config.INGEST_TOKEN:
+            return JSONResponse({"erro": "não autorizado"}, status_code=401)
     global INGESTED_BOOKS, INGESTED_SPORTS, INGESTED_PROFIT
     contratos = _converter_raspagem(payload.get("records", []))
     quando = pipeline._agora_iso() + " (conta)"
