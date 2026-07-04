@@ -251,6 +251,13 @@ def health():
         info["db_ok"] = True
     except Exception as e:
         info["erro"] = type(e).__name__ + ": " + str(e)[:120]
+    # Diagnóstico de config (só True/False, nunca o valor do segredo).
+    info["pagamentos"] = {
+        "stripe_key": bool(config.STRIPE_SECRET_KEY),
+        "stripe_webhook": bool(config.STRIPE_WEBHOOK_SECRET),
+        "abacatepay_key": bool(config.ABACATEPAY_API_KEY),
+        "abacatepay_webhook": bool(config.ABACATEPAY_WEBHOOK_SECRET),
+    }
     return info
 
 
