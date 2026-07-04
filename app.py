@@ -729,12 +729,14 @@ def admin_testar_email(request: Request):
     return {"ok": ok, "para": user["email"], "from": config.EMAIL_FROM, "detalhe": detalhe}
 
 
-@app.post("/api/admin/testar-telegram")
+@app.api_route("/api/admin/testar-telegram", methods=["GET", "POST"])
 def admin_testar_telegram(request: Request):
-    """Diagnóstico do bot do Telegram (valida token + posta no grupo)."""
+    """Diagnóstico do bot do Telegram (valida token + posta no grupo).
+    Aceita GET p/ você abrir direto no navegador (logado como admin)."""
     user = _usuario(request)
     if not _admin_email(user):
-        return JSONResponse({"erro": "só admin"}, status_code=403)
+        return JSONResponse({"erro": "Faça login com seu e-mail de admin primeiro."},
+                            status_code=403)
     return notifier.testar()
 
 
