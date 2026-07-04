@@ -58,6 +58,18 @@
     .pay-row{display:flex;gap:8px}
     .pay-row .btn{padding:13px 10px;font-size:14px}
     .btn-pix{background:rgba(56,212,245,.12);color:var(--cyan);border:1px solid rgba(56,212,245,.45)}
+
+    .modal-bg{position:fixed;inset:0;background:rgba(3,5,10,.72);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;z-index:50;padding:20px}
+    .modal-bg.show{display:flex}
+    .modal{background:var(--card);border:1px solid var(--line2);border-radius:20px;padding:28px;max-width:420px;width:100%;box-shadow:0 30px 80px rgba(0,0,0,.5)}
+    .modal-title{font-family:var(--font-d);font-size:20px;font-weight:800}
+    .modal-sub{color:var(--dim);font-size:13.5px;margin:8px 0 20px;line-height:1.5}
+    .fld{display:block;font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);margin-bottom:14px}
+    .fld input{display:block;width:100%;margin-top:7px;background:var(--bg);border:1px solid var(--line2);border-radius:11px;padding:13px 14px;color:var(--text);font-size:15px;font-family:var(--font-b);text-transform:none;letter-spacing:0}
+    .fld input:focus{outline:none;border-color:var(--cyan)}
+    .modal-err{color:#ff6b6b;font-size:13px;min-height:18px;margin-bottom:8px}
+    .modal-actions{display:flex;gap:10px;justify-content:flex-end}
+    .modal-actions .btn{width:auto}
     .btn-pix:hover{background:rgba(56,212,245,.2)}
     .payback{margin-top:12px;font-size:12px;text-align:center;color:var(--gold);font-weight:700;min-height:16px}
 
@@ -153,16 +165,35 @@
   <div style="height:50px"></div>
 </div>
 
+<div class="modal-bg" id="pix-modal">
+  <div class="modal">
+    <div class="modal-title">⚡ Pagar com Pix</div>
+    <div class="modal-sub">Precisamos do seu CPF e celular pra gerar a cobrança Pix (exigência do Pix). Seus dados vão só pro processador de pagamento.</div>
+    <label class="fld">CPF
+      <input id="pix-cpf" inputmode="numeric" autocomplete="off" placeholder="000.000.000-00" maxlength="14" />
+    </label>
+    <label class="fld">Celular (com DDD)
+      <input id="pix-cel" inputmode="numeric" autocomplete="off" placeholder="(11) 90000-0000" maxlength="16" />
+    </label>
+    <div class="modal-err" id="pix-err"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="pix-cancel">Cancelar</button>
+      <button class="btn btn-primary" id="pix-go">Gerar Pix →</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
 const toast = (html) => { const t=document.getElementById('toast'); t.innerHTML=html; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),5000); };
 
-async function pagar(plano, metodo, btn){
+async function pagar(plano, metodo, btn, extras){
   const ep = metodo === 'pix' ? '/api/checkout/pix' : '/api/checkout/stripe';
   const txt = btn.textContent; btn.textContent = '⏳ Gerando...'; btn.disabled = true;
   try {
-    const r = await fetch(ep, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({plano})});
+    const body = Object.assign({plano}, extras || {});
+    const r = await fetch(ep, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
     const j = await r.json().catch(()=>({}));
     if (r.ok && j.url) { location.href = j.url; return; }
     if (r.status === 401) { toast('🔒 Faça login pra assinar.'); setTimeout(()=>location.href='/login?plano='+plano, 1200); return; }
@@ -171,10 +202,39 @@ async function pagar(plano, metodo, btn){
   btn.textContent = txt; btn.disabled = false;
 }
 
+// ---- Pix: pede CPF + celular (exigência da AbacatePay v1) ----
+const $id = s => document.getElementById(s);
+let pixCtx = null;
+function abrirPix(plano, btn){ pixCtx = {plano, btn}; $id('pix-err').textContent=''; $id('pix-modal').classList.add('show'); setTimeout(()=>$id('pix-cpf').focus(),50); }
+function fecharPix(){ $id('pix-modal').classList.remove('show'); }
+$id('pix-cancel').onclick = fecharPix;
+$id('pix-modal').addEventListener('click', e=>{ if(e.target.id==='pix-modal') fecharPix(); });
+
+$id('pix-cpf').addEventListener('input', e=>{
+  let v = e.target.value.replace(/\D/g,'').slice(0,11);
+  e.target.value = v.replace(/(\d{3})(\d)/,'$1.$2').replace(/(\d{3})(\d)/,'$1.$2').replace(/(\d{3})(\d{1,2})$/,'$1-$2');
+});
+$id('pix-cel').addEventListener('input', e=>{
+  let v = e.target.value.replace(/\D/g,'').slice(0,11);
+  if (v.length > 10) v = v.replace(/(\d{2})(\d{5})(\d{0,4})/,'($1) $2-$3');
+  else if (v.length > 6) v = v.replace(/(\d{2})(\d{4})(\d{0,4})/,'($1) $2-$3');
+  else if (v.length > 2) v = v.replace(/(\d{2})(\d{0,5})/,'($1) $2');
+  e.target.value = v;
+});
+$id('pix-go').onclick = ()=>{
+  const cpf = $id('pix-cpf').value.replace(/\D/g,'');
+  const cel = $id('pix-cel').value.replace(/\D/g,'');
+  if (cpf.length !== 11){ $id('pix-err').textContent = 'CPF inválido — 11 dígitos.'; return; }
+  if (cel.length < 10 || cel.length > 11){ $id('pix-err').textContent = 'Celular inválido — inclua o DDD.'; return; }
+  fecharPix();
+  pagar(pixCtx.plano, 'pix', pixCtx.btn, {cpf, celular: cel});
+};
+
 document.querySelectorAll('[data-pay]').forEach(b=>{
   b.addEventListener('click', ()=>{
     const [plano, metodo] = b.dataset.pay.split(':');
-    pagar(plano, metodo, b);
+    if (metodo === 'pix') abrirPix(plano, b);
+    else pagar(plano, metodo, b);
   });
 });
 </script>

@@ -403,6 +403,19 @@ def checkout_pix(request: Request, payload: dict = Body(...)):
         return JSONResponse({"erro": "plano inválido"}, status_code=400)
     if not config.ABACATEPAY_API_KEY:
         return JSONResponse({"erro": "AbacatePay não configurado"}, status_code=503)
+    # A v1 exige customer COMPLETO (name, email, cellphone, taxId/CPF). O front
+    # coleta CPF + celular numa telinha antes de chamar aqui.
+    cpf = "".join(ch for ch in str(payload.get("cpf", "")) if ch.isdigit())
+    celular = "".join(ch for ch in str(payload.get("celular", "")) if ch.isdigit())
+    if len(cpf) != 11:
+        return JSONResponse({"erro": "CPF inválido — informe os 11 dígitos."}, status_code=400)
+    if len(celular) not in (10, 11):
+        return JSONResponse({"erro": "Celular inválido — informe com DDD."}, status_code=400)
+    cpf_fmt = f"{cpf[:3]}.{cpf[3:6]}.{cpf[6:9]}-{cpf[9:]}"
+    if len(celular) == 11:
+        cel_fmt = f"({celular[:2]}) {celular[2:7]}-{celular[7:]}"
+    else:
+        cel_fmt = f"({celular[:2]}) {celular[2:6]}-{celular[6:]}"
     body = {
         "frequency": "ONE_TIME",
         "methods": ["PIX"],
@@ -415,9 +428,12 @@ def checkout_pix(request: Request, payload: dict = Body(...)):
         }],
         "returnUrl": config.SITE_URL + "/planos",
         "completionUrl": config.SITE_URL + "/perfil?pago=1",
-        # NÃO enviamos "customer": a v1 exige customer COMPLETO (name, email,
-        # cellphone, taxId/CPF). Como não pedimos telefone/CPF no cadastro, deixamos
-        # a própria AbacatePay coletar esses dados do comprador na tela de Pix dela.
+        "customer": {
+            "name": user["nome"],
+            "email": user["email"],
+            "cellphone": cel_fmt,
+            "taxId": cpf_fmt,
+        },
     }
     try:
         r = requests.post("https://api.abacatepay.com/v1/billing/create", json=body,
