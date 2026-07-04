@@ -56,6 +56,34 @@ def _layout(titulo: str, corpo_html: str) -> str:
 </div>"""
 
 
+def enviar_boas_vindas(to: str, nome: str) -> bool:
+    """E-mail de boas-vindas quando a conta é criada (personalizado com o nome)."""
+    primeiro = (nome or "").strip().split(" ")[0] or "trader"
+    painel = config.SITE_URL + "/app"
+    corpo = f"""\
+    <p style="color:#a3b1c9;font-size:14.5px;line-height:1.6">
+      Fala, {primeiro}! 🎯 Sua conta no <b style="color:#f2f6fc">SureRadar</b> está pronta.
+    </p>
+    <p style="color:#a3b1c9;font-size:14.5px;line-height:1.6">
+      A gente encontra <b style="color:#2ee6a8">surebets</b> — apostas onde você cobre todos os
+      resultados em casas diferentes e trava o <b style="color:#f2f6fc">lucro garantido</b>, dê no que der.
+      As oportunidades já estão no seu painel, atualizando o tempo todo.
+    </p>
+    <a href="{painel}" style="display:inline-block;margin:18px 0;background:#2ee6a8;color:#052015;
+       text-decoration:none;font-weight:800;font-size:15px;padding:13px 26px;border-radius:12px">
+      Ver as entradas de hoje →
+    </a>
+    <p style="color:#a3b1c9;font-size:13.5px;line-height:1.6">
+      No plano <b style="color:#f2f6fc">Grátis</b> você já vê entradas até 1%. No
+      <b style="color:#ffc94d">PRO</b> destrava as de maior lucro (1% a 15%+), sem limite.
+    </p>
+    <p style="color:#5e6b85;font-size:13px;line-height:1.6">
+      Bons greens! 🍀 — Equipe SureRadar
+    </p>"""
+    return enviar(to, f"Bem-vindo ao SureRadar, {primeiro}! 🎯",
+                  _layout("Sua conta está pronta", corpo))
+
+
 def enviar_reset_senha(to: str, nome: str, link: str) -> bool:
     """E-mail com o link para redefinir a senha (válido por 1 hora)."""
     corpo = f"""\

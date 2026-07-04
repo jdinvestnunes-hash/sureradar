@@ -31,7 +31,7 @@ except (AttributeError, ValueError):
 import re
 from datetime import datetime, timezone
 
-from fastapi import Body, FastAPI, Query, Request, Response
+from fastapi import BackgroundTasks, Body, FastAPI, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -207,12 +207,13 @@ def _com_sessao(resp: Response, user_id: int):
 
 
 @app.post("/api/register")
-def register(payload: dict = Body(...)):
+def register(background_tasks: BackgroundTasks, payload: dict = Body(...)):
     user, erro = auth.criar_usuario(
         payload.get("nome", ""), payload.get("email", ""), payload.get("senha", ""),
         payload.get("whatsapp", ""))
     if erro:
         return JSONResponse({"erro": erro}, status_code=400)
+    background_tasks.add_task(emailer.enviar_boas_vindas, user["email"], user["nome"])
     resp = JSONResponse({"ok": True, "user": user})
     return _com_sessao(resp, user["id"])
 
@@ -286,7 +287,7 @@ def google_login(request: Request):
 
 
 @app.get("/auth/callback")
-def google_callback(request: Request, code: str = "", state: str = ""):
+def google_callback(request: Request, background_tasks: BackgroundTasks, code: str = "", state: str = ""):
     import requests
     if not code or not state or state != request.cookies.get("g_state"):
         return RedirectResponse("/login?erro=google", status_code=302)
@@ -309,7 +310,9 @@ def google_callback(request: Request, code: str = "", state: str = ""):
     email = info.get("email")
     if not email:
         return RedirectResponse("/login?erro=google", status_code=302)
-    user = auth.pegar_ou_criar_google(email, info.get("name", ""))
+    user, novo = auth.pegar_ou_criar_google(email, info.get("name", ""))
+    if novo:
+        background_tasks.add_task(emailer.enviar_boas_vindas, user["email"], user["nome"])
     resp = RedirectResponse("/app", status_code=302)
     resp.delete_cookie("g_state", path="/")
     return _com_sessao(resp, user["id"])

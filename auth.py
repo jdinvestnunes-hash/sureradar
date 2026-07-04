@@ -571,12 +571,12 @@ def pegar_ou_criar_google(email: str, nome: str):
     with _db() as c:
         row = c.execute(_q("SELECT * FROM users WHERE email=?"), (email,)).fetchone()
         if row:
-            return _perfil(row)
+            return _perfil(row), False       # já existia
         salt = secrets.token_bytes(16)
         uid = _insert(c,
             "INSERT INTO users(nome,email,hash,salt,plano,criado) VALUES(?,?,?,?,?,?)",
             (nome, email, _hash(secrets.token_hex(24), salt), salt, "free", time.time()))
-    return {"id": uid, "nome": nome, "email": email, "plano": "free", "plano_expira": None}
+    return {"id": uid, "nome": nome, "email": email, "plano": "free", "plano_expira": None}, True
 
 
 def atualizar_whatsapp(user_id, whatsapp):
