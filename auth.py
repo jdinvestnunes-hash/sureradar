@@ -10,6 +10,7 @@ estiver definida; senão cai no SQLite local (bom para desenvolvimento).
 """
 
 import hashlib
+import math
 import os
 import secrets
 import threading
@@ -187,7 +188,9 @@ def dias_restantes(user):
     exp = user.get("plano_expira")
     if user.get("plano") == "free" or not exp:
         return None
-    return max(0, int((exp - time.time()) / 86400))
+    # ARREDONDA PRA CIMA: quem paga 30 dias vê 30 (não 29 só porque já passou
+    # parte de hoje). No último dia mostra "1 dia" até vencer de verdade.
+    return max(0, math.ceil((exp - time.time()) / 86400))
 
 
 def _normalizar_plano(c, row):
@@ -338,7 +341,7 @@ def metricas():
 
     def dias_rest(u):
         e = u.get("plano_expira")
-        return max(0, int((e - now) / 86400)) if (u["plano"] == "pro" and e) else None
+        return max(0, math.ceil((e - now) / 86400)) if (u["plano"] == "pro" and e) else None
 
     recentes = [{"nome": u["nome"], "email": u["email"], "plano": ("pro" if _ativo(u) else "free"),
                  "dias": dias_rest(u), "criado": u["criado"]}
