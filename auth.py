@@ -113,6 +113,7 @@ def init():
             id {_SERIAL},
             nome TEXT NOT NULL,
             email TEXT UNIQUE NOT NULL,
+            whatsapp TEXT,
             hash {_BIN} NOT NULL,
             salt {_BIN} NOT NULL,
             plano TEXT NOT NULL DEFAULT 'free',
@@ -185,7 +186,8 @@ def init():
     # Migrações leves para bancos antigos: cada ALTER na SUA transação (no
     # Postgres, um erro aborta a transação inteira). Erro = coluna já existe.
     for tabela, coluna in [("checkouts", "pi TEXT"),
-                           ("users", f"plano_expira {_NUM}")]:
+                           ("users", f"plano_expira {_NUM}"),
+                           ("users", "whatsapp TEXT")]:
         try:
             with _db() as c:
                 c.execute(f"ALTER TABLE {tabela} ADD COLUMN {coluna}")
@@ -539,21 +541,24 @@ def banca_set(user_id: int, entradas: list):
 # ---------------------------------------------------------------------------
 # Cadastro / login
 # ---------------------------------------------------------------------------
-def criar_usuario(nome: str, email: str, senha: str):
+def criar_usuario(nome: str, email: str, senha: str, whatsapp: str = ""):
     nome = (nome or "").strip()
     email = (email or "").strip().lower()
+    whats = "".join(ch for ch in (whatsapp or "") if ch.isdigit())
     if len(nome) < 2:
         return None, "Digite seu nome."
     if "@" not in email or "." not in email.split("@")[-1]:
         return None, "E-mail inválido."
+    if len(whats) not in (10, 11):
+        return None, "WhatsApp inválido — informe com DDD (ex.: 11 99999-9999)."
     if len(senha or "") < 6:
         return None, "A senha precisa ter pelo menos 6 caracteres."
     salt = secrets.token_bytes(16)
     try:
         with _db() as c:
             uid = _insert(c,
-                "INSERT INTO users(nome,email,hash,salt,plano,criado) VALUES(?,?,?,?,?,?)",
-                (nome, email, _hash(senha, salt), salt, "free", time.time()))
+                "INSERT INTO users(nome,email,whatsapp,hash,salt,plano,criado) VALUES(?,?,?,?,?,?,?)",
+                (nome, email, whats, _hash(senha, salt), salt, "free", time.time()))
     except UNIQUE_ERR:
         return None, "Este e-mail já tem conta. Faça login."
     return {"id": uid, "nome": nome, "email": email, "plano": "free", "plano_expira": None}, None

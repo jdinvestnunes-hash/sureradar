@@ -209,7 +209,8 @@ def _com_sessao(resp: Response, user_id: int):
 @app.post("/api/register")
 def register(payload: dict = Body(...)):
     user, erro = auth.criar_usuario(
-        payload.get("nome", ""), payload.get("email", ""), payload.get("senha", ""))
+        payload.get("nome", ""), payload.get("email", ""), payload.get("senha", ""),
+        payload.get("whatsapp", ""))
     if erro:
         return JSONResponse({"erro": erro}, status_code=400)
     resp = JSONResponse({"ok": True, "user": user})

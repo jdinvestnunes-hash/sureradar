@@ -58,6 +58,12 @@
     .field input{width:100%;background:var(--card);border:1px solid var(--line2);border-radius:12px;padding:14px 16px;font-family:var(--font-b);font-size:15px;color:var(--text);outline:none;transition:.15s}
     .field input:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(46,230,168,.14)}
     .field input::placeholder{color:var(--mute)}
+    .pw-wrap{position:relative}
+    .pw-wrap input{padding-right:48px}
+    .pw-eye{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;
+            cursor:pointer;color:var(--mute);padding:8px;display:flex;align-items:center;border-radius:8px}
+    .pw-eye:hover{color:var(--dim)}
+    .pw-eye svg{width:20px;height:20px}
     .erro{display:none;background:rgba(255,107,107,.1);border:1px solid rgba(255,107,107,.35);color:var(--red);font-size:13.5px;font-weight:600;border-radius:11px;padding:12px 15px;margin-bottom:16px}
     .btn{width:100%;display:flex;align-items:center;justify-content:center;gap:9px;font-weight:800;font-size:15.5px;padding:16px;border-radius:13px;cursor:pointer;border:none;font-family:var(--font-b);background:var(--grad);color:#052015;box-shadow:0 12px 30px rgba(46,230,168,.28);transition:.16s;margin-top:6px}
     .btn:hover{transform:translateY(-1px);filter:brightness(1.06)}
@@ -148,9 +154,23 @@
           <label for="email">E-mail</label>
           <input type="email" id="email" placeholder="voce@email.com" autocomplete="email" required />
         </div>
+        <div class="field" id="f-whats">
+          <label for="whatsapp">WhatsApp</label>
+          <input type="tel" id="whatsapp" placeholder="(11) 99999-9999" autocomplete="tel" inputmode="numeric" maxlength="16" />
+        </div>
         <div class="field">
           <label for="senha">Senha</label>
-          <input type="password" id="senha" placeholder="Mínimo 6 caracteres" autocomplete="current-password" required minlength="6" />
+          <div class="pw-wrap">
+            <input type="password" id="senha" placeholder="Mínimo 6 caracteres" autocomplete="current-password" required minlength="6" />
+            <button type="button" class="pw-eye" data-eye="senha" aria-label="Mostrar senha"></button>
+          </div>
+        </div>
+        <div class="field" id="f-senha2">
+          <label for="senha2">Confirmar senha</label>
+          <div class="pw-wrap">
+            <input type="password" id="senha2" placeholder="Repita a senha" autocomplete="new-password" minlength="6" />
+            <button type="button" class="pw-eye" data-eye="senha2" aria-label="Mostrar senha"></button>
+          </div>
         </div>
         <button class="btn" id="btn" type="submit">Criar conta e ver entradas →</button>
       </form>
@@ -174,6 +194,9 @@ function modo(m){
   $('#tab-cad').classList.toggle('active', cad);
   $('#tab-login').classList.toggle('active', !cad);
   $('#f-nome').style.display = cad ? '' : 'none';
+  $('#f-whats').style.display = cad ? '' : 'none';
+  $('#f-senha2').style.display = cad ? '' : 'none';
+  $('#senha').setAttribute('autocomplete', cad ? 'new-password' : 'current-password');
   $('#head-cad').style.display = cad ? '' : 'none';
   $('#head-login').style.display = cad ? 'none' : '';
   $('#swap-cad').style.display = cad ? '' : 'none';
@@ -224,7 +247,19 @@ $('#form').addEventListener('submit', async (e) => {
   erro.style.display = 'none';
   btn.disabled = true;
   const body = { email: $('#email').value, senha: $('#senha').value };
-  if (MODO === 'cadastro') body.nome = $('#nome').value;
+  if (MODO === 'cadastro') {
+    body.nome = $('#nome').value;
+    body.whatsapp = $('#whatsapp').value;
+    const wd = ($('#whatsapp').value || '').replace(/\D/g, '');
+    if (wd.length !== 10 && wd.length !== 11) {
+      erro.textContent = 'WhatsApp inválido — informe com DDD.'; erro.style.color = '';
+      erro.style.display = 'block'; btn.disabled = false; return;
+    }
+    if ($('#senha').value !== $('#senha2').value) {
+      erro.textContent = 'As senhas não são iguais.'; erro.style.color = '';
+      erro.style.display = 'block'; btn.disabled = false; return;
+    }
+  }
   try {
     const r = await fetch(MODO === 'cadastro' ? '/api/register' : '/api/login', {
       method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body)
@@ -237,6 +272,29 @@ $('#form').addEventListener('submit', async (e) => {
     erro.style.display = 'block';
     btn.disabled = false;
   }
+});
+
+// olhinho: mostrar/ocultar senha
+const EYE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>';
+const EYE_OFF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-10-8-10-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 10 8 10 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+document.querySelectorAll('.pw-eye').forEach(b => {
+  b.innerHTML = EYE;
+  b.addEventListener('click', () => {
+    const inp = $('#' + b.dataset.eye);
+    const mostrar = inp.type === 'password';
+    inp.type = mostrar ? 'text' : 'password';
+    b.innerHTML = mostrar ? EYE_OFF : EYE;
+  });
+});
+
+// máscara do WhatsApp: (11) 99999-9999
+$('#whatsapp').addEventListener('input', (e) => {
+  let v = e.target.value.replace(/\D/g, '').slice(0, 11);
+  if (v.length > 10) v = v.replace(/(\d{2})(\d{5})(\d{0,4})/, '($1) $2-$3');
+  else if (v.length > 6) v = v.replace(/(\d{2})(\d{4})(\d{0,4})/, '($1) $2-$3');
+  else if (v.length > 2) v = v.replace(/(\d{2})(\d{0,5})/, '($1) $2');
+  else if (v.length > 0) v = v.replace(/(\d{0,2})/, '($1');
+  e.target.value = v;
 });
 </script>
 </body>
