@@ -45,7 +45,11 @@ _lock = threading.Lock()
 # poder MESCLAR raspagens parciais (ex.: view "≤1%" e view "PRO" vêm em ingests
 # separados) sem uma apagar a outra, e EXPIRAR as que sumiram da fonte.
 _bets: dict = {}
-_EXPIRY_SEG = 720             # 12 min sem reaparecer -> a surebet é removida
+# Rede de segurança: só remove por TEMPO se o robô parar de mandar. A remoção
+# normal (aposta que saiu da conta) é IMEDIATA, no snapshot da próxima raspagem.
+# Tem que ser MAIOR que o ciclo do robô (~12 min) senão a aposta some antes da
+# próxima raspagem chegar (bug do "sumiu antes dos 10 min").
+_EXPIRY_SEG = 1500            # 25 min sem NENHUMA raspagem -> aí sim limpa
 _ultima_atualizacao: str = None
 _ultima_ts: float = 0          # unix time da última atualização (p/ o timer)
 _ingest_ts: float = 0          # unix time do último INGEST REAL (extensão/conta)
