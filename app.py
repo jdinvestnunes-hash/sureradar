@@ -750,6 +750,34 @@ def admin_telegram_chats(request: Request):
     return notifier.descobrir_chats()
 
 
+_MSG_BOASVINDAS = (
+    "🏆 <b>BEM-VINDO AO ALQUIMIA DO GREEN</b> 🏆\n\n\n"
+    "Aqui você recebe <b>+30 apostas GRÁTIS todos os dias</b> 📲\n\n\n"
+    "✅ Entradas de <b>1% a 5% de lucro garantido</b>\n\n"
+    "✅ <b>Surebet</b> = você cobre todos os resultados em casas diferentes e "
+    "<b>trava o lucro, dê no que der</b>. Não é sorte, é matemática 🧮\n\n"
+    "✅ Cada entrada já vem com as <b>casas, as odds e o link</b> pra apostar\n\n\n"
+    "💰 <b>COMO USAR:</b>\n\n"
+    "1️⃣ Chegou a entrada → clica no link de cada casa\n\n"
+    "2️⃣ Aposta os valores indicados (ou usa a nossa <b>calculadora</b> com a SUA banca)\n\n"
+    "3️⃣ Lucro travado ✅\n\n\n"
+    "🔓 <b>Quer as entradas de 5% a 15%+?</b>\n\n"
+    "Essas são exclusivas do <b>PRO</b> 👉 https://sureradar.site\n\n\n"
+    "⚠️ +18 • Aposte com responsabilidade"
+)
+
+
+@app.api_route("/api/admin/postar-boasvindas", methods=["GET", "POST"])
+def admin_postar_boasvindas(request: Request):
+    """Posta a mensagem de boas-vindas (formatada) no canal configurado."""
+    user = _usuario(request)
+    if not _admin_email(user):
+        return JSONResponse({"erro": "Faça login com seu e-mail de admin primeiro."},
+                            status_code=403)
+    ok = notifier.enviar_texto(_MSG_BOASVINDAS)
+    return {"ok": ok, "postou_em_chat_id": config.TELEGRAM_CHAT_ID or "(não configurado)"}
+
+
 @app.post("/api/perfil/whatsapp")
 def perfil_whatsapp(request: Request, payload: dict = Body(...)):
     """Salva/atualiza o WhatsApp (usado tb p/ contas Google que não têm)."""
