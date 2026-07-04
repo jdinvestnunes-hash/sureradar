@@ -43,6 +43,32 @@ def enviar_texto(texto):
     })
 
 
+def testar():
+    """Diagnóstico: valida o token (getMe) e tenta postar no grupo (sendMessage).
+    Devolve a resposta crua do Telegram — mostra token errado / bot fora do grupo."""
+    out = {"tem_token": bool(config.TELEGRAM_BOT_TOKEN),
+           "tem_chat_id": bool(config.TELEGRAM_CHAT_ID)}
+    if not config.TELEGRAM_BOT_TOKEN:
+        out["erro"] = "TELEGRAM_BOT_TOKEN não configurado"
+        return out
+    try:
+        r = requests.get(API.format(token=config.TELEGRAM_BOT_TOKEN, metodo="getMe"), timeout=10)
+        out["getMe"] = f"{r.status_code}: {r.text[:200]}"
+    except Exception as e:
+        out["getMe"] = "erro: " + str(e)[:150]
+    if config.TELEGRAM_CHAT_ID:
+        try:
+            r = requests.post(API.format(token=config.TELEGRAM_BOT_TOKEN, metodo="sendMessage"),
+                              json={"chat_id": config.TELEGRAM_CHAT_ID,
+                                    "text": "✅ Teste do SureRadar — bot funcionando."}, timeout=10)
+            out["sendMessage"] = f"{r.status_code}: {r.text[:250]}"
+        except Exception as e:
+            out["sendMessage"] = "erro: " + str(e)[:150]
+    else:
+        out["sendMessage"] = "TELEGRAM_CHAT_ID não configurado"
+    return out
+
+
 def _brl(v):
     """Formata número como R$ 1.234,56 (padrão brasileiro)."""
     return "R$ " + f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")

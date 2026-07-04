@@ -43,6 +43,7 @@ import config
 import emailer
 import feed
 import lifecycle
+import notifier
 import pipeline
 import promo
 
@@ -428,6 +429,11 @@ def health():
         "resend_key": bool(config.RESEND_API_KEY),
         "from": config.EMAIL_FROM,
     }
+    info["telegram"] = {
+        "bot_token": bool(config.TELEGRAM_BOT_TOKEN),
+        "chat_id": bool(config.TELEGRAM_CHAT_ID),
+        "promo_ativo": config.PROMO_ATIVO,
+    }
     return info
 
 
@@ -721,6 +727,15 @@ def admin_testar_email(request: Request):
         return JSONResponse({"erro": "só admin"}, status_code=403)
     ok, detalhe = emailer.testar(user["email"])
     return {"ok": ok, "para": user["email"], "from": config.EMAIL_FROM, "detalhe": detalhe}
+
+
+@app.post("/api/admin/testar-telegram")
+def admin_testar_telegram(request: Request):
+    """Diagnóstico do bot do Telegram (valida token + posta no grupo)."""
+    user = _usuario(request)
+    if not _admin_email(user):
+        return JSONResponse({"erro": "só admin"}, status_code=403)
+    return notifier.testar()
 
 
 @app.post("/api/perfil/whatsapp")
