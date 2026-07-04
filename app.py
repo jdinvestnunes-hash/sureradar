@@ -772,6 +772,22 @@ def tickets_criar(request: Request, payload: dict = Body(...)):
     return {"ok": True}
 
 
+@app.post("/api/tickets/responder")
+def tickets_responder_user(request: Request, payload: dict = Body(...)):
+    """Usuário responde ao próprio ticket (só quando é a vez dele)."""
+    user = _usuario(request)
+    if not user:
+        return JSONResponse({"erro": "não autenticado"}, status_code=401)
+    try:
+        tid = int(payload.get("ticket_id"))
+    except (TypeError, ValueError):
+        return JSONResponse({"erro": "id inválido"}, status_code=400)
+    ok, erro = auth.responder_ticket_user(user["id"], tid, payload.get("mensagem", ""))
+    if not ok:
+        return JSONResponse({"erro": erro}, status_code=400)
+    return {"ok": True}
+
+
 # --- Painel ADMIN (dar/renovar PRO com a duração escolhida) ---
 @app.post("/api/admin/unlock")
 def admin_unlock(request: Request, payload: dict = Body(...)):
@@ -854,12 +870,26 @@ def admin_plano(request: Request, payload: dict = Body(...)):
 
 
 @app.get("/api/admin/tickets")
-def admin_tickets(request: Request):
+def admin_tickets(request: Request, status: str = ""):
     user = _usuario(request)
     erro = _guard_admin(request, user)
     if erro:
         return erro
-    return {"tickets": auth.listar_tickets_admin()}
+    return {"tickets": auth.listar_tickets_admin(status or None)}
+
+
+@app.post("/api/admin/tickets/resolver")
+def admin_tickets_resolver(request: Request, payload: dict = Body(...)):
+    user = _usuario(request)
+    erro = _guard_admin(request, user)
+    if erro:
+        return erro
+    try:
+        tid = int(payload.get("id"))
+    except (TypeError, ValueError):
+        return JSONResponse({"erro": "id inválido"}, status_code=400)
+    auth.resolver_ticket(tid)
+    return {"ok": True}
 
 
 @app.post("/api/admin/tickets/responder")

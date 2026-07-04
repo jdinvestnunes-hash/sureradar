@@ -232,6 +232,21 @@ def init():
                 c.execute(f"ALTER TABLE {tabela} ADD COLUMN {coluna}")
         except Exception:
             pass
+    # Migra tickets antigos (mensagem/resposta -> conversa em ticket_msgs) + status.
+    try:
+        with _db() as c:
+            c.execute("UPDATE tickets SET status='aguardando' WHERE status='aberto'")
+            legacy = c.execute("""SELECT id, mensagem, resposta, criado, respondido FROM tickets t
+                WHERE NOT EXISTS (SELECT 1 FROM ticket_msgs m WHERE m.ticket_id=t.id)""").fetchall()
+            for t in legacy:
+                if t["mensagem"]:
+                    c.execute(_q("INSERT INTO ticket_msgs(ticket_id,autor,texto,criado) VALUES(?,?,?,?)"),
+                              (t["id"], "user", t["mensagem"], t["criado"]))
+                if t["resposta"]:
+                    c.execute(_q("INSERT INTO ticket_msgs(ticket_id,autor,texto,criado) VALUES(?,?,?,?)"),
+                              (t["id"], "admin", t["resposta"], t["respondido"] or t["criado"]))
+    except Exception as e:
+        print("!! migracao tickets:", e)
 
 
 # ---------------------------------------------------------------------------
@@ -357,66 +372,120 @@ def registrar_post(post_id):
 
 
 # ---------------------------------------------------------------------------
-# Tickets de suporte
+# Tickets de suporte (conversa ida-e-volta, trava por turno)
+#   status: 'aguardando' (vez do admin) | 'respondido' (vez do usuário) | 'resolvido'
 # ---------------------------------------------------------------------------
-def _ultimo_ticket_ts(user_id):
+def _msg_ticket(c, ticket_id, autor, texto):
+    c.execute(_q("INSERT INTO ticket_msgs(ticket_id,autor,texto,criado) VALUES(?,?,?,?)"),
+              (ticket_id, autor, texto[:4000], time.time()))
+
+
+def _threads(ticket_ids):
+    if not ticket_ids:
+        return {}
+    ph = ",".join(["?"] * len(ticket_ids))
     with _db() as c:
-        row = c.execute(_q("SELECT criado FROM tickets WHERE user_id=? ORDER BY criado DESC LIMIT 1"),
-                        (user_id,)).fetchone()
-    return row["criado"] if row else 0
+        rows = c.execute(_q(f"""SELECT ticket_id, autor, texto, criado FROM ticket_msgs
+            WHERE ticket_id IN ({ph}) ORDER BY criado ASC"""), tuple(ticket_ids)).fetchall()
+    out = {}
+    for r in rows:
+        out.setdefault(r["ticket_id"], []).append(dict(r))
+    return out
 
 
 def criar_ticket(user_id, mensagem):
-    """Abre um ticket. Trava: 1 por usuário a cada 24h. Retorna (ok, erro)."""
+    """Abre um ticket NOVO. Trava: 1 novo ticket por usuário a cada 24h."""
     msg = (mensagem or "").strip()
     if len(msg) < 5:
         return False, "Escreva sua mensagem (mínimo 5 caracteres)."
     msg = msg[:2000]
-    ult = _ultimo_ticket_ts(user_id)
-    if ult and (time.time() - ult) < 86400:
-        horas = int((86400 - (time.time() - ult)) / 3600) + 1
-        return False, f"Você já enviou um ticket. Pode enviar outro em ~{horas}h."
     with _db() as c:
-        c.execute(_q("INSERT INTO tickets(user_id,mensagem,resposta,status,criado) VALUES(?,?,?,?,?)"),
-                  (user_id, msg, None, "aberto", time.time()))
+        row = c.execute(_q("SELECT criado FROM tickets WHERE user_id=? ORDER BY criado DESC LIMIT 1"),
+                        (user_id,)).fetchone()
+        if row and (time.time() - row["criado"]) < 86400:
+            horas = int((86400 - (time.time() - row["criado"])) / 3600) + 1
+            return False, f"Você já abriu um ticket. Pode abrir outro em ~{horas}h."
+        tid = _insert(c, "INSERT INTO tickets(user_id,mensagem,status,criado) VALUES(?,?,?,?)",
+                      (user_id, msg, "aguardando", time.time()))
+        _msg_ticket(c, tid, "user", msg)
     return True, None
 
 
-def listar_tickets_user(user_id):
+def responder_ticket_user(user_id, ticket_id, mensagem):
+    """Usuário responde ao PRÓPRIO ticket — só quando é a vez dele (admin já
+    respondeu). Depois trava de novo (vez do admin)."""
+    msg = (mensagem or "").strip()
+    if len(msg) < 2:
+        return False, "Escreva sua mensagem."
     with _db() as c:
-        rows = c.execute(_q("""SELECT id, mensagem, resposta, status, criado, respondido
-            FROM tickets WHERE user_id=? ORDER BY criado DESC LIMIT 20"""), (user_id,)).fetchall()
-    return [dict(r) for r in rows]
-
-
-def listar_tickets_admin():
-    with _db() as c:
-        rows = c.execute(_q("""SELECT t.id, t.user_id, t.mensagem, t.resposta, t.status,
-            t.criado, t.respondido, u.nome, u.email
-            FROM tickets t JOIN users u ON u.id = t.user_id
-            ORDER BY (t.status='respondido'), t.criado DESC LIMIT 100""")).fetchall()
-    return [dict(r) for r in rows]
+        t = c.execute(_q("SELECT user_id, status FROM tickets WHERE id=?"), (ticket_id,)).fetchone()
+        if not t or t["user_id"] != user_id:
+            return False, "Ticket não encontrado."
+        if t["status"] != "respondido":
+            return False, "Aguarde a resposta do suporte antes de enviar de novo."
+        _msg_ticket(c, ticket_id, "user", msg[:4000])
+        c.execute(_q("UPDATE tickets SET status='aguardando' WHERE id=?"), (ticket_id,))
+    return True, None
 
 
 def responder_ticket(ticket_id, resposta):
-    """Admin responde. Retorna {email,nome,mensagem} p/ avisar o usuário, ou None."""
+    """Admin responde. Libera a vez do usuário. Retorna {email,nome} ou None."""
     resp = (resposta or "").strip()
     if not resp:
         return None
     with _db() as c:
-        row = c.execute(_q("""SELECT t.mensagem, u.email, u.nome FROM tickets t
-            JOIN users u ON u.id = t.user_id WHERE t.id=?"""), (ticket_id,)).fetchone()
+        row = c.execute(_q("SELECT u.email, u.nome FROM tickets t JOIN users u ON u.id=t.user_id "
+                           "WHERE t.id=?"), (ticket_id,)).fetchone()
         if not row:
             return None
+        _msg_ticket(c, ticket_id, "admin", resp[:4000])
         c.execute(_q("UPDATE tickets SET resposta=?, status='respondido', respondido=? WHERE id=?"),
                   (resp[:4000], time.time(), ticket_id))
     return dict(row)
+
+
+def resolver_ticket(ticket_id):
+    with _db() as c:
+        c.execute(_q("UPDATE tickets SET status='resolvido' WHERE id=?"), (ticket_id,))
+    return True
+
+
+def listar_tickets_user(user_id):
+    with _db() as c:
+        rows = [dict(r) for r in c.execute(_q("""SELECT id, status, criado FROM tickets
+            WHERE user_id=? ORDER BY criado DESC LIMIT 20"""), (user_id,)).fetchall()]
+    th = _threads([r["id"] for r in rows])
+    for r in rows:
+        r["msgs"] = th.get(r["id"], [])
+    return rows
+
+
+def listar_tickets_admin(status=None):
+    q = ("SELECT t.id, t.user_id, t.status, t.criado, u.nome, u.email "
+         "FROM tickets t JOIN users u ON u.id = t.user_id")
+    args = ()
+    if status:
+        q += " WHERE t.status=?"
+        args = (status,)
+    q += " ORDER BY t.criado DESC LIMIT 100"
+    with _db() as c:
+        rows = [dict(r) for r in c.execute(_q(q), args).fetchall()]
+    th = _threads([r["id"] for r in rows])
+    for r in rows:
+        r["msgs"] = th.get(r["id"], [])
+    return rows
 
 
 def excluir_usuario(user_id):
     """Apaga a conta e TODOS os dados ligados a ela (sessões, banca, pagamentos,
     checkouts, assinaturas, tokens). Ação irreversível — usada pelo admin."""
     with _db() as c:
+        # apaga as mensagens dos tickets do usuário antes dos tickets
+        try:
+            c.execute(_q("""DELETE FROM ticket_msgs WHERE ticket_id IN
+                (SELECT id FROM tickets WHERE user_id=?)"""), (user_id,))
+        except Exception:
+            pass
         for tabela in ("sessions", "pagamentos", "user_banca", "checkouts",
                        "assinaturas", "reset_tokens", "confirm_tokens", "email_enviados",
                        "tickets"):

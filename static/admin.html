@@ -82,6 +82,7 @@
     .b-free{background:transparent;color:var(--red);border:1px solid rgba(255,107,107,.4)}
     .b-del{background:rgba(255,107,107,.14);color:var(--red);border:1px solid rgba(255,107,107,.4)}
     .b-del:hover{background:var(--red);color:#fff}
+    .tk-tab.on{background:var(--grad);color:#052015;border-color:transparent}
 
     .toast{position:fixed;left:50%;bottom:30px;transform:translateX(-50%) translateY(20px);opacity:0;background:var(--card2);border:1px solid var(--line2);border-radius:12px;padding:14px 20px;font-size:14px;font-weight:600;box-shadow:0 20px 50px rgba(0,0,0,.5);transition:.25s;z-index:50}
     .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
@@ -97,9 +98,10 @@
       Sure<span class="grad">Radar</span>
     </div>
     <nav class="nav">
-      <a class="on"><span class="ic">📊</span> Visão geral</a>
-      <a onclick="document.getElementById('sec-users').scrollIntoView({behavior:'smooth'})"><span class="ic">👥</span> Assinantes</a>
-      <a onclick="document.getElementById('sec-pag').scrollIntoView({behavior:'smooth'})"><span class="ic">💳</span> Pagamentos</a>
+      <a class="on" id="nav-dash" onclick="mostrarView('dash')"><span class="ic">📊</span> Visão geral</a>
+      <a onclick="mostrarView('dash');setTimeout(()=>document.getElementById('sec-users').scrollIntoView({behavior:'smooth'}),60)"><span class="ic">👥</span> Assinantes</a>
+      <a onclick="mostrarView('dash');setTimeout(()=>document.getElementById('sec-pag').scrollIntoView({behavior:'smooth'}),60)"><span class="ic">💳</span> Pagamentos</a>
+      <a id="nav-tickets" onclick="mostrarView('tickets')"><span class="ic">🎫</span> Tickets <span id="nav-tk-badge" class="tab-badge" style="display:none"></span></a>
       <a href="/app"><span class="ic">↗</span> Ir ao painel</a>
     </nav>
     <div class="bottom">SureRadar Admin<br>Atualizado em tempo real</div>
@@ -114,6 +116,7 @@
       <button class="refresh" onclick="carregar()">↻ Atualizar</button>
     </div>
 
+    <div id="view-dash">
     <!-- KPIs principais -->
     <div class="kpis" id="kpis"></div>
     <div class="kpis2" id="kpis2"></div>
@@ -136,11 +139,19 @@
       <input id="busca" class="search" placeholder="🔎 Filtrar por nome ou e-mail…" />
       <div id="lista"></div>
     </div>
+    </div><!-- /view-dash -->
 
-    <!-- tickets de suporte -->
-    <div class="panel" id="sec-tickets">
-      <h3>🎫 Tickets de suporte <small id="tk-count"></small></h3>
-      <div id="tickets"></div>
+    <!-- VIEW: tickets -->
+    <div id="view-tickets" style="display:none">
+      <div class="panel">
+        <h3>🎫 Tickets de suporte <small id="tk-count"></small></h3>
+        <div style="display:flex;gap:8px;margin:8px 0 16px">
+          <button class="mini tk-tab on" data-st="aguardando">Aguardando</button>
+          <button class="mini tk-tab" data-st="respondido">Respondidos</button>
+          <button class="mini tk-tab" data-st="resolvido">Resolvidos</button>
+        </div>
+        <div id="tickets"></div>
+      </div>
     </div>
   </main>
 </div>
@@ -268,36 +279,70 @@ document.addEventListener("click",(e)=>{
 function escH(s){return (s||"").replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));}
 function dataBR(ts){return new Date(ts*1000).toLocaleDateString("pt-BR");}
 
-function renderTickets(list){
-  const abertos=list.filter(t=>t.status!=="respondido").length;
-  $("#tk-count").textContent = abertos ? `${abertos} aberto(s)` : "tudo respondido";
-  $("#tickets").innerHTML = list.length ? list.map(t=>{
-    const aberto=t.status!=="respondido";
-    const resp = t.resposta
-      ? `<div style="margin-top:8px;color:var(--dim);font-size:13px"><b style="color:var(--green)">Sua resposta:</b> ${escH(t.resposta)}</div>`
-      : `<div style="margin-top:10px"><textarea data-tk="${t.id}" rows="2" placeholder="Responder ${escH(t.nome)}..." style="width:100%;background:var(--bg);border:1px solid var(--line2);border-radius:9px;padding:9px 11px;color:var(--text);font-size:13.5px;font-family:inherit;resize:vertical"></textarea>
-           <button class="btn b-pro" data-resp="${t.id}" style="margin-top:6px">Responder</button></div>`;
-    return `<div style="border:1px solid ${aberto?'rgba(255,201,77,.35)':'var(--line)'};border-radius:12px;padding:14px 16px;margin-bottom:12px;background:var(--bg)">
-      <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--mute)">
-        <span><b style="color:var(--text)">${escH(t.nome)}</b> · ${escH(t.email)}</span><span>${dataBR(t.criado)}</span></div>
-      <div style="margin-top:8px;font-size:14px;color:var(--text);white-space:pre-wrap">${escH(t.mensagem)}</div>
-      ${resp}</div>`;
-  }).join("") : '<div class="empty">Nenhum ticket ainda.</div>';
+// ---- Views (dashboard x tickets) ----
+function mostrarView(v){
+  $("#view-dash").style.display = v==="tickets" ? "none" : "";
+  $("#view-tickets").style.display = v==="tickets" ? "" : "none";
+  document.querySelectorAll(".nav a").forEach(a=>a.classList.remove("on"));
+  (v==="tickets"?$("#nav-tickets"):$("#nav-dash")).classList.add("on");
+  $("#head-sub").textContent = v==="tickets" ? "Suporte — tickets dos usuários." : "Visão do negócio — receita, assinantes e crescimento.";
+  if(v==="tickets") loadTickets();
 }
 
+let TK_STATUS="aguardando";
+function tkThread(msgs){ return (msgs||[]).map(m=>{
+  const admin=m.autor==="admin";
+  return `<div style="margin-top:6px;display:flex;justify-content:${admin?'flex-start':'flex-end'}">
+    <div style="max-width:82%;font-size:13.5px;white-space:pre-wrap;border-radius:10px;padding:8px 11px;
+      background:${admin?'rgba(46,230,168,.1)':'var(--card)'};border:1px solid ${admin?'rgba(46,230,168,.3)':'var(--line2)'}">
+      <b style="font-size:10px;color:${admin?'var(--green)':'var(--mute)'}">${admin?'SUPORTE':'CLIENTE'}</b><br>${escH(m.texto)}</div></div>`;
+}).join(""); }
+function renderTickets(list){
+  $("#tickets").innerHTML = list.length ? list.map(t=>{
+    let acao;
+    if(t.status==="resolvido"){
+      acao = `<div style="margin-top:8px;font-size:12.5px;color:var(--green)">✓ Resolvido</div>`;
+    } else if(t.status==="respondido"){
+      acao = `<div style="margin-top:8px;font-size:12.5px;color:var(--gold)">⏳ Aguardando o cliente</div>
+              <button class="btn b-pre" data-resolver="${t.id}" style="margin-top:6px">Resolver</button>`;
+    } else {
+      acao = `<div style="margin-top:10px"><textarea data-tk="${t.id}" rows="2" placeholder="Responder ${escH(t.nome)}..." style="width:100%;background:var(--bg);border:1px solid var(--line2);border-radius:9px;padding:9px 11px;color:var(--text);font-size:13.5px;font-family:inherit;resize:vertical"></textarea>
+        <div style="display:flex;gap:8px;margin-top:6px"><button class="btn b-pro" data-resp="${t.id}">Responder</button><button class="btn b-pre" data-resolver="${t.id}">Resolver</button></div></div>`;
+    }
+    return `<div style="border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:12px;background:var(--bg)">
+      <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--mute)">
+        <span><b style="color:var(--text)">${escH(t.nome)}</b> · ${escH(t.email)}</span><span>#${t.id} · ${dataBR(t.criado)}</span></div>
+      ${tkThread(t.msgs)}${acao}</div>`;
+  }).join("") : '<div class="empty">Nenhum ticket aqui.</div>';
+}
+async function loadTickets(){
+  const r=await fetch("/api/admin/tickets?status="+TK_STATUS);
+  if(r.ok){ renderTickets((await r.json()).tickets||[]); }
+}
+async function atualizarBadge(){
+  try{
+    const r=await fetch("/api/admin/tickets?status=aguardando");
+    if(!r.ok) return;
+    const n=((await r.json()).tickets||[]).length;
+    const b=$("#nav-tk-badge"), c=$("#tk-count");
+    if(n){ b.textContent=n; b.style.display=""; c.textContent=n+" aguardando"; }
+    else { b.style.display="none"; c.textContent="tudo em dia"; }
+  }catch{}
+}
 async function responderTicket(id, texto){
   const r=await fetch("/api/admin/tickets/responder",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id,resposta:texto})});
   const j=await r.json().catch(()=>({}));
   if(!r.ok){toast("❌ "+(j.erro||"erro"));return;}
-  toast("✅ Resposta enviada");
-  carregar();
+  toast("✅ Resposta enviada"); loadTickets(); atualizarBadge();
+}
+async function resolverTicket(id){
+  const r=await fetch("/api/admin/tickets/resolver",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})});
+  if(r.ok){ toast("✓ Resolvido"); loadTickets(); atualizarBadge(); }
 }
 document.addEventListener("click",(e)=>{
-  const id=e.target.dataset.resp; if(!id)return;
-  const ta=document.querySelector(`textarea[data-tk="${id}"]`);
-  const txt=(ta&&ta.value.trim())||"";
-  if(txt.length<2){toast("Escreva a resposta.");return;}
-  responderTicket(parseInt(id),txt);
+  if(e.target.dataset.resp){ const id=e.target.dataset.resp; const ta=document.querySelector(`textarea[data-tk="${id}"]`); const txt=(ta&&ta.value.trim())||""; if(txt.length<2){toast("Escreva a resposta.");return;} responderTicket(parseInt(id),txt); return; }
+  if(e.target.dataset.resolver){ resolverTicket(parseInt(e.target.dataset.resolver)); return; }
+  if(e.target.classList&&e.target.classList.contains("tk-tab")){ document.querySelectorAll(".tk-tab").forEach(x=>x.classList.remove("on")); e.target.classList.add("on"); TK_STATUS=e.target.dataset.st; loadTickets(); return; }
 });
 
 async function carregar(){
@@ -307,7 +352,7 @@ async function carregar(){
   $("#gate").innerHTML=""; $("#app").style.display="flex";
   renderMetricas(await rm.json());
   const ru=await fetch("/api/admin/usuarios"); if(ru.ok){USERS=(await ru.json()).usuarios||[];renderUsuarios();}
-  const rt=await fetch("/api/admin/tickets"); if(rt.ok){renderTickets((await rt.json()).tickets||[]);}
+  atualizarBadge();
 }
 document.addEventListener("input",e=>{if(e.target.id==="busca")renderUsuarios();});
 carregar();

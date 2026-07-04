@@ -253,7 +253,17 @@ async function load(){
 }
 
 
-// ---------- Tickets de suporte ----------
+// ---------- Tickets de suporte (conversa) ----------
+function esc(s){ return (s||"").replace(/[&<>]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
+function bolha(m){
+  const admin = m.autor === "admin";
+  return `<div style="margin-top:8px;display:flex;justify-content:${admin?'flex-start':'flex-end'}">
+    <div style="max-width:85%;border-radius:12px;padding:10px 13px;font-size:14px;white-space:pre-wrap;
+      background:${admin?'rgba(46,230,168,.1)':'var(--card2)'};border:1px solid ${admin?'rgba(46,230,168,.3)':'var(--line2)'};
+      color:${admin?'var(--text)':'var(--dim)'}">
+      <div style="font-size:10.5px;font-weight:800;letter-spacing:.05em;margin-bottom:3px;color:${admin?'var(--green)':'var(--mute)'}">${admin?'SUPORTE':'VOCÊ'}</div>
+      ${esc(m.texto)}</div></div>`;
+}
 async function loadTickets(){
   let d; try { d = await (await fetch("/api/tickets")).json(); } catch { return; }
   const box = $("#tk-lista");
@@ -261,18 +271,39 @@ async function loadTickets(){
   if (!ts.length){ box.innerHTML = ""; return; }
   box.innerHTML = `<div style="font-size:11.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);margin-bottom:10px">Seus tickets</div>` +
     ts.map(t=>{
-      const resp = t.resposta
-        ? `<div style="margin-top:10px;background:rgba(46,230,168,.08);border:1px solid rgba(46,230,168,.3);border-radius:10px;padding:11px 13px">
-             <div style="font-size:11px;font-weight:800;color:var(--green);margin-bottom:4px">RESPOSTA DO SUPORTE</div>
-             <div style="font-size:14px;color:var(--text);white-space:pre-wrap">${esc(t.resposta)}</div></div>`
-        : `<div style="margin-top:8px;font-size:12.5px;color:var(--gold)">⏳ Aguardando resposta</div>`;
-      return `<div style="background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:12px">
-        <div style="font-size:11.5px;color:var(--mute);margin-bottom:6px">${data_br(t.criado)}</div>
-        <div style="font-size:14px;color:var(--dim);white-space:pre-wrap">${esc(t.mensagem)}</div>
-        ${resp}</div>`;
+      const thread = (t.msgs||[]).map(bolha).join("");
+      let rodape;
+      if (t.status === "respondido"){
+        rodape = `<div style="margin-top:12px;display:flex;gap:8px">
+          <input class="tk-reply" data-t="${t.id}" placeholder="Responder..." maxlength="2000"
+            style="flex:1;background:var(--bg);border:1px solid var(--line2);border-radius:10px;padding:11px 13px;color:var(--text);font-size:14px;font-family:var(--font-b)" />
+          <button class="btn btn-ghost tk-reply-send" data-t="${t.id}" style="width:auto;padding:11px 16px">Enviar</button></div>`;
+      } else if (t.status === "resolvido"){
+        rodape = `<div style="margin-top:10px;font-size:12.5px;color:var(--green)">✓ Resolvido</div>`;
+      } else {
+        rodape = `<div style="margin-top:10px;font-size:12.5px;color:var(--gold)">⏳ Aguardando resposta do suporte</div>`;
+      }
+      return `<div style="border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:14px">
+        <div style="font-size:11.5px;color:var(--mute);margin-bottom:4px">Ticket #${t.id} · ${data_br(t.criado)}</div>
+        ${thread}${rodape}</div>`;
     }).join("");
 }
-function esc(s){ return (s||"").replace(/[&<>]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
+async function enviarRespostaTicket(id, texto){
+  try {
+    const r = await fetch("/api/tickets/responder",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({ticket_id:id,mensagem:texto})});
+    const j = await r.json().catch(()=>({}));
+    if (!r.ok){ alert(j.erro || "Não foi possível enviar."); return; }
+    loadTickets();
+  } catch { alert("Erro de conexão."); }
+}
+document.addEventListener("click", e=>{
+  if (!e.target.classList || !e.target.classList.contains("tk-reply-send")) return;
+  const id = e.target.dataset.t;
+  const inp = document.querySelector(`.tk-reply[data-t="${id}"]`);
+  const txt = (inp && inp.value.trim()) || "";
+  if (txt.length < 2){ return; }
+  enviarRespostaTicket(parseInt(id), txt);
+});
 
 $("#tk-send").onclick = async ()=>{
   const msg = $("#tk-msg").value.trim();
