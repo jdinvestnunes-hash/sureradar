@@ -164,9 +164,25 @@ async function load(){
   // card de assinatura
   const sc = $("#sub-card");
   if (pro){
+    const assin = d.tem_assinatura
+      ? `<p style="color:var(--dim);font-size:13.5px;margin-bottom:16px">💳 Assinatura no cartão <b>ativa</b> — renova automático${d.expira?` em ${data_br(d.expira)}`:""}. Cancele quando quiser.</p>
+         <button class="btn btn-ghost" id="btn-gerenciar" style="width:100%;margin-bottom:10px">Gerenciar / cancelar assinatura</button>`
+      : "";
     sc.innerHTML = `<div class="ct">Assinatura</div>
       <p style="color:var(--dim);font-size:14px;margin-bottom:16px">Seu Pro está ativo. Você tem acesso a todas as entradas, de 1% a 15%+.</p>
+      ${assin}
       <button class="btn btn-ghost" onclick="location.href='/app'">Ir para o painel →</button>`;
+    const bg = $("#btn-gerenciar");
+    if (bg) bg.onclick = async ()=>{
+      bg.textContent = "⏳ Abrindo..."; bg.disabled = true;
+      try {
+        const r = await fetch("/api/assinatura/portal",{method:"POST"});
+        const j = await r.json().catch(()=>({}));
+        if (r.ok && j.url) { location.href = j.url; return; }
+        alert(j.erro || "Não foi possível abrir o portal agora.");
+      } catch { alert("Erro de conexão."); }
+      bg.textContent = "Gerenciar / cancelar assinatura"; bg.disabled = false;
+    };
   } else {
     sc.innerHTML = `<div class="ct">Vire Pro e destrave as entradas de maior lucro</div>
       <ul class="up-benes">

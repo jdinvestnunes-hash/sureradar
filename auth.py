@@ -159,6 +159,23 @@ def init():
             c.execute("CREATE UNIQUE INDEX IF NOT EXISTS ix_checkout_ext ON checkouts(provider, external_id)")
         except Exception:
             pass
+        # Assinaturas recorrentes (cartão/Stripe): mapeia sub_id/customer -> usuário
+        # p/ processar renovações (invoice.paid) e cancelamentos.
+        c.execute(f"""CREATE TABLE IF NOT EXISTS assinaturas(
+            id {_SERIAL},
+            user_id BIGINT NOT NULL,
+            provider TEXT NOT NULL,
+            sub_id TEXT NOT NULL,
+            customer_id TEXT,
+            plano TEXT NOT NULL,
+            dias BIGINT NOT NULL,
+            valor {_NUM} NOT NULL,
+            status TEXT NOT NULL,
+            criado {_NUM} NOT NULL)""")
+        try:
+            c.execute("CREATE UNIQUE INDEX IF NOT EXISTS ix_assinatura_sub ON assinaturas(sub_id)")
+        except Exception:
+            pass
     # Migrações leves para bancos antigos: cada ALTER na SUA transação (no
     # Postgres, um erro aborta a transação inteira). Erro = coluna já existe.
     for tabela, coluna in [("checkouts", "pi TEXT"),
@@ -234,11 +251,17 @@ def voltar_free(user_id: int):
 # Checkouts / pagamentos (Stripe, AbacatePay)
 # ---------------------------------------------------------------------------
 def checkout_registrar(provider, external_id, user_id, plano, dias, valor, metodo):
+    args = (provider, external_id, user_id, plano, dias, valor, metodo, "pendente", time.time())
     with _db() as c:
-        c.execute(_q("""INSERT INTO checkouts
-            (provider,external_id,user_id,plano,dias,valor,metodo,status,criado)
-            VALUES(?,?,?,?,?,?,?,?,?)"""),
-            (provider, external_id, user_id, plano, dias, valor, metodo, "pendente", time.time()))
+        if PG:
+            c.execute(_q("""INSERT INTO checkouts
+                (provider,external_id,user_id,plano,dias,valor,metodo,status,criado)
+                VALUES(?,?,?,?,?,?,?,?,?)
+                ON CONFLICT (provider,external_id) DO NOTHING"""), args)
+        else:
+            c.execute("""INSERT OR IGNORE INTO checkouts
+                (provider,external_id,user_id,plano,dias,valor,metodo,status,criado)
+                VALUES(?,?,?,?,?,?,?,?,?)""", args)
 
 
 def checkout_pagar(provider, external_id, pi=None):
@@ -256,6 +279,46 @@ def checkout_pagar(provider, external_id, pi=None):
                   (pi, row["id"]))
     ativar_pro(row["user_id"], row["plano"], int(row["dias"]),
                float(row["valor"]), metodo=row["metodo"])
+    return dict(row)
+
+
+def assinatura_set(user_id, provider, sub_id, customer_id, plano, dias, valor, status="ativa"):
+    """Registra/atualiza a assinatura recorrente (upsert por sub_id)."""
+    with _db() as c:
+        row = c.execute(_q("SELECT id FROM assinaturas WHERE sub_id=?"), (sub_id,)).fetchone()
+        if row:
+            c.execute(_q("UPDATE assinaturas SET status=?, customer_id=? WHERE sub_id=?"),
+                      (status, customer_id, sub_id))
+        else:
+            c.execute(_q("""INSERT INTO assinaturas
+                (user_id,provider,sub_id,customer_id,plano,dias,valor,status,criado)
+                VALUES(?,?,?,?,?,?,?,?,?)"""),
+                (user_id, provider, sub_id, customer_id, plano, dias, valor, status, time.time()))
+
+
+def assinatura_por_sub(sub_id):
+    with _db() as c:
+        row = c.execute(_q("SELECT * FROM assinaturas WHERE sub_id=?"), (sub_id,)).fetchone()
+    return dict(row) if row else None
+
+
+def assinatura_do_user(user_id):
+    """Assinatura ATIVA mais recente do usuário (p/ o botão de gerenciar/cancelar)."""
+    with _db() as c:
+        row = c.execute(_q("""SELECT * FROM assinaturas WHERE user_id=? AND status='ativa'
+                              ORDER BY criado DESC LIMIT 1"""), (user_id,)).fetchone()
+    return dict(row) if row else None
+
+
+def assinatura_cancelar(sub_id):
+    """Assinatura cancelada/encerrada no Stripe -> tira o PRO da pessoa."""
+    with _db() as c:
+        row = c.execute(_q("SELECT * FROM assinaturas WHERE sub_id=?"), (sub_id,)).fetchone()
+        if not row:
+            return None
+        c.execute(_q("UPDATE assinaturas SET status='cancelada' WHERE sub_id=?"), (sub_id,))
+    voltar_free(row["user_id"])
+    print(f">> ASSINATURA cancelada: PRO revogado do user {row['user_id']}")
     return dict(row)
 
 

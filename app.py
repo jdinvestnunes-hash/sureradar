@@ -330,8 +330,11 @@ def checkout_stripe(request: Request, payload: dict = Body(...)):
         return JSONResponse({"erro": "plano inválido"}, status_code=400)
     if not config.STRIPE_SECRET_KEY:
         return JSONResponse({"erro": "Stripe não configurado"}, status_code=503)
+    # ASSINATURA recorrente: cobra automático (mês p/ mensal, ano p/ anual) até
+    # a pessoa cancelar. Pix continua pagamento único (renovação manual).
+    intervalo = "year" if p["dias"] >= 365 else "month"
     data = {
-        "mode": "payment",
+        "mode": "subscription",
         "success_url": config.SITE_URL + "/perfil?pago=1",
         "cancel_url": config.SITE_URL + "/planos",
         "customer_email": user["email"],
@@ -339,7 +342,10 @@ def checkout_stripe(request: Request, payload: dict = Body(...)):
         "line_items[0][quantity]": "1",
         "line_items[0][price_data][currency]": "brl",
         "line_items[0][price_data][unit_amount]": str(int(round(p["valor"] * 100))),
+        "line_items[0][price_data][recurring][interval]": intervalo,
         "line_items[0][price_data][product_data][name]": "SureRadar " + p["nome"],
+        "subscription_data[metadata][user_id]": str(user["id"]),
+        "subscription_data[metadata][plano]": plano,
         "metadata[user_id]": str(user["id"]),
         "metadata[plano]": plano,
     }
@@ -368,6 +374,27 @@ def _verifica_assinatura_stripe(body: bytes, sig_header: str, secret: str) -> bo
         return False
 
 
+@app.post("/api/assinatura/portal")
+def assinatura_portal(request: Request):
+    """Abre o portal do Stripe p/ a pessoa gerenciar/cancelar a assinatura."""
+    user = _usuario(request)
+    if not user:
+        return JSONResponse({"erro": "não autenticado"}, status_code=401)
+    a = auth.assinatura_do_user(user["id"])
+    if not a or not a.get("customer_id"):
+        return JSONResponse({"erro": "sem assinatura ativa"}, status_code=400)
+    try:
+        r = requests.post("https://api.stripe.com/v1/billing_portal/sessions",
+                          data={"customer": a["customer_id"],
+                                "return_url": config.SITE_URL + "/perfil"},
+                          auth=(config.STRIPE_SECRET_KEY, ""), timeout=20)
+    except requests.RequestException as e:
+        return JSONResponse({"erro": "falha de rede", "detalhe": str(e)[:120]}, status_code=502)
+    if not r.ok:
+        return JSONResponse({"erro": "Stripe recusou", "detalhe": r.text[:200]}, status_code=502)
+    return {"url": r.json().get("url")}
+
+
 @app.post("/api/webhook/stripe")
 async def webhook_stripe(request: Request):
     body = await request.body()
@@ -381,8 +408,29 @@ async def webhook_stripe(request: Request):
     tipo = ev.get("type")
     obj = ev.get("data", {}).get("object", {})
     if tipo == "checkout.session.completed":
-        if obj.get("id") and obj.get("payment_status") in (None, "paid"):
+        # 1ª cobrança (assinatura recém-criada OU pagamento único de fallback).
+        if obj.get("id"):
             auth.checkout_pagar("stripe", obj["id"], obj.get("payment_intent"))
+        sub_id = obj.get("subscription")
+        if sub_id and obj.get("client_reference_id"):
+            plano = (obj.get("metadata") or {}).get("plano", "mensal")
+            p = config.PLANOS.get(plano) or {}
+            auth.assinatura_set(int(obj["client_reference_id"]), "stripe", sub_id,
+                                obj.get("customer"), plano, p.get("dias", 30),
+                                p.get("valor", 0.0), "ativa")
+    elif tipo == "invoice.paid":
+        # RENOVAÇÃO automática (mês/ano seguinte). A 1ª fatura
+        # (subscription_create) já foi tratada no checkout.session.completed.
+        if obj.get("billing_reason") == "subscription_cycle" and obj.get("subscription"):
+            a = auth.assinatura_por_sub(obj["subscription"])
+            if a and obj.get("id"):
+                auth.checkout_registrar("stripe", obj["id"], a["user_id"], a["plano"],
+                                        a["dias"], a["valor"], "stripe")
+                auth.checkout_pagar("stripe", obj["id"], obj.get("payment_intent"))
+    elif tipo == "customer.subscription.deleted":
+        # assinatura encerrada (cancelou / parou de pagar) -> volta pro free
+        if obj.get("id"):
+            auth.assinatura_cancelar(obj["id"])
     elif tipo in ("charge.refunded", "charge.dispute.created",
                   "charge.dispute.funds_withdrawn"):
         # estorno ou chargeback -> tira o PRO da pessoa
@@ -520,6 +568,7 @@ def perfil_dados(request: Request):
         "expira": user.get("plano_expira"),
         "aviso_renovar": _aviso_renovar(dias),
         "admin": _admin_email(user),
+        "tem_assinatura": bool(auth.assinatura_do_user(user["id"])),
         "pagamentos": auth.listar_pagamentos(user["id"]),
     }
 
