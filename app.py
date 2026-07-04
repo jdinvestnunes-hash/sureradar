@@ -1314,6 +1314,14 @@ def tela_calculadora(request: Request):
     return RedirectResponse("/app?view=calc" + ("&" + qs if qs else ""), status_code=302)
 
 
+@app.get("/grupo")
+@app.get("/free")
+@app.get("/telegram")
+def tela_grupo():
+    """Squeeze page focada em entrar no grupo grátis do Telegram (tráfego Facebook)."""
+    return FileResponse(STATIC_DIR / "grupo.html")
+
+
 @app.get("/termos")
 def tela_termos():
     return FileResponse(STATIC_DIR / "termos.html")
