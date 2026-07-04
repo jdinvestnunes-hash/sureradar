@@ -103,6 +103,26 @@ def enviar_boas_vindas(to: str, nome: str) -> bool:
                   _layout("Sua conta está pronta", corpo))
 
 
+def enviar_confirmacao(to: str, nome: str, link: str) -> bool:
+    """E-mail para CONFIRMAR o cadastro. A conta só libera depois do clique."""
+    primeiro = (nome or "").strip().split(" ")[0] or "trader"
+    corpo = f"""\
+    <p style="color:#a3b1c9;font-size:14.5px;line-height:1.6">
+      Fala, {primeiro}! Falta <b style="color:#f2f6fc">um clique</b> pra ativar sua conta no
+      <b style="color:#f2f6fc">SureRadar</b> e liberar as entradas.
+    </p>
+    <a href="{link}" style="display:inline-block;margin:18px 0;background:#2ee6a8;color:#052015;
+       text-decoration:none;font-weight:800;font-size:15px;padding:13px 26px;border-radius:12px">
+      Confirmar meu e-mail →
+    </a>
+    <p style="color:#5e6b85;font-size:12.5px;line-height:1.6">
+      Se o botão não funcionar, copie e cole no navegador:<br>
+      <span style="color:#38d4f5;word-break:break-all">{link}</span><br>
+      Este link vale por 3 dias.
+    </p>"""
+    return enviar(to, "Confirme seu e-mail — SureRadar", _layout("Confirme seu cadastro", corpo))
+
+
 def enviar_reset_senha(to: str, nome: str, link: str) -> bool:
     """E-mail com o link para redefinir a senha (válido por 1 hora)."""
     corpo = f"""\

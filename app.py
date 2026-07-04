@@ -194,6 +194,23 @@ def _client_ip(request: Request):
     return request.client.host if request.client else ""
 
 
+# --- Rate limit simples em memória (anti-abuso: cadastro, reset, reenvio) ---
+import time as _time
+_rate_hits = {}     # chave -> lista de timestamps
+
+
+def _rate_ok(chave, maximo, janela_seg):
+    """True se ainda pode; registra a tentativa. Janela deslizante em memória."""
+    agora = _time.time()
+    xs = [t for t in _rate_hits.get(chave, []) if agora - t < janela_seg]
+    if len(xs) >= maximo:
+        _rate_hits[chave] = xs
+        return False
+    xs.append(agora)
+    _rate_hits[chave] = xs
+    return True
+
+
 def _ip_admin_ok(request: Request):
     """True se NÃO há allowlist de IP, ou se o IP do cliente está nela."""
     return (not config.ADMIN_IPS) or (_client_ip(request) in config.ADMIN_IPS)
@@ -207,24 +224,60 @@ def _com_sessao(resp: Response, user_id: int):
 
 
 @app.post("/api/register")
-def register(background_tasks: BackgroundTasks, payload: dict = Body(...)):
+def register(background_tasks: BackgroundTasks, request: Request, payload: dict = Body(...)):
+    # anti-abuso: no máx 5 contas por IP a cada hora
+    if not _rate_ok("reg:" + _client_ip(request), 5, 3600):
+        return JSONResponse({"erro": "Muitas contas criadas desse acesso. Tente mais tarde."},
+                            status_code=429)
     user, erro = auth.criar_usuario(
         payload.get("nome", ""), payload.get("email", ""), payload.get("senha", ""),
         payload.get("whatsapp", ""))
     if erro:
         return JSONResponse({"erro": erro}, status_code=400)
-    background_tasks.add_task(emailer.enviar_boas_vindas, user["email"], user["nome"])
-    resp = JSONResponse({"ok": True, "user": user})
-    return _com_sessao(resp, user["id"])
+    # NÃO loga: manda o e-mail de confirmação; a conta só libera após confirmar.
+    token = auth.criar_token_confirmacao(user["id"])
+    link = config.SITE_URL + "/confirmar?token=" + token
+    background_tasks.add_task(emailer.enviar_confirmacao, user["email"], user["nome"], link)
+    return {"ok": True, "precisa_confirmar": True, "email": user["email"]}
 
 
 @app.post("/api/login")
-def login(payload: dict = Body(...)):
+def login(request: Request, payload: dict = Body(...)):
+    # anti brute-force: 10 tentativas por IP a cada 10 min
+    if not _rate_ok("login:" + _client_ip(request), 10, 600):
+        return JSONResponse({"erro": "Muitas tentativas. Espere alguns minutos."}, status_code=429)
     user = auth.autenticar(payload.get("email", ""), payload.get("senha", ""))
     if not user:
         return JSONResponse({"erro": "E-mail ou senha incorretos."}, status_code=401)
+    if not user.get("verificado", True):
+        return JSONResponse({"erro": "Confirme seu e-mail antes de entrar. Veja sua caixa de entrada.",
+                             "nao_verificado": True, "email": user["email"]}, status_code=403)
     resp = JSONResponse({"ok": True, "user": user})
     return _com_sessao(resp, user["id"])
+
+
+@app.get("/confirmar")
+def confirmar(background_tasks: BackgroundTasks, token: str = ""):
+    """Link do e-mail: confirma a conta, manda boas-vindas e já entra logado."""
+    u = auth.confirmar_email(token)
+    if not u:
+        return RedirectResponse("/login?erro=confirmar", status_code=302)
+    background_tasks.add_task(emailer.enviar_boas_vindas, u["email"], u["nome"])
+    resp = RedirectResponse("/app?confirmado=1", status_code=302)
+    return _com_sessao(resp, u["id"])
+
+
+@app.post("/api/reenviar-confirmacao")
+def reenviar_confirmacao(background_tasks: BackgroundTasks, payload: dict = Body(...)):
+    """Reenvia o e-mail de confirmação (se a conta existir e não estiver confirmada)."""
+    email = (payload.get("email") or "").strip().lower()
+    if "@" in email and _rate_ok("reenvio:" + email, 3, 900):   # máx 3 a cada 15 min
+        uid, nome = auth.user_nao_verificado(email)
+        if uid:
+            token = auth.criar_token_confirmacao(uid)
+            link = config.SITE_URL + "/confirmar?token=" + token
+            background_tasks.add_task(emailer.enviar_confirmacao, email, nome, link)
+    return {"ok": True}
 
 
 @app.post("/api/logout")
@@ -236,15 +289,16 @@ def logout(request: Request):
 
 
 @app.post("/api/senha/esqueci")
-def senha_esqueci(payload: dict = Body(...)):
+def senha_esqueci(background_tasks: BackgroundTasks, payload: dict = Body(...)):
     """Pede redefinição de senha: manda e-mail com link (se o e-mail existir).
-    Resposta é SEMPRE ok — não revela se o e-mail tem conta (segurança)."""
+    Resposta é SEMPRE ok — não revela se o e-mail tem conta (segurança).
+    Rate limit: máx 3 pedidos por e-mail a cada 15 min (anti-abuso/spam)."""
     email = (payload.get("email") or "").strip().lower()
-    if "@" in email:
+    if "@" in email and _rate_ok("reset:" + email, 3, 900):
         token, nome = auth.criar_token_reset(email)
         if token:
             link = config.SITE_URL + "/redefinir?token=" + token
-            emailer.enviar_reset_senha(email, nome, link)
+            background_tasks.add_task(emailer.enviar_reset_senha, email, nome, link)
     return {"ok": True}
 
 

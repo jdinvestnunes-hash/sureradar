@@ -118,6 +118,7 @@ def init():
             salt {_BIN} NOT NULL,
             plano TEXT NOT NULL DEFAULT 'free',
             plano_expira {_NUM},
+            email_verificado {_NUM} NOT NULL DEFAULT 1,
             criado {_NUM} NOT NULL)""")
         c.execute(f"""CREATE TABLE IF NOT EXISTS sessions(
             token TEXT PRIMARY KEY,
@@ -183,11 +184,18 @@ def init():
             user_id BIGINT NOT NULL,
             expira {_NUM} NOT NULL,
             usado {_NUM} NOT NULL DEFAULT 0)""")
+        # Tokens de confirmação de e-mail (cadastro só libera após confirmar).
+        c.execute(f"""CREATE TABLE IF NOT EXISTS confirm_tokens(
+            token TEXT PRIMARY KEY,
+            user_id BIGINT NOT NULL,
+            expira {_NUM} NOT NULL,
+            usado {_NUM} NOT NULL DEFAULT 0)""")
     # Migrações leves para bancos antigos: cada ALTER na SUA transação (no
     # Postgres, um erro aborta a transação inteira). Erro = coluna já existe.
     for tabela, coluna in [("checkouts", "pi TEXT"),
                            ("users", f"plano_expira {_NUM}"),
-                           ("users", "whatsapp TEXT")]:
+                           ("users", "whatsapp TEXT"),
+                           ("users", f"email_verificado {_NUM} DEFAULT 1")]:
         try:
             with _db() as c:
                 c.execute(f"ALTER TABLE {tabela} ADD COLUMN {coluna}")
@@ -557,8 +565,8 @@ def criar_usuario(nome: str, email: str, senha: str, whatsapp: str = ""):
     try:
         with _db() as c:
             uid = _insert(c,
-                "INSERT INTO users(nome,email,whatsapp,hash,salt,plano,criado) VALUES(?,?,?,?,?,?,?)",
-                (nome, email, whats, _hash(senha, salt), salt, "free", time.time()))
+                "INSERT INTO users(nome,email,whatsapp,hash,salt,plano,email_verificado,criado) VALUES(?,?,?,?,?,?,?,?)",
+                (nome, email, whats, _hash(senha, salt), salt, "free", 0, time.time()))
     except UNIQUE_ERR:
         return None, "Este e-mail já tem conta. Faça login."
     return {"id": uid, "nome": nome, "email": email, "plano": "free", "plano_expira": None}, None
@@ -574,8 +582,8 @@ def pegar_ou_criar_google(email: str, nome: str):
             return _perfil(row), False       # já existia
         salt = secrets.token_bytes(16)
         uid = _insert(c,
-            "INSERT INTO users(nome,email,hash,salt,plano,criado) VALUES(?,?,?,?,?,?)",
-            (nome, email, _hash(secrets.token_hex(24), salt), salt, "free", time.time()))
+            "INSERT INTO users(nome,email,hash,salt,plano,email_verificado,criado) VALUES(?,?,?,?,?,?,?)",
+            (nome, email, _hash(secrets.token_hex(24), salt), salt, "free", 1, time.time()))
     return {"id": uid, "nome": nome, "email": email, "plano": "free", "plano_expira": None}, True
 
 
@@ -588,6 +596,39 @@ def atualizar_whatsapp(user_id, whatsapp):
         c.execute(_q("UPDATE users SET whatsapp=? WHERE id=?"), (whats, user_id))
     limpar_cache_sessoes()
     return True, whats
+
+
+def criar_token_confirmacao(user_id):
+    """Gera token de confirmação de e-mail (vale 3 dias)."""
+    token = secrets.token_urlsafe(32)
+    with _db() as c:
+        c.execute(_q("INSERT INTO confirm_tokens(token,user_id,expira,usado) VALUES(?,?,?,0)"),
+                  (token, user_id, time.time() + 3 * 86400))
+    return token
+
+
+def confirmar_email(token):
+    """Valida o token e marca o e-mail como verificado. Retorna {id,nome,email} ou None."""
+    with _db() as c:
+        row = c.execute(_q("SELECT * FROM confirm_tokens WHERE token=?"), (token or "",)).fetchone()
+        if not row or int(row["usado"]) or row["expira"] < time.time():
+            return None
+        c.execute(_q("UPDATE users SET email_verificado=1 WHERE id=?"), (row["user_id"],))
+        c.execute(_q("UPDATE confirm_tokens SET usado=1 WHERE token=?"), (token,))
+        u = c.execute(_q("SELECT id, nome, email FROM users WHERE id=?"), (row["user_id"],)).fetchone()
+    limpar_cache_sessoes()
+    return dict(u) if u else None
+
+
+def user_nao_verificado(email):
+    """Retorna (id, nome) se existe conta NÃO verificada com esse e-mail; senão (None, None)."""
+    email = (email or "").strip().lower()
+    with _db() as c:
+        row = c.execute(_q("SELECT id, nome, email_verificado FROM users WHERE email=?"),
+                        (email,)).fetchone()
+    if row and not int(row["email_verificado"]):
+        return row["id"], row["nome"]
+    return None, None
 
 
 def criar_token_reset(email: str):
@@ -630,7 +671,8 @@ def autenticar(email: str, senha: str):
             return None
         plano, exp = _normalizar_plano(c, row)
     return {"id": row["id"], "nome": row["nome"], "email": row["email"],
-            "plano": plano, "plano_expira": exp}
+            "plano": plano, "plano_expira": exp,
+            "verificado": bool(row["email_verificado"])}
 
 
 # ---------------------------------------------------------------------------

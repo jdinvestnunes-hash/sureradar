@@ -145,6 +145,15 @@
 
       <div class="erro" id="erro"></div>
 
+      <div id="confirm-box" style="display:none;text-align:center">
+        <div style="font-size:44px;margin-bottom:6px">📧</div>
+        <h2 style="font-size:20px;font-weight:800;margin-bottom:8px">Confirme seu e-mail</h2>
+        <p style="color:var(--dim);font-size:14px;line-height:1.55">Enviamos um link de confirmação para <b id="cb-email"></b>. Clique nele pra ativar sua conta e entrar.</p>
+        <p style="color:var(--mute);font-size:13px;margin-top:16px">Não chegou? Veja o spam ou <a id="cb-reenviar" style="cursor:pointer;color:var(--green,#2ee6a8)">reenvie o e-mail</a>.</p>
+        <div id="cb-msg" style="font-size:13px;margin-top:10px;min-height:16px"></div>
+        <p style="margin-top:20px"><a onclick="location.reload()" style="cursor:pointer;color:var(--dim);font-size:13.5px">← Voltar</a></p>
+      </div>
+
       <form id="form" autocomplete="on">
         <div class="field" id="f-nome">
           <label for="nome">Seu nome</label>
@@ -237,8 +246,33 @@ if (errParam) {
   const e = $('#erro');
   e.textContent = errParam === 'google_off'
     ? 'Login com Google ainda não está configurado.'
+    : errParam === 'confirmar'
+    ? 'Link de confirmação inválido ou expirado. Faça login e reenvie.'
     : 'Não foi possível entrar com o Google. Tente novamente.';
   e.style.display = 'block';
+}
+
+function mostrarConfirmar(email){
+  $('#form').style.display = 'none';
+  $('#swap-cad').style.display = 'none';
+  $('#swap-login').style.display = 'none';
+  $('#forgot').style.display = 'none';
+  $('#erro').style.display = 'none';
+  const g = document.querySelector('.btn-google'); if (g) g.style.display = 'none';
+  const dv = document.querySelector('.divider'); if (dv) dv.style.display = 'none';
+  $('#head-cad').style.display = 'none';
+  $('#head-login').style.display = 'none';
+  $('#cb-email').textContent = email || 'seu e-mail';
+  $('#confirm-box').style.display = '';
+  $('#cb-reenviar').onclick = async () => {
+    const m = $('#cb-msg'); m.style.color = 'var(--dim)'; m.textContent = 'Reenviando...';
+    try {
+      await fetch('/api/reenviar-confirmacao', {
+        method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ email })
+      });
+    } catch {}
+    m.style.color = '#2ee6a8'; m.textContent = '✓ Reenviado! Confira sua caixa (e o spam).';
+  };
 }
 
 $('#form').addEventListener('submit', async (e) => {
@@ -264,8 +298,13 @@ $('#form').addEventListener('submit', async (e) => {
     const r = await fetch(MODO === 'cadastro' ? '/api/register' : '/api/login', {
       method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body)
     });
-    const j = await r.json();
-    if (!r.ok) { erro.textContent = j.erro || 'Algo deu errado. Tente de novo.'; erro.style.display = 'block'; btn.disabled = false; return; }
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      if (r.status === 403 && j.nao_verificado) { mostrarConfirmar(j.email || body.email); btn.disabled = false; return; }
+      erro.style.color = ''; erro.textContent = j.erro || 'Algo deu errado. Tente de novo.';
+      erro.style.display = 'block'; btn.disabled = false; return;
+    }
+    if (MODO === 'cadastro' && j.precisa_confirmar) { mostrarConfirmar(j.email || body.email); btn.disabled = false; return; }
     location.href = '/app';
   } catch {
     erro.textContent = 'Falha de conexão. Tente novamente.';
