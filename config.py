@@ -229,9 +229,10 @@ EMAIL_FROM = os.getenv("EMAIL_FROM", "SureRadar <nao-responda@sureradar.site>").
 
 # Fluxo de marketing no grupo. Desligue com PROMO_ATIVO=0.
 PROMO_ATIVO = os.getenv("PROMO_ATIVO", "1") not in ("0", "false", "False", "no")
-# Intervalo entre as entradas postadas no grupo (minutos).
-# TESTE = 10 (uma a cada reset do robô). PRODUÇÃO = 60 (de hora em hora).
-TELEGRAM_POST_INTERVAL_MIN = int(os.getenv("TELEGRAM_POST_INTERVAL_MIN", "10"))
+# Intervalo entre as entradas postadas no grupo/canal — sorteado a cada envio
+# entre MIN e MAX minutos (fica natural, não robótico).
+TELEGRAM_POST_MIN_MIN = int(os.getenv("TELEGRAM_POST_MIN_MIN", "30"))
+TELEGRAM_POST_MAX_MIN = int(os.getenv("TELEGRAM_POST_MAX_MIN", "50"))
 
 # Teto de lucro "são": surebets acima disso são ANOMALIAS (ex.: escanteios com
 # odd bugada dando 30-400%) e são descartadas na ingestão. Real vai até ~25%.
