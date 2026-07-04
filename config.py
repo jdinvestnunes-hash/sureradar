@@ -196,8 +196,24 @@ TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "").strip()
 TELEGRAM_LUCRO_MAX = float(os.getenv("TELEGRAM_LUCRO_MAX", "1.0"))
 TELEGRAM_MAX_POR_RODADA = int(os.getenv("TELEGRAM_MAX_POR_RODADA", "3"))
 
-# URL do site (usada no rodapé/CTA das mensagens do Telegram).
+# URL do site (usada no rodapé/CTA das mensagens do Telegram e nos checkouts).
 SITE_URL = os.getenv("SITE_URL", "https://sureradar.site").strip()
+
+# ---------------------------------------------------------------------------
+# PAGAMENTOS — planos e gateways (Stripe = cartão, AbacatePay = Pix)
+# ---------------------------------------------------------------------------
+# Pagamento único que libera N dias de PRO (renovação manual, com aviso). Não é
+# assinatura recorrente por enquanto — casa com o modelo de dias_restantes.
+PLANOS = {
+    "mensal": {"nome": "Pro Mensal", "dias": 30, "valor": 97.0},
+    "anual":  {"nome": "Pro Anual",  "dias": 365, "valor": 497.0},
+}
+
+STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "").strip()
+STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "").strip()
+
+ABACATEPAY_API_KEY = os.getenv("ABACATEPAY_API_KEY", "").strip()
+ABACATEPAY_WEBHOOK_SECRET = os.getenv("ABACATEPAY_WEBHOOK_SECRET", "").strip()
 
 # Fluxo de marketing no grupo (5 posts/dia + prova social). Desligue com PROMO_ATIVO=0.
 PROMO_ATIVO = os.getenv("PROMO_ATIVO", "1") not in ("0", "false", "False", "no")

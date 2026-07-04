@@ -54,6 +54,11 @@
     .btn-ghost{background:rgba(255,255,255,.04);color:var(--text);border:1px solid var(--line2)}
     .btn-ghost:hover{border-color:var(--cyan)}
     .btn-atual{background:transparent;border:1px dashed var(--line2);color:var(--mute);cursor:default}
+    .btn:disabled{opacity:.6;cursor:wait}
+    .pay-row{display:flex;gap:8px}
+    .pay-row .btn{padding:13px 10px;font-size:14px}
+    .btn-pix{background:rgba(56,212,245,.12);color:var(--cyan);border:1px solid rgba(56,212,245,.45)}
+    .btn-pix:hover{background:rgba(56,212,245,.2)}
     .payback{margin-top:12px;font-size:12px;text-align:center;color:var(--gold);font-weight:700;min-height:16px}
 
     .guarantee{display:flex;align-items:center;gap:14px;max-width:620px;margin:20px auto 0;background:var(--card);border:1px solid rgba(255,201,77,.3);border-radius:16px;padding:18px 22px}
@@ -114,7 +119,10 @@
         <li><span class="ck">✓</span> Todas as casas e mercados</li>
         <li><span class="ck">✓</span> Suporte exclusivo</li>
       </ul>
-      <button class="btn btn-primary" data-plano="anual">Assinar anual →</button>
+      <div class="pay-row">
+        <button class="btn btn-primary" data-pay="anual:cartao">💳 Cartão</button>
+        <button class="btn btn-pix" data-pay="anual:pix">⚡ Pix</button>
+      </div>
       <div class="payback">💰 1 entrada de 5% já paga meses</div>
     </div>
 
@@ -130,7 +138,10 @@
         <li><span class="ck">✓</span> Todas as casas e mercados</li>
         <li><span class="ck">✓</span> Suporte exclusivo</li>
       </ul>
-      <button class="btn btn-ghost" data-plano="mensal">Assinar mensal</button>
+      <div class="pay-row">
+        <button class="btn btn-ghost" data-pay="mensal:cartao">💳 Cartão</button>
+        <button class="btn btn-pix" data-pay="mensal:pix">⚡ Pix</button>
+      </div>
       <div class="payback">💰 2 entradas de 5% pagam o mês</div>
     </div>
   </div>
@@ -146,15 +157,24 @@
 
 <script>
 const toast = (html) => { const t=document.getElementById('toast'); t.innerHTML=html; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),5000); };
-document.querySelectorAll('[data-plano]').forEach(b=>{
-  b.addEventListener('click', async ()=>{
-    const plano = b.dataset.plano;
-    // Checkout real (Pix/cartão) entra aqui. Por enquanto, tenta ativação de teste.
-    try {
-      const r = await fetch('/api/dev/ativar-pro',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({plano})});
-      if (r.ok) { toast('✅ <b>PRO ativado!</b> Redirecionando…'); setTimeout(()=>location.href='/perfil',900); return; }
-    } catch {}
-    toast('🚀 <b>Pagamento chegando em breve!</b> O checkout (Pix/cartão) está sendo ligado.');
+
+async function pagar(plano, metodo, btn){
+  const ep = metodo === 'pix' ? '/api/checkout/pix' : '/api/checkout/stripe';
+  const txt = btn.textContent; btn.textContent = '⏳ Gerando...'; btn.disabled = true;
+  try {
+    const r = await fetch(ep, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({plano})});
+    const j = await r.json().catch(()=>({}));
+    if (r.ok && j.url) { location.href = j.url; return; }
+    if (r.status === 401) { toast('🔒 Faça login pra assinar.'); setTimeout(()=>location.href='/login?plano='+plano, 1200); return; }
+    toast('❌ ' + (j.erro || 'Não foi possível iniciar o pagamento agora.'));
+  } catch (e) { toast('❌ Erro de conexão. Tente de novo.'); }
+  btn.textContent = txt; btn.disabled = false;
+}
+
+document.querySelectorAll('[data-pay]').forEach(b=>{
+  b.addEventListener('click', ()=>{
+    const [plano, metodo] = b.dataset.pay.split(':');
+    pagar(plano, metodo, b);
   });
 });
 </script>

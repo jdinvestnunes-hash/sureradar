@@ -140,6 +140,23 @@ def init():
             id BIGINT PRIMARY KEY,
             dados TEXT NOT NULL,
             atualizado {_NUM} NOT NULL)""")
+        # Checkouts iniciados (Stripe/AbacatePay) — o webhook confirma o pagamento
+        # pelo external_id e ativa o PRO. Guarda o que ativar (plano/dias/valor).
+        c.execute(f"""CREATE TABLE IF NOT EXISTS checkouts(
+            id {_SERIAL},
+            provider TEXT NOT NULL,
+            external_id TEXT NOT NULL,
+            user_id BIGINT NOT NULL,
+            plano TEXT NOT NULL,
+            dias BIGINT NOT NULL,
+            valor {_NUM} NOT NULL,
+            metodo TEXT NOT NULL,
+            status TEXT NOT NULL,
+            criado {_NUM} NOT NULL)""")
+        try:
+            c.execute("CREATE UNIQUE INDEX IF NOT EXISTS ix_checkout_ext ON checkouts(provider, external_id)")
+        except Exception:
+            pass
         if not PG:  # migração leve do SQLite antigo
             try:
                 c.execute("ALTER TABLE users ADD COLUMN plano_expira REAL")
@@ -203,6 +220,34 @@ def voltar_free(user_id: int):
     with _db() as c:
         c.execute(_q("UPDATE users SET plano='free', plano_expira=NULL WHERE id=?"), (user_id,))
     limpar_cache_sessoes()
+
+
+# ---------------------------------------------------------------------------
+# Checkouts / pagamentos (Stripe, AbacatePay)
+# ---------------------------------------------------------------------------
+def checkout_registrar(provider, external_id, user_id, plano, dias, valor, metodo):
+    with _db() as c:
+        c.execute(_q("""INSERT INTO checkouts
+            (provider,external_id,user_id,plano,dias,valor,metodo,status,criado)
+            VALUES(?,?,?,?,?,?,?,?,?)"""),
+            (provider, external_id, user_id, plano, dias, valor, metodo, "pendente", time.time()))
+
+
+def checkout_pagar(provider, external_id):
+    """Confirma o pagamento (chamado pelo webhook): acha o checkout pendente,
+    ativa o PRO e marca como pago. IDEMPOTENTE (webhook pode vir duplicado)."""
+    with _db() as c:
+        row = c.execute(_q("SELECT * FROM checkouts WHERE provider=? AND external_id=?"),
+                        (provider, external_id)).fetchone()
+        if not row:
+            return None
+        if row["status"] == "pago":
+            return dict(row)             # já processado
+        c.execute(_q("UPDATE checkouts SET status='pago' WHERE id=? AND status='pendente'"),
+                  (row["id"],))
+    ativar_pro(row["user_id"], row["plano"], int(row["dias"]),
+               float(row["valor"]), metodo=row["metodo"])
+    return dict(row)
 
 
 # ---------------------------------------------------------------------------

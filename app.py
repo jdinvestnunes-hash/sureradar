@@ -12,10 +12,15 @@ Endpoints:
     GET /api/surebets    -> surebets já filtradas conforme a query do usuário
 """
 
+import hashlib
+import hmac
+import json
 import secrets
 import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
+
+import requests
 
 # Mostra os logs do agendador em tempo real (evita buffer em background).
 try:
@@ -247,6 +252,139 @@ def health():
     except Exception as e:
         info["erro"] = type(e).__name__ + ": " + str(e)[:120]
     return info
+
+
+# ===========================================================================
+# PAGAMENTOS — Stripe (cartão) e AbacatePay (Pix)
+# ===========================================================================
+def _plano_valido(payload):
+    plano = (payload or {}).get("plano", "mensal")
+    return plano, config.PLANOS.get(plano)
+
+
+@app.post("/api/checkout/stripe")
+def checkout_stripe(request: Request, payload: dict = Body(...)):
+    """Cria uma sessão de checkout do Stripe (cartão) e devolve a URL."""
+    user = _usuario(request)
+    if not user:
+        return JSONResponse({"erro": "não autenticado"}, status_code=401)
+    plano, p = _plano_valido(payload)
+    if not p:
+        return JSONResponse({"erro": "plano inválido"}, status_code=400)
+    if not config.STRIPE_SECRET_KEY:
+        return JSONResponse({"erro": "Stripe não configurado"}, status_code=503)
+    data = {
+        "mode": "payment",
+        "success_url": config.SITE_URL + "/perfil?pago=1",
+        "cancel_url": config.SITE_URL + "/planos",
+        "customer_email": user["email"],
+        "client_reference_id": str(user["id"]),
+        "line_items[0][quantity]": "1",
+        "line_items[0][price_data][currency]": "brl",
+        "line_items[0][price_data][unit_amount]": str(int(round(p["valor"] * 100))),
+        "line_items[0][price_data][product_data][name]": "SureRadar " + p["nome"],
+        "metadata[user_id]": str(user["id"]),
+        "metadata[plano]": plano,
+    }
+    try:
+        r = requests.post("https://api.stripe.com/v1/checkout/sessions", data=data,
+                          auth=(config.STRIPE_SECRET_KEY, ""), timeout=20)
+    except requests.RequestException as e:
+        return JSONResponse({"erro": "falha de rede", "detalhe": str(e)[:120]}, status_code=502)
+    if not r.ok:
+        return JSONResponse({"erro": "Stripe recusou", "detalhe": r.text[:200]}, status_code=502)
+    sess = r.json()
+    auth.checkout_registrar("stripe", sess["id"], user["id"], plano, p["dias"], p["valor"], "stripe")
+    return {"url": sess["url"]}
+
+
+def _verifica_assinatura_stripe(body: bytes, sig_header: str, secret: str) -> bool:
+    if not secret or not sig_header:
+        return False
+    try:
+        campos = dict(kv.split("=", 1) for kv in sig_header.split(",") if "=" in kv)
+        t, v1 = campos.get("t"), campos.get("v1")
+        assinado = f"{t}.".encode() + body
+        esperado = hmac.new(secret.encode(), assinado, hashlib.sha256).hexdigest()
+        return hmac.compare_digest(esperado, v1 or "")
+    except Exception:
+        return False
+
+
+@app.post("/api/webhook/stripe")
+async def webhook_stripe(request: Request):
+    body = await request.body()
+    if not _verifica_assinatura_stripe(body, request.headers.get("stripe-signature", ""),
+                                       config.STRIPE_WEBHOOK_SECRET):
+        return JSONResponse({"erro": "assinatura inválida"}, status_code=400)
+    try:
+        ev = json.loads(body)
+    except Exception:
+        return JSONResponse({"erro": "payload inválido"}, status_code=400)
+    if ev.get("type") == "checkout.session.completed":
+        sess = ev.get("data", {}).get("object", {})
+        if sess.get("id") and sess.get("payment_status") in (None, "paid"):
+            auth.checkout_pagar("stripe", sess["id"])
+    return {"ok": True}
+
+
+@app.post("/api/checkout/pix")
+def checkout_pix(request: Request, payload: dict = Body(...)):
+    """Cria uma cobrança Pix no AbacatePay e devolve a URL de pagamento."""
+    user = _usuario(request)
+    if not user:
+        return JSONResponse({"erro": "não autenticado"}, status_code=401)
+    plano, p = _plano_valido(payload)
+    if not p:
+        return JSONResponse({"erro": "plano inválido"}, status_code=400)
+    if not config.ABACATEPAY_API_KEY:
+        return JSONResponse({"erro": "AbacatePay não configurado"}, status_code=503)
+    body = {
+        "frequency": "ONE_TIME",
+        "methods": ["PIX"],
+        "products": [{
+            "externalId": "pro-" + plano,
+            "name": "SureRadar " + p["nome"],
+            "description": "Assinatura " + p["nome"] + " (" + str(p["dias"]) + " dias)",
+            "quantity": 1,
+            "price": int(round(p["valor"] * 100)),
+        }],
+        "returnUrl": config.SITE_URL + "/planos",
+        "completionUrl": config.SITE_URL + "/perfil?pago=1",
+        "customer": {"name": user["nome"], "email": user["email"]},
+    }
+    try:
+        r = requests.post("https://api.abacatepay.com/v1/billing/create", json=body,
+                          headers={"Authorization": "Bearer " + config.ABACATEPAY_API_KEY},
+                          timeout=20)
+    except requests.RequestException as e:
+        return JSONResponse({"erro": "falha de rede", "detalhe": str(e)[:120]}, status_code=502)
+    if not r.ok:
+        return JSONResponse({"erro": "AbacatePay recusou", "detalhe": r.text[:200]}, status_code=502)
+    d = (r.json() or {}).get("data") or {}
+    bid, url = d.get("id"), d.get("url")
+    if not bid or not url:
+        return JSONResponse({"erro": "resposta inesperada do AbacatePay"}, status_code=502)
+    auth.checkout_registrar("abacatepay", bid, user["id"], plano, p["dias"], p["valor"], "pix")
+    return {"url": url}
+
+
+@app.post("/api/webhook/abacatepay")
+async def webhook_abacate(request: Request):
+    if (not config.ABACATEPAY_WEBHOOK_SECRET or
+            request.query_params.get("webhookSecret") != config.ABACATEPAY_WEBHOOK_SECRET):
+        return JSONResponse({"erro": "secret inválido"}, status_code=401)
+    try:
+        ev = await request.json()
+    except Exception:
+        return JSONResponse({"erro": "payload inválido"}, status_code=400)
+    if ev.get("event") in ("billing.paid", "billing.completed", "payment.paid"):
+        d = ev.get("data") or {}
+        billing = d.get("billing") or d.get("pixQrCode") or d
+        bid = (billing or {}).get("id") or d.get("id")
+        if bid:
+            auth.checkout_pagar("abacatepay", bid)
+    return {"ok": True}
 
 
 # --- Banca (entradas do usuário) persistida no banco ---
