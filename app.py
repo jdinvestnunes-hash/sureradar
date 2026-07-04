@@ -740,6 +740,16 @@ def admin_testar_telegram(request: Request):
     return notifier.testar()
 
 
+@app.api_route("/api/admin/telegram-chats", methods=["GET", "POST"])
+def admin_telegram_chats(request: Request):
+    """Descobre o ID dos grupos onde o bot está — SEM postar nada no grupo."""
+    user = _usuario(request)
+    if not _admin_email(user):
+        return JSONResponse({"erro": "Faça login com seu e-mail de admin primeiro."},
+                            status_code=403)
+    return notifier.descobrir_chats()
+
+
 @app.post("/api/perfil/whatsapp")
 def perfil_whatsapp(request: Request, payload: dict = Body(...)):
     """Salva/atualiza o WhatsApp (usado tb p/ contas Google que não têm)."""

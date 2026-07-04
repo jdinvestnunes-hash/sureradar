@@ -144,5 +144,32 @@ def enviar_surebet(sb):
     return enviar_texto(formatar_surebet(sb))
 
 
+def descobrir_chats():
+    """Lê os updates do bot (getUpdates) e lista os grupos que ele 'enxergou'
+    — SEM postar nada. Quando você ADICIONA o bot a um grupo, o Telegram gera um
+    evento (my_chat_member) que aparece aqui com o ID do grupo. Ninguém vê."""
+    if not config.TELEGRAM_BOT_TOKEN:
+        return {"erro": "TELEGRAM_BOT_TOKEN não configurado"}
+    try:
+        r = requests.get(API.format(token=config.TELEGRAM_BOT_TOKEN, metodo="getUpdates"), timeout=12)
+        data = r.json()
+    except Exception as e:
+        return {"erro": "rede: " + str(e)[:150]}
+    if not data.get("ok"):
+        return {"erro": str(data)[:200]}
+    chats = {}
+    for up in data.get("result", []):
+        for chave in ("message", "my_chat_member", "chat_member", "channel_post",
+                      "edited_message", "callback_query"):
+            obj = up.get(chave) or {}
+            ch = obj.get("chat") or (obj.get("message") or {}).get("chat")
+            if ch and ch.get("id"):
+                chats[ch["id"]] = {"id": ch["id"], "type": ch.get("type"),
+                                   "title": ch.get("title") or ch.get("username")
+                                   or ch.get("first_name")}
+    return {"chats": list(chats.values()), "eventos": len(data.get("result", [])),
+            "dica": "Se vazio: adicione o bot ao grupo AGORA (ou remova e adicione de novo) e recarregue."}
+
+
 def _esc(t):
     return str(t).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
