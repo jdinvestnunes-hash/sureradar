@@ -451,50 +451,24 @@ def checkout_pix(request: Request, payload: dict = Body(...)):
     return {"url": url}
 
 
-_ULTIMO_WEBHOOK_ABACATE = {}   # DEBUG: guarda o último webhook recebido
-
-
 @app.post("/api/webhook/abacatepay")
 async def webhook_abacate(request: Request):
-    global _ULTIMO_WEBHOOK_ABACATE
-    body_raw = await request.body()
-    dbg = {"quando": pipeline._agora_iso(),
-           "tem_query_secret": "webhookSecret" in request.query_params,
-           "secret_ok": None, "event": None, "bid": None,
-           "checkout_encontrado": None, "chaves_data": None}
-    secret_ok = (bool(config.ABACATEPAY_WEBHOOK_SECRET) and
-                 request.query_params.get("webhookSecret") == config.ABACATEPAY_WEBHOOK_SECRET)
-    dbg["secret_ok"] = secret_ok
-    if not secret_ok:
-        _ULTIMO_WEBHOOK_ABACATE = dbg
-        print(">> WEBHOOK ABACATE (secret invalido):", dbg)
+    if (not config.ABACATEPAY_WEBHOOK_SECRET or
+            request.query_params.get("webhookSecret") != config.ABACATEPAY_WEBHOOK_SECRET):
         return JSONResponse({"erro": "secret inválido"}, status_code=401)
     try:
-        ev = json.loads(body_raw)
+        ev = await request.json()
     except Exception:
-        dbg["erro"] = "json inválido"
-        _ULTIMO_WEBHOOK_ABACATE = dbg
         return JSONResponse({"erro": "payload inválido"}, status_code=400)
-    dbg["event"] = ev.get("event")
-    d = ev.get("data") or {}
-    dbg["chaves_data"] = list(d.keys()) if isinstance(d, dict) else str(type(d))
-    billing = d.get("billing") or d.get("pixQrCode") or d
-    bid = (billing or {}).get("id") or d.get("id")
-    dbg["bid"] = bid
-    # aceita billing.paid e afins; ativa se achar o checkout pendente
+    # billing.paid é o evento do Pix (v1); os demais são tolerância p/ variações.
     if ev.get("event") in ("billing.paid", "billing.completed", "payment.paid",
-                            "checkout.completed", "transparent.completed") and bid:
-        res = auth.checkout_pagar("abacatepay", bid)
-        dbg["checkout_encontrado"] = bool(res)
-    _ULTIMO_WEBHOOK_ABACATE = dbg
-    print(">> WEBHOOK ABACATE:", dbg)
+                            "checkout.completed", "transparent.completed"):
+        d = ev.get("data") or {}
+        billing = d.get("billing") or d.get("pixQrCode") or d
+        bid = (billing or {}).get("id") or d.get("id")
+        if bid:
+            auth.checkout_pagar("abacatepay", bid)
     return {"ok": True}
-
-
-@app.get("/api/webhook/abacatepay/debug")
-def webhook_abacate_debug():
-    """DEBUG temporário: mostra o último webhook recebido da AbacatePay."""
-    return _ULTIMO_WEBHOOK_ABACATE or {"vazio": True, "nota": "nenhum webhook recebido ainda"}
 
 
 # --- Banca (entradas do usuário) persistida no banco ---
