@@ -1404,15 +1404,11 @@ def tela_calculadora(request: Request):
 @app.get("/grupo")
 @app.get("/free")
 @app.get("/telegram")
-def tela_grupo():
-    """Squeeze page focada em entrar no grupo grátis do Telegram (tráfego Facebook)."""
-    return FileResponse(STATIC_DIR / "grupo.html")
-
-
 @app.get("/oportunidade")
 @app.get("/metodo")
-def tela_oportunidade():
-    """Landing 'ponte' neutra (sem termos de aposta) p/ passar na revisão do Facebook."""
+def tela_grupo():
+    """Landing do grupo — versão NEUTRA (sem termos de aposta) p/ passar na revisão
+    do Facebook. Todos os apelidos (/grupo, /oportunidade, etc.) servem a mesma."""
     return FileResponse(STATIC_DIR / "oportunidade.html")
 
 
