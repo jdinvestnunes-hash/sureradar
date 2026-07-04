@@ -208,6 +208,17 @@ def init():
             status TEXT NOT NULL,
             criado {_NUM} NOT NULL,
             respondido {_NUM})""")
+        # Mensagens dos tickets (conversa ida-e-volta: autor='user'|'admin').
+        c.execute(f"""CREATE TABLE IF NOT EXISTS ticket_msgs(
+            id {_SERIAL},
+            ticket_id BIGINT NOT NULL,
+            autor TEXT NOT NULL,
+            texto TEXT NOT NULL,
+            criado {_NUM} NOT NULL)""")
+        # Entradas já postadas no grupo (persiste p/ NUNCA repetir, mesmo após redeploy).
+        c.execute(f"""CREATE TABLE IF NOT EXISTS posts_grupo(
+            post_id TEXT PRIMARY KEY,
+            criado {_NUM} NOT NULL)""")
     # Migrações leves para bancos antigos: cada ALTER na SUA transação (no
     # Postgres, um erro aborta a transação inteira). Erro = coluna já existe.
     for tabela, coluna in [("checkouts", "pi TEXT"),
@@ -321,6 +332,28 @@ def descadastrar(token):
             return None
         c.execute(_q("UPDATE users SET email_optout=1 WHERE id=?"), (row["id"],))
     return row["email"]
+
+
+# ---------------------------------------------------------------------------
+# Posts do grupo (dedup persistente — nunca repete a mesma entrada)
+# ---------------------------------------------------------------------------
+def post_ja_enviado(post_id):
+    with _db() as c:
+        row = c.execute(_q("SELECT 1 FROM posts_grupo WHERE post_id=?"), (str(post_id),)).fetchone()
+    return row is not None
+
+
+def registrar_post(post_id):
+    try:
+        with _db() as c:
+            if PG:
+                c.execute(_q("""INSERT INTO posts_grupo(post_id,criado) VALUES(?,?)
+                               ON CONFLICT (post_id) DO NOTHING"""), (str(post_id), time.time()))
+            else:
+                c.execute("INSERT OR IGNORE INTO posts_grupo(post_id,criado) VALUES(?,?)",
+                          (str(post_id), time.time()))
+    except Exception as e:
+        print("!! registrar_post:", e)
 
 
 # ---------------------------------------------------------------------------

@@ -21,6 +21,7 @@ try:
 except Exception:                       # pragma: no cover
     _BR = None
 
+import auth
 import config
 import feed
 import notifier
@@ -73,9 +74,19 @@ def _reset_dia(dia):
 
 
 def _pegar(cands):
+    """Primeira entrada AINDA NÃO postada — checa memória e o banco (persistente,
+    nunca repete a mesma entrada mesmo após redeploy ou em outro dia)."""
     for c in cands:
-        if c["id"] not in _estado["postados"]:
-            return c
+        cid = c["id"]
+        if cid in _estado["postados"]:
+            continue
+        try:
+            if auth.post_ja_enviado(cid):
+                _estado["postados"].add(cid)
+                continue
+        except Exception:
+            pass
+        return c
     return None
 
 
@@ -207,6 +218,7 @@ def postar_faixa(lo, hi, rotulo):
         return False
     notifier.enviar_surebet(sb)      # já leva os links das casas + CTA no rodapé
     _estado["postados"].add(sb["id"])
+    auth.registrar_post(sb["id"])    # PERSISTE — nunca reposta esta entrada
     print(f">> promo: postou {rotulo} — {float(sb['profit_pct']):.2f}% {sb.get('event','')}")
     return True
 
