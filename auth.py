@@ -152,16 +152,21 @@ def init():
             valor {_NUM} NOT NULL,
             metodo TEXT NOT NULL,
             status TEXT NOT NULL,
+            pi TEXT,
             criado {_NUM} NOT NULL)""")
         try:
             c.execute("CREATE UNIQUE INDEX IF NOT EXISTS ix_checkout_ext ON checkouts(provider, external_id)")
         except Exception:
             pass
-        if not PG:  # migração leve do SQLite antigo
-            try:
-                c.execute("ALTER TABLE users ADD COLUMN plano_expira REAL")
-            except sqlite3.OperationalError:
-                pass
+    # Migrações leves para bancos antigos: cada ALTER na SUA transação (no
+    # Postgres, um erro aborta a transação inteira). Erro = coluna já existe.
+    for tabela, coluna in [("checkouts", "pi TEXT"),
+                           ("users", f"plano_expira {_NUM}")]:
+        try:
+            with _db() as c:
+                c.execute(f"ALTER TABLE {tabela} ADD COLUMN {coluna}")
+        except Exception:
+            pass
 
 
 # ---------------------------------------------------------------------------
@@ -233,9 +238,10 @@ def checkout_registrar(provider, external_id, user_id, plano, dias, valor, metod
             (provider, external_id, user_id, plano, dias, valor, metodo, "pendente", time.time()))
 
 
-def checkout_pagar(provider, external_id):
+def checkout_pagar(provider, external_id, pi=None):
     """Confirma o pagamento (chamado pelo webhook): acha o checkout pendente,
-    ativa o PRO e marca como pago. IDEMPOTENTE (webhook pode vir duplicado)."""
+    ativa o PRO e marca como pago. IDEMPOTENTE (webhook pode vir duplicado).
+    `pi` = payment_intent do Stripe (guardado p/ mapear estorno/chargeback)."""
     with _db() as c:
         row = c.execute(_q("SELECT * FROM checkouts WHERE provider=? AND external_id=?"),
                         (provider, external_id)).fetchone()
@@ -243,10 +249,25 @@ def checkout_pagar(provider, external_id):
             return None
         if row["status"] == "pago":
             return dict(row)             # já processado
-        c.execute(_q("UPDATE checkouts SET status='pago' WHERE id=? AND status='pendente'"),
-                  (row["id"],))
+        c.execute(_q("UPDATE checkouts SET status='pago', pi=? WHERE id=? AND status='pendente'"),
+                  (pi, row["id"]))
     ativar_pro(row["user_id"], row["plano"], int(row["dias"]),
                float(row["valor"]), metodo=row["metodo"])
+    return dict(row)
+
+
+def checkout_revogar_por_pi(pi):
+    """Estorno/chargeback: acha o checkout pago com esse payment_intent e TIRA o
+    PRO da pessoa (volta pra free). Idempotente."""
+    if not pi:
+        return None
+    with _db() as c:
+        row = c.execute(_q("SELECT * FROM checkouts WHERE pi=? AND status='pago'"), (pi,)).fetchone()
+        if not row:
+            return None
+        c.execute(_q("UPDATE checkouts SET status='estornado' WHERE id=?"), (row["id"],))
+    voltar_free(row["user_id"])
+    print(f">> ESTORNO/chargeback: PRO revogado do user {row['user_id']}")
     return dict(row)
 
 

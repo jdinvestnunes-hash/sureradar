@@ -321,10 +321,17 @@ async def webhook_stripe(request: Request):
         ev = json.loads(body)
     except Exception:
         return JSONResponse({"erro": "payload inválido"}, status_code=400)
-    if ev.get("type") == "checkout.session.completed":
-        sess = ev.get("data", {}).get("object", {})
-        if sess.get("id") and sess.get("payment_status") in (None, "paid"):
-            auth.checkout_pagar("stripe", sess["id"])
+    tipo = ev.get("type")
+    obj = ev.get("data", {}).get("object", {})
+    if tipo == "checkout.session.completed":
+        if obj.get("id") and obj.get("payment_status") in (None, "paid"):
+            auth.checkout_pagar("stripe", obj["id"], obj.get("payment_intent"))
+    elif tipo in ("charge.refunded", "charge.dispute.created",
+                  "charge.dispute.funds_withdrawn"):
+        # estorno ou chargeback -> tira o PRO da pessoa
+        pi = obj.get("payment_intent")
+        if pi:
+            auth.checkout_revogar_por_pi(pi)
     return {"ok": True}
 
 
