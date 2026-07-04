@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Calculadora de Surebet — SureRadar</title>
+  <meta name="description" content="Calcule quanto apostar em cada casa pra travar o lucro, com a banca que você tem." />
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@700;800&family=Inter:wght@400;500;600;700;800&display=swap" media="print" onload="this.media='all'" />
+  <style>
+    :root{--bg:#05070d;--card:#0e1421;--card2:#121a2b;--line:#1b2740;--line2:#27395c;
+      --text:#f2f6fc;--dim:#a3b1c9;--mute:#5e6b85;--green:#2ee6a8;--cyan:#38d4f5;--gold:#ffc94d;--red:#ff6b6b;
+      --grad:linear-gradient(112deg,#2ee6a8 10%,#38d4f5 90%);--fd:"Sora","Inter",sans-serif;--fb:"Inter",system-ui,sans-serif}
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100vh}
+    a{color:inherit;text-decoration:none}
+    nav{border-bottom:1px solid var(--line);background:rgba(5,7,13,.8);backdrop-filter:blur(12px)}
+    .navin{max-width:640px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;height:60px;padding:0 20px}
+    .brand{font-family:var(--fd);font-weight:800;font-size:19px}.brand span{color:var(--green)}
+    .navin a.back{font-size:13.5px;color:var(--dim)}
+    .wrap{max-width:640px;margin:0 auto;padding:28px 20px 70px}
+    h1{font-family:var(--fd);font-size:26px;font-weight:800;letter-spacing:-.02em}
+    .sub{color:var(--dim);font-size:14.5px;margin:8px 0 26px;line-height:1.55}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:22px}
+    .lbl{font-size:11.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--mute);margin-bottom:8px}
+    .row{display:flex;gap:12px;align-items:flex-end}
+    .fld{flex:1;margin-bottom:16px}
+    input{width:100%;background:var(--bg);border:1px solid var(--line2);border-radius:11px;padding:13px 14px;color:var(--text);font-size:15px;font-family:var(--fb);outline:none}
+    input:focus{border-color:var(--cyan)}
+    input.nome{font-size:14px}
+    .leg{background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px}
+    .leg-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+    .leg-tag{font-family:var(--fd);font-weight:800;font-size:13px;color:var(--cyan)}
+    .leg-win{font-size:12.5px;color:var(--mute)}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .total-box{margin:16px 0}
+    .btns{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 4px}
+    .mini{background:rgba(255,255,255,.05);border:1px solid var(--line2);color:var(--text);border-radius:9px;padding:9px 12px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:var(--fb)}
+    .mini:hover{border-color:var(--cyan)}
+    .result{margin-top:20px;border-radius:16px;padding:20px;text-align:center;background:linear-gradient(160deg,rgba(46,230,168,.12),var(--card2));border:1px solid rgba(46,230,168,.4)}
+    .result.bad{background:linear-gradient(160deg,rgba(255,107,107,.1),var(--card2));border-color:rgba(255,107,107,.4)}
+    .result .big{font-family:var(--fd);font-size:34px;font-weight:800;letter-spacing:-.02em;color:var(--green)}
+    .result.bad .big{color:var(--red)}
+    .result .lb{color:var(--dim);font-size:13.5px;margin-top:2px}
+    .result .pct{display:inline-block;margin-top:10px;background:rgba(46,230,168,.15);color:var(--green);font-weight:800;font-size:14px;padding:5px 14px;border-radius:99px}
+    .result.bad .pct{background:rgba(255,107,107,.15);color:var(--red)}
+    .foot{margin-top:22px;text-align:center}
+    .foot a{color:var(--green);font-size:13.5px}
+    .hint{color:var(--mute);font-size:12.5px;text-align:center;margin-top:10px}
+  </style>
+</head>
+<body>
+<nav><div class="navin">
+  <a href="/" class="brand">Sure<span>Radar</span></a>
+  <a href="/app" class="back">Ir para o painel →</a>
+</div></nav>
+
+<div class="wrap">
+  <h1>Calculadora de Surebet</h1>
+  <p class="sub">Coloque as <b style="color:var(--text)">odds</b> de cada casa e <b style="color:var(--text)">quanto você quer apostar no total</b> (sua banca). A gente divide certinho pra travar o lucro — dê no que der.</p>
+
+  <div class="card">
+    <!-- Perna 1 -->
+    <div class="leg">
+      <div class="leg-top"><span class="leg-tag" id="tag1">Casa 1</span><span class="leg-win" id="win1"></span></div>
+      <input class="nome" id="n1" placeholder="Ex.: Casa/mercado (opcional)" maxlength="40" />
+      <div class="grid2" style="margin-top:10px">
+        <div><div class="lbl">Odd</div><input id="o1" inputmode="decimal" placeholder="ex.: 1.40" /></div>
+        <div><div class="lbl">Apostar (R$)</div><input id="s1" inputmode="decimal" placeholder="0,00" /></div>
+      </div>
+    </div>
+    <!-- Perna 2 -->
+    <div class="leg">
+      <div class="leg-top"><span class="leg-tag" id="tag2">Casa 2</span><span class="leg-win" id="win2"></span></div>
+      <input class="nome" id="n2" placeholder="Ex.: Casa/mercado (opcional)" maxlength="40" />
+      <div class="grid2" style="margin-top:10px">
+        <div><div class="lbl">Odd</div><input id="o2" inputmode="decimal" placeholder="ex.: 3.10" /></div>
+        <div><div class="lbl">Apostar (R$)</div><input id="s2" inputmode="decimal" placeholder="0,00" /></div>
+      </div>
+    </div>
+
+    <div class="total-box">
+      <div class="lbl">Total que você quer apostar (sua banca)</div>
+      <input id="total" inputmode="decimal" placeholder="ex.: 250,00" />
+    </div>
+
+    <div class="btns">
+      <button class="mini" data-round="1">Arredondar R$1</button>
+      <button class="mini" data-round="5">R$5</button>
+      <button class="mini" data-round="10">R$10</button>
+      <button class="mini" id="equilibrar">⚖ Equilibrar</button>
+    </div>
+
+    <div class="result" id="result">
+      <div class="big" id="lucro">R$ 0,00</div>
+      <div class="lb">lucro garantido</div>
+      <div class="pct" id="pct">0,00%</div>
+    </div>
+    <p class="hint" id="hint">Preencha as odds e o total pra ver a divisão.</p>
+  </div>
+
+  <div class="foot">
+    <a href="/cadastro">Quer as entradas prontas todo dia? Crie sua conta grátis →</a>
+  </div>
+</div>
+
+<script>
+const $ = s => document.getElementById(s);
+const num = v => { v=(v||"").toString().replace(/\./g,"").replace(",",".").replace(/[^\d.]/g,""); const n=parseFloat(v); return isNaN(n)?0:n; };
+const brl = v => "R$ " + Number(v).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2});
+
+function odds(){ return [num($("o1").value), num($("o2").value)]; }
+function stakes(){ return [num($("s1").value), num($("s2").value)]; }
+function setStake(i,v){ $("s"+(i+1)).value = v ? v.toFixed(2).replace(".",",") : ""; }
+function setTotal(v){ $("total").value = v ? v.toFixed(2).replace(".",",") : ""; }
+
+// divide o total pelas odds (lucro igual dos dois lados)
+function equilibrar(){
+  const [o1,o2]=odds(); const t=num($("total").value);
+  if(o1<=1||o2<=1||t<=0){ render(); return; }
+  const inv1=1/o1, inv2=1/o2, s=inv1+inv2;
+  setStake(0, t*inv1/s); setStake(1, t*inv2/s);
+  render();
+}
+// editou UMA aposta -> ajusta a outra pra retorno igual, e atualiza o total
+function ajustar(i){
+  const [o1,o2]=odds(); const st=stakes();
+  if(o1<=1||o2<=1){ render(); return; }
+  const oThis = i===0?o1:o2, oOther = i===0?o2:o1;
+  const other = st[i]*oThis/oOther;
+  setStake(i===0?1:0, other);
+  setTotal(st[i]+other);
+  render();
+}
+function arredondar(mult){
+  let st=stakes().map(v=>Math.round(v/mult)*mult);
+  setStake(0,st[0]); setStake(1,st[1]); setTotal(st[0]+st[1]); render();
+}
+function render(){
+  const [o1,o2]=odds(); const st=stakes(); const total=st[0]+st[1];
+  const r1=st[0]*o1, r2=st[1]*o2;
+  $("win1").textContent = (o1>1&&st[0]>0)? `se sair: ${brl(r1-total)}` : "";
+  $("win2").textContent = (o2>1&&st[1]>0)? `se sair: ${brl(r2-total)}` : "";
+  const res=$("result"), hint=$("hint");
+  if(o1<=1||o2<=1||total<=0){
+    res.classList.remove("bad"); $("lucro").textContent="R$ 0,00"; $("pct").textContent="0,00%";
+    hint.textContent="Preencha as odds e o total pra ver a divisão."; return;
+  }
+  const garant = Math.min(r1,r2)-total;
+  const pct = (Math.min(r1,r2)/total-1)*100;
+  $("lucro").textContent = brl(garant);
+  $("pct").textContent = pct.toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2})+"%";
+  res.classList.toggle("bad", garant<0);
+  hint.textContent = garant>=0
+    ? "✅ Lucro travado — ganhe quem ganhar. Aposte os valores acima em cada casa."
+    : "⚠️ Com essas odds/valores não fecha lucro. Ajuste os valores ou as odds.";
+}
+
+// eventos
+$("total").addEventListener("input", equilibrar);
+["o1","o2"].forEach(id=>$(id).addEventListener("input", ()=>{ if(num($("total").value)>0) equilibrar(); else render(); }));
+$("s1").addEventListener("input", ()=>ajustar(0));
+$("s2").addEventListener("input", ()=>ajustar(1));
+["n1","n2"].forEach(id=>$(id).addEventListener("input", e=>{
+  const t = $("tag"+(id==="n1"?"1":"2")); t.textContent = e.target.value.trim() || (id==="n1"?"Casa 1":"Casa 2");
+}));
+document.querySelectorAll("[data-round]").forEach(b=>b.addEventListener("click",()=>arredondar(parseInt(b.dataset.round))));
+$("equilibrar").addEventListener("click", equilibrar);
+
+// pré-preenche pela URL: ?o1=1.40&o2=3.10&n1=Casa%20A&n2=Casa%20B&total=250
+(function(){
+  const p = new URLSearchParams(location.search);
+  ["o1","o2","n1","n2","total"].forEach(k=>{ const v=p.get(k); if(v){ $(k).value = v; } });
+  ["n1","n2"].forEach(id=>{ const t=$("tag"+(id==="n1"?"1":"2")); if($(id).value.trim()) t.textContent=$(id).value.trim(); });
+  if(num($("total").value)>0) equilibrar(); else render();
+})();
+</script>
+</body>
+</html>

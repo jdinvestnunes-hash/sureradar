@@ -9,6 +9,8 @@ Se as duas variáveis não estiverem preenchidas, o notificador fica inativo
 (silencioso) e o resto do sistema segue funcionando normalmente.
 """
 
+from urllib.parse import urlencode
+
 import requests
 
 import config
@@ -102,6 +104,17 @@ def formatar_surebet(sb):
     if sb.get("lucro_brl") is not None:
         linhas.append("")
         linhas.append(f"✅ Lucro garantido: <b>{_brl(sb['lucro_brl'])}</b>")
+    # Calculadora pré-preenchida com as odds da entrada (banca do usuário).
+    legs = sb.get("legs", [])[:2]
+    if len(legs) == 2 and getattr(config, "SITE_URL", ""):
+        qs = urlencode({
+            "o1": f"{legs[0]['odd']:.2f}", "o2": f"{legs[1]['odd']:.2f}",
+            "n1": str(legs[0].get("outcome") or legs[0].get("bookmaker") or "Casa 1")[:30],
+            "n2": str(legs[1].get("outcome") or legs[1].get("bookmaker") or "Casa 2")[:30],
+        })
+        linhas.append("")
+        linhas.append(f'🧮 <b>Tem outra banca?</b> Calcule 👉 '
+                      f'<a href="{config.SITE_URL}/calculadora?{qs}">abrir calculadora</a>')
     if getattr(config, "SITE_URL", ""):
         linhas.append("")
         linhas.append(f'🆓 <b>Crie sua conta grátis aqui</b> 👉 <a href="{config.SITE_URL}">{config.SITE_URL}</a>')

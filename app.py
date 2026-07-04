@@ -1236,6 +1236,12 @@ def tela_redefinir():
     return FileResponse(STATIC_DIR / "redefinir.html")
 
 
+@app.get("/calculadora")
+def tela_calculadora():
+    """Calculadora de surebet pública (útil p/ quem vê a entrada no Telegram)."""
+    return FileResponse(STATIC_DIR / "calculadora.html")
+
+
 @app.get("/termos")
 def tela_termos():
     return FileResponse(STATIC_DIR / "termos.html")
