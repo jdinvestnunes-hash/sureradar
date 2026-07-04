@@ -302,11 +302,17 @@ def health():
     except Exception as e:
         info["erro"] = type(e).__name__ + ": " + str(e)[:120]
     # Diagnóstico de config (só True/False, nunca o valor do segredo).
+    sk = config.STRIPE_SECRET_KEY
+    abk = config.ABACATEPAY_API_KEY
     info["pagamentos"] = {
-        "stripe_key": bool(config.STRIPE_SECRET_KEY),
+        "stripe_key": bool(sk),
         "stripe_webhook": bool(config.STRIPE_WEBHOOK_SECRET),
-        "abacatepay_key": bool(config.ABACATEPAY_API_KEY),
+        "stripe_mode": ("live" if sk.startswith("sk_live_") else
+                        "test" if sk.startswith("sk_test_") else "?"),
+        "abacatepay_key": bool(abk),
         "abacatepay_webhook": bool(config.ABACATEPAY_WEBHOOK_SECRET),
+        "abacatepay_mode": ("prod" if abk.startswith("abc_prod_") else
+                            "dev" if abk.startswith("abc_dev_") else "?"),
     }
     return info
 
