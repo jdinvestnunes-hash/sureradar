@@ -533,6 +533,8 @@ function switchView(v) {
   document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("active", t.dataset.view === v));
   $("#view-ops").classList.toggle("hidden", v !== "ops");
   $("#view-bank").classList.toggle("hidden", v !== "bank");
+  const vc = document.getElementById("view-calc");
+  if (vc) vc.classList.toggle("hidden", v !== "calc");
   if (v === "bank") renderBanca();
 }
 

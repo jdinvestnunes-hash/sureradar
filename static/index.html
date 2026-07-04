@@ -31,7 +31,7 @@
     <nav class="tabs">
       <button class="tab active" data-view="ops">Oportunidades</button>
       <button class="tab" data-view="bank">Minha Banca <span id="bank-count" class="tab-badge">0</span></button>
-      <a class="tab" href="/calculadora" title="Calculadora de surebet">🧮 Calculadora</a>
+      <button class="tab" data-view="calc" title="Calculadora de surebet">🧮 Calculadora</button>
     </nav>
 
     <div class="topbar-right">
@@ -122,6 +122,48 @@
     </div>
   </div>
 
+  <!-- VIEW: CALCULADORA -->
+  <div class="bank-view hidden" id="view-calc">
+    <div class="bank-head">
+      <h1>Calculadora</h1>
+      <p class="subtitle">Coloque as <b>odds</b> e <b>quanto você quer apostar no total</b> (sua banca). A gente divide pra travar o lucro.</p>
+    </div>
+    <div style="max-width:620px">
+      <div style="background:var(--surface,#0e1421);border:1px solid var(--border,#1b2740);border-radius:16px;padding:20px">
+        <div class="cv-leg">
+          <div class="cv-leg-top"><span class="cv-tag" id="cv-tag1">Casa 1</span><span class="cv-win" id="cv-win1"></span></div>
+          <input class="cv-in" id="cv-n1" placeholder="Casa/mercado (opcional)" maxlength="40" />
+          <div class="cv-grid">
+            <div><div class="cv-lbl">Odd</div><input class="cv-in" id="cv-o1" inputmode="decimal" placeholder="ex.: 1.40" /></div>
+            <div><div class="cv-lbl">Apostar (R$)</div><input class="cv-in" id="cv-s1" inputmode="decimal" placeholder="0,00" /></div>
+          </div>
+        </div>
+        <div class="cv-leg">
+          <div class="cv-leg-top"><span class="cv-tag" id="cv-tag2">Casa 2</span><span class="cv-win" id="cv-win2"></span></div>
+          <input class="cv-in" id="cv-n2" placeholder="Casa/mercado (opcional)" maxlength="40" />
+          <div class="cv-grid">
+            <div><div class="cv-lbl">Odd</div><input class="cv-in" id="cv-o2" inputmode="decimal" placeholder="ex.: 3.10" /></div>
+            <div><div class="cv-lbl">Apostar (R$)</div><input class="cv-in" id="cv-s2" inputmode="decimal" placeholder="0,00" /></div>
+          </div>
+        </div>
+        <div style="margin:14px 0"><div class="cv-lbl">Total que você quer apostar (sua banca)</div>
+          <input class="cv-in" id="cv-total" inputmode="decimal" placeholder="ex.: 250,00" /></div>
+        <div class="cv-btns">
+          <button class="cv-mini" data-cvround="1">Arredondar R$1</button>
+          <button class="cv-mini" data-cvround="5">R$5</button>
+          <button class="cv-mini" data-cvround="10">R$10</button>
+          <button class="cv-mini" id="cv-eq">⚖ Equilibrar</button>
+        </div>
+        <div class="cv-result" id="cv-result">
+          <div class="cv-big" id="cv-lucro">R$ 0,00</div>
+          <div class="cv-lb">lucro garantido</div>
+          <div class="cv-pct" id="cv-pct">0,00%</div>
+        </div>
+        <p class="cv-hint" id="cv-hint">Preencha as odds e o total pra ver a divisão.</p>
+      </div>
+    </div>
+  </div>
+
   <!-- MODAL CALCULADORA -->
   <div id="calc-overlay" class="overlay hidden">
     <div class="modal" role="dialog" aria-modal="true">
@@ -185,5 +227,81 @@
   </div>
 
   <script src="/static/app.js"></script>
+
+  <style>
+    #view-calc .cv-leg{background:var(--surface2,#121a2b);border:1px solid var(--border,#1b2740);border-radius:14px;padding:16px;margin-bottom:14px}
+    #view-calc .cv-leg-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+    #view-calc .cv-tag{font-weight:800;font-size:13px;color:var(--cyan,#38d4f5)}
+    #view-calc .cv-win{font-size:12.5px;color:var(--muted,#647388)}
+    #view-calc .cv-lbl{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted,#647388);margin-bottom:6px}
+    #view-calc .cv-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px}
+    #view-calc .cv-in{width:100%;background:var(--bg,#05070d);border:1px solid var(--border2,#27395c);border-radius:11px;padding:12px 13px;color:var(--text,#f2f6fc);font-size:15px;font-family:inherit;outline:none}
+    #view-calc .cv-in:focus{border-color:var(--cyan,#38d4f5)}
+    #view-calc .cv-btns{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0}
+    #view-calc .cv-mini{background:rgba(255,255,255,.05);border:1px solid var(--border2,#27395c);color:var(--text,#f2f6fc);border-radius:9px;padding:9px 12px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit}
+    #view-calc .cv-mini:hover{border-color:var(--cyan,#38d4f5)}
+    #view-calc .cv-result{margin-top:18px;border-radius:15px;padding:20px;text-align:center;background:linear-gradient(160deg,rgba(46,230,168,.12),var(--surface2,#121a2b));border:1px solid rgba(46,230,168,.4)}
+    #view-calc .cv-result.bad{background:linear-gradient(160deg,rgba(255,107,107,.1),var(--surface2,#121a2b));border-color:rgba(255,107,107,.4)}
+    #view-calc .cv-big{font-size:32px;font-weight:800;color:var(--green,#2ee6a8)}
+    #view-calc .cv-result.bad .cv-big{color:#ff6b6b}
+    #view-calc .cv-lb{color:var(--dim,#a3b1c9);font-size:13px;margin-top:2px}
+    #view-calc .cv-pct{display:inline-block;margin-top:10px;background:rgba(46,230,168,.15);color:var(--green,#2ee6a8);font-weight:800;font-size:14px;padding:5px 14px;border-radius:99px}
+    #view-calc .cv-result.bad .cv-pct{background:rgba(255,107,107,.15);color:#ff6b6b}
+    #view-calc .cv-hint{color:var(--muted,#647388);font-size:12.5px;text-align:center;margin-top:10px}
+  </style>
+  <script>
+  (function(){
+    var g = function(id){ return document.getElementById(id); };
+    var num = function(v){
+      v = (v||"").toString().trim();
+      if (v.indexOf(",") >= 0) v = v.replace(/\./g,"").replace(",", ".");
+      v = v.replace(/[^\d.]/g, "");
+      var n = parseFloat(v); return isNaN(n) ? 0 : n;
+    };
+    var brl = function(v){ return "R$ " + Number(v).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2}); };
+    var odds = function(){ return [num(g("cv-o1").value), num(g("cv-o2").value)]; };
+    var stks = function(){ return [num(g("cv-s1").value), num(g("cv-s2").value)]; };
+    var setS = function(i,v){ g("cv-s"+(i+1)).value = v ? v.toFixed(2).replace(".",",") : ""; };
+    var setT = function(v){ g("cv-total").value = v ? v.toFixed(2).replace(".",",") : ""; };
+    function equilibrar(){
+      var o=odds(), t=num(g("cv-total").value);
+      if(o[0]<=1||o[1]<=1||t<=0){ render(); return; }
+      var i1=1/o[0], i2=1/o[1], s=i1+i2;
+      setS(0, t*i1/s); setS(1, t*i2/s); render();
+    }
+    function ajustar(i){
+      var o=odds(), st=stks();
+      if(o[0]<=1||o[1]<=1){ render(); return; }
+      var oT=i===0?o[0]:o[1], oO=i===0?o[1]:o[0], other=st[i]*oT/oO;
+      setS(i===0?1:0, other); setT(st[i]+other); render();
+    }
+    function arred(m){ var st=stks().map(function(v){return Math.round(v/m)*m;}); setS(0,st[0]); setS(1,st[1]); setT(st[0]+st[1]); render(); }
+    function render(){
+      var o=odds(), st=stks(), total=st[0]+st[1], r1=st[0]*o[0], r2=st[1]*o[1];
+      g("cv-win1").textContent = (o[0]>1&&st[0]>0)? "se sair: "+brl(r1-total) : "";
+      g("cv-win2").textContent = (o[1]>1&&st[1]>0)? "se sair: "+brl(r2-total) : "";
+      var res=g("cv-result"), hint=g("cv-hint");
+      if(o[0]<=1||o[1]<=1||total<=0){ res.classList.remove("bad"); g("cv-lucro").textContent="R$ 0,00"; g("cv-pct").textContent="0,00%"; hint.textContent="Preencha as odds e o total pra ver a divisão."; return; }
+      var gar=Math.min(r1,r2)-total, pct=(Math.min(r1,r2)/total-1)*100;
+      g("cv-lucro").textContent=brl(gar);
+      g("cv-pct").textContent=pct.toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2})+"%";
+      res.classList.toggle("bad", gar<0);
+      hint.textContent = gar>=0 ? "✅ Lucro travado — ganhe quem ganhar. Aposte os valores acima em cada casa." : "⚠️ Com essas odds/valores não fecha lucro. Ajuste os valores ou as odds.";
+    }
+    g("cv-total").addEventListener("input", equilibrar);
+    ["cv-o1","cv-o2"].forEach(function(id){ g(id).addEventListener("input", function(){ if(num(g("cv-total").value)>0) equilibrar(); else render(); }); });
+    g("cv-s1").addEventListener("input", function(){ ajustar(0); });
+    g("cv-s2").addEventListener("input", function(){ ajustar(1); });
+    ["cv-n1","cv-n2"].forEach(function(id){ g(id).addEventListener("input", function(e){ var t=g("cv-tag"+(id==="cv-n1"?"1":"2")); t.textContent=e.target.value.trim()||(id==="cv-n1"?"Casa 1":"Casa 2"); }); });
+    document.querySelectorAll("[data-cvround]").forEach(function(b){ b.addEventListener("click", function(){ arred(parseInt(b.dataset.cvround)); }); });
+    g("cv-eq").addEventListener("click", equilibrar);
+    // pré-preenche pela URL (?view=calc&o1=..&o2=..&n1=..&n2=..) — vindo do Telegram
+    var p = new URLSearchParams(location.search);
+    ["o1","o2","n1","n2"].forEach(function(k){ var v=p.get(k); if(v){ g("cv-"+k).value=v; } });
+    ["n1","n2"].forEach(function(k){ if(g("cv-"+k).value.trim()) g("cv-tag"+(k==="n1"?"1":"2")).textContent=g("cv-"+k).value.trim(); });
+    if(p.get("view")==="calc" && typeof switchView==="function"){ switchView("calc"); }
+    render();
+  })();
+  </script>
 </body>
 </html>

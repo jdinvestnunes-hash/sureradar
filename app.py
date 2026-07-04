@@ -1267,9 +1267,13 @@ def tela_redefinir():
 
 
 @app.get("/calculadora")
-def tela_calculadora():
-    """Calculadora de surebet pública (útil p/ quem vê a entrada no Telegram)."""
-    return FileResponse(STATIC_DIR / "calculadora.html")
+def tela_calculadora(request: Request):
+    """Calculadora fica DENTRO do app (aba). Quem não tem conta é mandado a criar
+    uma grátis; logado, abre a aba Calculadora já com as odds do link (Telegram)."""
+    if not _usuario(request):
+        return RedirectResponse("/cadastro", status_code=302)
+    qs = request.url.query
+    return RedirectResponse("/app?view=calc" + ("&" + qs if qs else ""), status_code=302)
 
 
 @app.get("/termos")
