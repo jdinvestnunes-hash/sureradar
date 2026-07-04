@@ -128,6 +128,17 @@
       <div class="ct">Histórico de pagamentos</div>
       <div id="pgs"></div>
     </div>
+
+    <!-- Suporte / Tickets -->
+    <div class="card full">
+      <div class="ct">Suporte</div>
+      <p style="color:var(--dim);font-size:13.5px;margin-bottom:14px">Precisa de ajuda? Abra um ticket — respondemos por aqui e no seu e-mail. <b style="color:var(--dim)">Você pode enviar 1 ticket por dia.</b></p>
+      <textarea id="tk-msg" rows="3" maxlength="2000" placeholder="Escreva sua dúvida ou problema..."
+        style="width:100%;background:var(--bg);border:1px solid var(--line2);border-radius:11px;padding:13px 14px;color:var(--text);font-size:14.5px;font-family:var(--font-b);resize:vertical"></textarea>
+      <button id="tk-send" class="btn btn-primary" style="margin-top:10px;width:auto;padding:12px 22px">Enviar ticket</button>
+      <div id="tk-out" style="font-size:13px;margin-top:8px;min-height:16px"></div>
+      <div id="tk-lista" style="margin-top:22px"></div>
+    </div>
   </div>
   <div style="height:50px"></div>
 </div>
@@ -242,8 +253,44 @@ async function load(){
 }
 
 
+// ---------- Tickets de suporte ----------
+async function loadTickets(){
+  let d; try { d = await (await fetch("/api/tickets")).json(); } catch { return; }
+  const box = $("#tk-lista");
+  const ts = d.tickets || [];
+  if (!ts.length){ box.innerHTML = ""; return; }
+  box.innerHTML = `<div style="font-size:11.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);margin-bottom:10px">Seus tickets</div>` +
+    ts.map(t=>{
+      const resp = t.resposta
+        ? `<div style="margin-top:10px;background:rgba(46,230,168,.08);border:1px solid rgba(46,230,168,.3);border-radius:10px;padding:11px 13px">
+             <div style="font-size:11px;font-weight:800;color:var(--green);margin-bottom:4px">RESPOSTA DO SUPORTE</div>
+             <div style="font-size:14px;color:var(--text);white-space:pre-wrap">${esc(t.resposta)}</div></div>`
+        : `<div style="margin-top:8px;font-size:12.5px;color:var(--gold)">⏳ Aguardando resposta</div>`;
+      return `<div style="background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:12px">
+        <div style="font-size:11.5px;color:var(--mute);margin-bottom:6px">${data_br(t.criado)}</div>
+        <div style="font-size:14px;color:var(--dim);white-space:pre-wrap">${esc(t.mensagem)}</div>
+        ${resp}</div>`;
+    }).join("");
+}
+function esc(s){ return (s||"").replace(/[&<>]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
+
+$("#tk-send").onclick = async ()=>{
+  const msg = $("#tk-msg").value.trim();
+  const out = $("#tk-out");
+  if (msg.length < 5){ out.style.color="#ff6b6b"; out.textContent="Escreva sua mensagem (mín. 5 caracteres)."; return; }
+  $("#tk-send").disabled = true; out.style.color="var(--dim)"; out.textContent="Enviando...";
+  try {
+    const r = await fetch("/api/tickets",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({mensagem:msg})});
+    const j = await r.json().catch(()=>({}));
+    if (r.ok){ out.style.color="var(--green)"; out.textContent="✓ Ticket enviado! Responderemos em breve."; $("#tk-msg").value=""; loadTickets(); }
+    else { out.style.color="#ff6b6b"; out.textContent = j.erro || "Não foi possível enviar."; }
+  } catch { out.style.color="#ff6b6b"; out.textContent="Erro de conexão."; }
+  $("#tk-send").disabled = false;
+};
+
 $("#sair").onclick = async e => { e.preventDefault(); await fetch("/api/logout",{method:"POST"}); location.href="/login"; };
 load();
+loadTickets();
 </script>
 </body>
 </html>

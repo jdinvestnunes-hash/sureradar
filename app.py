@@ -752,6 +752,26 @@ def perfil_whatsapp(request: Request, payload: dict = Body(...)):
     return {"ok": True, "whatsapp": res}
 
 
+# --- Tickets de suporte (usuário) ---
+@app.get("/api/tickets")
+def tickets_listar(request: Request):
+    user = _usuario(request)
+    if not user:
+        return JSONResponse({"erro": "não autenticado"}, status_code=401)
+    return {"tickets": auth.listar_tickets_user(user["id"])}
+
+
+@app.post("/api/tickets")
+def tickets_criar(request: Request, payload: dict = Body(...)):
+    user = _usuario(request)
+    if not user:
+        return JSONResponse({"erro": "não autenticado"}, status_code=401)
+    ok, erro = auth.criar_ticket(user["id"], payload.get("mensagem", ""))
+    if not ok:
+        return JSONResponse({"erro": erro}, status_code=400)
+    return {"ok": True}
+
+
 # --- Painel ADMIN (dar/renovar PRO com a duração escolhida) ---
 @app.post("/api/admin/unlock")
 def admin_unlock(request: Request, payload: dict = Body(...)):
@@ -831,6 +851,34 @@ def admin_plano(request: Request, payload: dict = Body(...)):
     restantes = max(0, int((nova_exp - __import__("time").time()) / 86400))
     return {"ok": True, "email": alvo["email"], "plano": "pro",
             "dias_adicionados": dias, "dias_totais": restantes}
+
+
+@app.get("/api/admin/tickets")
+def admin_tickets(request: Request):
+    user = _usuario(request)
+    erro = _guard_admin(request, user)
+    if erro:
+        return erro
+    return {"tickets": auth.listar_tickets_admin()}
+
+
+@app.post("/api/admin/tickets/responder")
+def admin_tickets_responder(background_tasks: BackgroundTasks, request: Request,
+                            payload: dict = Body(...)):
+    user = _usuario(request)
+    erro = _guard_admin(request, user)
+    if erro:
+        return erro
+    try:
+        tid = int(payload.get("id"))
+    except (TypeError, ValueError):
+        return JSONResponse({"erro": "id inválido"}, status_code=400)
+    dono = auth.responder_ticket(tid, payload.get("resposta", ""))
+    if not dono:
+        return JSONResponse({"erro": "ticket não encontrado ou resposta vazia"}, status_code=400)
+    background_tasks.add_task(emailer.enviar_resposta_ticket,
+                             dono["email"], dono["nome"], payload.get("resposta", ""))
+    return {"ok": True}
 
 
 @app.post("/api/admin/excluir")

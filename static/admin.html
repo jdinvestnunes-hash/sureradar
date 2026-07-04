@@ -136,6 +136,12 @@
       <input id="busca" class="search" placeholder="🔎 Filtrar por nome ou e-mail…" />
       <div id="lista"></div>
     </div>
+
+    <!-- tickets de suporte -->
+    <div class="panel" id="sec-tickets">
+      <h3>🎫 Tickets de suporte <small id="tk-count"></small></h3>
+      <div id="tickets"></div>
+    </div>
   </main>
 </div>
 
@@ -259,6 +265,41 @@ document.addEventListener("click",(e)=>{
   }
 });
 
+function escH(s){return (s||"").replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));}
+function dataBR(ts){return new Date(ts*1000).toLocaleDateString("pt-BR");}
+
+function renderTickets(list){
+  const abertos=list.filter(t=>t.status!=="respondido").length;
+  $("#tk-count").textContent = abertos ? `${abertos} aberto(s)` : "tudo respondido";
+  $("#tickets").innerHTML = list.length ? list.map(t=>{
+    const aberto=t.status!=="respondido";
+    const resp = t.resposta
+      ? `<div style="margin-top:8px;color:var(--dim);font-size:13px"><b style="color:var(--green)">Sua resposta:</b> ${escH(t.resposta)}</div>`
+      : `<div style="margin-top:10px"><textarea data-tk="${t.id}" rows="2" placeholder="Responder ${escH(t.nome)}..." style="width:100%;background:var(--bg);border:1px solid var(--line2);border-radius:9px;padding:9px 11px;color:var(--text);font-size:13.5px;font-family:inherit;resize:vertical"></textarea>
+           <button class="btn b-pro" data-resp="${t.id}" style="margin-top:6px">Responder</button></div>`;
+    return `<div style="border:1px solid ${aberto?'rgba(255,201,77,.35)':'var(--line)'};border-radius:12px;padding:14px 16px;margin-bottom:12px;background:var(--bg)">
+      <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--mute)">
+        <span><b style="color:var(--text)">${escH(t.nome)}</b> · ${escH(t.email)}</span><span>${dataBR(t.criado)}</span></div>
+      <div style="margin-top:8px;font-size:14px;color:var(--text);white-space:pre-wrap">${escH(t.mensagem)}</div>
+      ${resp}</div>`;
+  }).join("") : '<div class="empty">Nenhum ticket ainda.</div>';
+}
+
+async function responderTicket(id, texto){
+  const r=await fetch("/api/admin/tickets/responder",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id,resposta:texto})});
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok){toast("❌ "+(j.erro||"erro"));return;}
+  toast("✅ Resposta enviada");
+  carregar();
+}
+document.addEventListener("click",(e)=>{
+  const id=e.target.dataset.resp; if(!id)return;
+  const ta=document.querySelector(`textarea[data-tk="${id}"]`);
+  const txt=(ta&&ta.value.trim())||"";
+  if(txt.length<2){toast("Escreva a resposta.");return;}
+  responderTicket(parseInt(id),txt);
+});
+
 async function carregar(){
   const rm=await fetch("/api/admin/metricas");
   if(rm.status===403){$("#app").style.display="none";$("#gate").innerHTML='<p class="empty">Sem permissão. Só admins.</p>';return;}
@@ -266,6 +307,7 @@ async function carregar(){
   $("#gate").innerHTML=""; $("#app").style.display="flex";
   renderMetricas(await rm.json());
   const ru=await fetch("/api/admin/usuarios"); if(ru.ok){USERS=(await ru.json()).usuarios||[];renderUsuarios();}
+  const rt=await fetch("/api/admin/tickets"); if(rt.ok){renderTickets((await rt.json()).tickets||[]);}
 }
 document.addEventListener("input",e=>{if(e.target.id==="busca")renderUsuarios();});
 carregar();

@@ -115,6 +115,17 @@ _NUDGES = {
 }
 
 
+def enviar_resposta_ticket(to: str, nome: str, resposta: str) -> bool:
+    """Avisa o usuário que o suporte respondeu o ticket dele (plain text)."""
+    texto = (
+        f"Oi {_primeiro(nome)}, o suporte do SureRadar respondeu seu ticket:\n\n"
+        f"\"{(resposta or '').strip()[:800]}\"\n\n"
+        f"Você também vê a resposta no seu perfil: {config.SITE_URL}/perfil\n\n"
+        f"Abraço,\nEquipe SureRadar"
+    )
+    return enviar(to, "Resposta do suporte — SureRadar", texto=texto)
+
+
 def enviar_nudge(to: str, nome: str, tipo: str, unsub_url: str = "") -> bool:
     par = _NUDGES.get(tipo)
     if not par:

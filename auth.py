@@ -199,6 +199,15 @@ def init():
             c.execute("CREATE UNIQUE INDEX IF NOT EXISTS ix_email_env ON email_enviados(user_id, tipo)")
         except Exception:
             pass
+        # Tickets de suporte (usuário abre no perfil, admin responde no painel).
+        c.execute(f"""CREATE TABLE IF NOT EXISTS tickets(
+            id {_SERIAL},
+            user_id BIGINT NOT NULL,
+            mensagem TEXT NOT NULL,
+            resposta TEXT,
+            status TEXT NOT NULL,
+            criado {_NUM} NOT NULL,
+            respondido {_NUM})""")
     # Migrações leves para bancos antigos: cada ALTER na SUA transação (no
     # Postgres, um erro aborta a transação inteira). Erro = coluna já existe.
     for tabela, coluna in [("checkouts", "pi TEXT"),
@@ -314,12 +323,70 @@ def descadastrar(token):
     return row["email"]
 
 
+# ---------------------------------------------------------------------------
+# Tickets de suporte
+# ---------------------------------------------------------------------------
+def _ultimo_ticket_ts(user_id):
+    with _db() as c:
+        row = c.execute(_q("SELECT criado FROM tickets WHERE user_id=? ORDER BY criado DESC LIMIT 1"),
+                        (user_id,)).fetchone()
+    return row["criado"] if row else 0
+
+
+def criar_ticket(user_id, mensagem):
+    """Abre um ticket. Trava: 1 por usuário a cada 24h. Retorna (ok, erro)."""
+    msg = (mensagem or "").strip()
+    if len(msg) < 5:
+        return False, "Escreva sua mensagem (mínimo 5 caracteres)."
+    msg = msg[:2000]
+    ult = _ultimo_ticket_ts(user_id)
+    if ult and (time.time() - ult) < 86400:
+        horas = int((86400 - (time.time() - ult)) / 3600) + 1
+        return False, f"Você já enviou um ticket. Pode enviar outro em ~{horas}h."
+    with _db() as c:
+        c.execute(_q("INSERT INTO tickets(user_id,mensagem,resposta,status,criado) VALUES(?,?,?,?,?)"),
+                  (user_id, msg, None, "aberto", time.time()))
+    return True, None
+
+
+def listar_tickets_user(user_id):
+    with _db() as c:
+        rows = c.execute(_q("""SELECT id, mensagem, resposta, status, criado, respondido
+            FROM tickets WHERE user_id=? ORDER BY criado DESC LIMIT 20"""), (user_id,)).fetchall()
+    return [dict(r) for r in rows]
+
+
+def listar_tickets_admin():
+    with _db() as c:
+        rows = c.execute(_q("""SELECT t.id, t.user_id, t.mensagem, t.resposta, t.status,
+            t.criado, t.respondido, u.nome, u.email
+            FROM tickets t JOIN users u ON u.id = t.user_id
+            ORDER BY (t.status='respondido'), t.criado DESC LIMIT 100""")).fetchall()
+    return [dict(r) for r in rows]
+
+
+def responder_ticket(ticket_id, resposta):
+    """Admin responde. Retorna {email,nome,mensagem} p/ avisar o usuário, ou None."""
+    resp = (resposta or "").strip()
+    if not resp:
+        return None
+    with _db() as c:
+        row = c.execute(_q("""SELECT t.mensagem, u.email, u.nome FROM tickets t
+            JOIN users u ON u.id = t.user_id WHERE t.id=?"""), (ticket_id,)).fetchone()
+        if not row:
+            return None
+        c.execute(_q("UPDATE tickets SET resposta=?, status='respondido', respondido=? WHERE id=?"),
+                  (resp[:4000], time.time(), ticket_id))
+    return dict(row)
+
+
 def excluir_usuario(user_id):
     """Apaga a conta e TODOS os dados ligados a ela (sessões, banca, pagamentos,
     checkouts, assinaturas, tokens). Ação irreversível — usada pelo admin."""
     with _db() as c:
         for tabela in ("sessions", "pagamentos", "user_banca", "checkouts",
-                       "assinaturas", "reset_tokens", "confirm_tokens", "email_enviados"):
+                       "assinaturas", "reset_tokens", "confirm_tokens", "email_enviados",
+                       "tickets"):
             try:
                 c.execute(_q(f"DELETE FROM {tabela} WHERE user_id=?"), (user_id,))
             except Exception:
