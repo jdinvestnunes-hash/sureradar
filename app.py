@@ -33,7 +33,7 @@ from datetime import datetime, timezone
 
 from fastapi import BackgroundTasks, Body, FastAPI, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 import threading
@@ -311,6 +311,24 @@ def senha_esqueci(background_tasks: BackgroundTasks, payload: dict = Body(...)):
             link = config.SITE_URL + "/redefinir?token=" + token
             background_tasks.add_task(emailer.enviar_reset_senha, email, nome, link)
     return {"ok": True}
+
+
+@app.api_route("/descadastrar", methods=["GET", "POST"])
+def descadastrar(u: str = ""):
+    """Opt-out dos e-mails de marketing (link do e-mail + 1-clique do Gmail)."""
+    email = auth.descadastrar(u)
+    msg = (f"Pronto! <b>{email}</b> não vai mais receber e-mails de marketing do SureRadar."
+           if email else "Link inválido ou você já havia se descadastrado.")
+    html = f"""<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1"><title>Descadastro — SureRadar</title>
+      <style>body{{background:#05070d;color:#f2f6fc;font-family:Inter,Arial,sans-serif;display:flex;
+      align-items:center;justify-content:center;min-height:100vh;margin:0;padding:24px;text-align:center}}
+      .c{{max-width:440px;background:#0e1421;border:1px solid #1b2740;border-radius:18px;padding:36px}}
+      .b{{font-family:Sora,Inter,sans-serif;font-weight:800;font-size:22px;margin-bottom:14px}}
+      .g{{color:#2ee6a8}} p{{color:#a3b1c9;line-height:1.6}} a{{color:#38d4f5}}</style></head>
+      <body><div class="c"><div class="b">Sure<span class="g">Radar</span></div>
+      <p>{msg}</p><p style="margin-top:16px"><a href="/">Voltar ao site</a></p></div></body></html>"""
+    return HTMLResponse(html)
 
 
 @app.post("/api/senha/redefinir")
@@ -1151,6 +1169,16 @@ def tela_auth():
 def tela_redefinir():
     """Página para criar uma senha nova (chega pelo link do e-mail)."""
     return FileResponse(STATIC_DIR / "redefinir.html")
+
+
+@app.get("/termos")
+def tela_termos():
+    return FileResponse(STATIC_DIR / "termos.html")
+
+
+@app.get("/privacidade")
+def tela_privacidade():
+    return FileResponse(STATIC_DIR / "privacidade.html")
 
 
 @app.get("/perfil")

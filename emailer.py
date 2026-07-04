@@ -17,9 +17,10 @@ import config
 _API = "https://api.resend.com/emails"
 
 
-def enviar(to: str, assunto: str, html: str = None, texto: str = None) -> bool:
+def enviar(to: str, assunto: str, html: str = None, texto: str = None, headers: dict = None) -> bool:
     """Envia um e-mail. `html` p/ e-mails visuais; `texto` p/ plain text (cai
-    melhor na aba Principal). Retorna True se o Resend aceitou."""
+    melhor na aba Principal). `headers` p/ List-Unsubscribe etc. Retorna True se
+    o Resend aceitou."""
     if not config.RESEND_API_KEY:
         print(f"!! RESEND_API_KEY não configurada — e-mail NÃO enviado: {assunto}")
         return False
@@ -28,6 +29,8 @@ def enviar(to: str, assunto: str, html: str = None, texto: str = None) -> bool:
         corpo["html"] = html
     if texto:
         corpo["text"] = texto
+    if headers:
+        corpo["headers"] = headers
     try:
         r = requests.post(
             _API,
@@ -112,13 +115,19 @@ _NUDGES = {
 }
 
 
-def enviar_nudge(to: str, nome: str, tipo: str) -> bool:
+def enviar_nudge(to: str, nome: str, tipo: str, unsub_url: str = "") -> bool:
     par = _NUDGES.get(tipo)
     if not par:
         return False
     assunto, corpo = par
     texto = corpo.format(n=_primeiro(nome), url=config.SITE_URL)
-    return enviar(to, assunto, texto=texto)
+    headers = None
+    if unsub_url:
+        texto += f"\n\n---\nNão quer mais esses e-mails? Descadastre aqui: {unsub_url}"
+        # cabeçalho padrão que o Gmail usa p/ o botão de descadastro (1 clique)
+        headers = {"List-Unsubscribe": f"<{unsub_url}>",
+                   "List-Unsubscribe-Post": "List-Unsubscribe=One-Click"}
+    return enviar(to, assunto, texto=texto, headers=headers)
 
 
 def _layout(titulo: str, corpo_html: str) -> str:

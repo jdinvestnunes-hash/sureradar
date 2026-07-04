@@ -204,7 +204,9 @@ def init():
     for tabela, coluna in [("checkouts", "pi TEXT"),
                            ("users", f"plano_expira {_NUM}"),
                            ("users", "whatsapp TEXT"),
-                           ("users", f"email_verificado {_NUM} DEFAULT 1")]:
+                           ("users", f"email_verificado {_NUM} DEFAULT 1"),
+                           ("users", f"email_optout {_NUM} DEFAULT 0"),
+                           ("users", "unsub_token TEXT")]:
         try:
             with _db() as c:
                 c.execute(f"ALTER TABLE {tabela} ADD COLUMN {coluna}")
@@ -281,11 +283,35 @@ def registrar_email(user_id, tipo):
 
 
 def usuarios_free_verificados():
-    """Grátis + e-mail confirmado (alvo do fluxo de nudges pró)."""
+    """Grátis + e-mail confirmado + NÃO descadastrado (alvo dos nudges pró)."""
     with _db() as c:
         rows = c.execute(_q("""SELECT id, nome, email, criado FROM users
-            WHERE plano='free' AND email_verificado=1""")).fetchall()
+            WHERE plano='free' AND email_verificado=1
+              AND (email_optout IS NULL OR email_optout=0)""")).fetchall()
     return [dict(r) for r in rows]
+
+
+def unsub_token(user_id):
+    """Token estável de descadastro (cria se ainda não tiver)."""
+    with _db() as c:
+        row = c.execute(_q("SELECT unsub_token FROM users WHERE id=?"), (user_id,)).fetchone()
+        if row and row["unsub_token"]:
+            return row["unsub_token"]
+        tok = secrets.token_urlsafe(16)
+        c.execute(_q("UPDATE users SET unsub_token=? WHERE id=?"), (tok, user_id))
+    return tok
+
+
+def descadastrar(token):
+    """Marca o usuário como opt-out de e-mails de marketing. Retorna o e-mail."""
+    if not token:
+        return None
+    with _db() as c:
+        row = c.execute(_q("SELECT id, email FROM users WHERE unsub_token=?"), (token,)).fetchone()
+        if not row:
+            return None
+        c.execute(_q("UPDATE users SET email_optout=1 WHERE id=?"), (row["id"],))
+    return row["email"]
 
 
 def excluir_usuario(user_id):

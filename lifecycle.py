@@ -37,7 +37,8 @@ def _rodar_uma_vez():
         for dmin, dmax, tipo in _JANELAS:
             if dmin <= dias < dmax:
                 if auth.registrar_email(u["id"], tipo):
-                    ok = emailer.enviar_nudge(u["email"], u["nome"], tipo)
+                    unsub = config.SITE_URL + "/descadastrar?u=" + auth.unsub_token(u["id"])
+                    ok = emailer.enviar_nudge(u["email"], u["nome"], tipo, unsub)
                     print(f">> nudge {tipo} -> {u['email']} ({'ok' if ok else 'falhou'})")
                 break      # no máximo 1 nudge por usuário por rodada
 
