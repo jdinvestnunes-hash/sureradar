@@ -92,15 +92,19 @@ async function initMeta() {
   REFRESH_SEC = META.refresh_seg || 600; restante = REFRESH_SEC;
   if (filtros.min_profit === undefined) filtros.min_profit = 0;
   if (filtros.max_profit === undefined) filtros.max_profit = 0;
-  // Espelha a conta: marca TODAS as casas por padrão. Só mantém uma seleção
-  // manual se TODAS as casas salvas ainda existem (mesma fonte).
+  // Espelha a conta: marca TODAS as casas por padrão. Mantém a seleção manual do
+  // usuário, MAS auto-marca casas NOVAS que apareceram na fonte (senão o usuário
+  // perde arbs de casas novas — ex.: BetBoom só aparece em apostas de alto lucro).
   const metaKeys = META.bookmakers.map((b) => b.key);
-  const salvasValidas = (filtros.bookmakers || []).filter((k) => metaKeys.includes(k));
-  if (!filtros.bookmakers || salvasValidas.length !== filtros.bookmakers.length || !salvasValidas.length) {
-    filtros.bookmakers = metaKeys.slice(); // fonte nova -> todas
+  const conhecidas = filtros._casas_conhecidas;   // casas já exibidas antes
+  if (!filtros.bookmakers || !filtros.bookmakers.length || !conhecidas) {
+    filtros.bookmakers = metaKeys.slice();         // 1ª vez / vazio -> todas
   } else {
-    filtros.bookmakers = salvasValidas;
+    const sel = new Set(filtros.bookmakers.filter((k) => metaKeys.includes(k)));
+    metaKeys.filter((k) => !conhecidas.includes(k)).forEach((k) => sel.add(k)); // novas -> marca
+    filtros.bookmakers = metaKeys.filter((k) => sel.has(k));
   }
+  filtros._casas_conhecidas = metaKeys.slice();
   if (filtros.sport === undefined) filtros.sport = "";
   if (filtros.date === undefined) filtros.date = "";
   saveFiltros();
