@@ -34,11 +34,8 @@ INTERVALO_MAX_MIN = int(getattr(config, "TELEGRAM_POST_MAX_MIN", 50))
 
 def _sortear_intervalo():
     return random.randint(INTERVALO_MIN_MIN, INTERVALO_MAX_MIN) * 60
-# Horários (Brasília) das 2 entradas de ~5% do dia.
-HORARIOS_5PCT = ["17:00", "18:00"]
-# Faixas de lucro (min, max) — normal (a cada intervalo) e as 2 de 5% do dia.
-FAIXA_NORMAL = (1.0001, 3.0)
-FAIXA_5PCT = (4.0, 6.5)
+# Faixa de lucro das entradas do canal: 2% a 5%, sem horário fixo.
+FAIXA_NORMAL = (2.0, 5.0)
 # Preferência de casas (as 2 pernas); se não achar, relaxa.
 import re as _re
 _CASAS_OK = _re.compile(r"^(betano|bet365|superbet|stake|novibet)", _re.I)
@@ -264,28 +261,21 @@ def postar_social():
 # Agendador
 # ---------------------------------------------------------------------------
 def _loop():
-    ultimo = 0.0                      # ts do último post normal (0 = posta logo)
+    ultimo = 0.0                      # ts do último post (0 = posta logo)
     intervalo_seg = 0                 # 1º post sai logo; depois sorteia 30-50 min
     while not _parar.is_set():
         try:
             a = _agora()
             dia = a.strftime("%Y-%m-%d")
-            hhmm = a.strftime("%H:%M")
             if dia != _estado["dia"]:
                 _reset_dia(dia)
             if notifier.ativo():
                 agora = _time.time()
-                # as 2 entradas de ~5% do dia (17:00 e 18:00, uma vez cada)
-                if hhmm in HORARIOS_5PCT and hhmm not in _estado["slots"]:
-                    _estado["slots"].add(hhmm)
-                    if postar_faixa(*FAIXA_5PCT, "5%"):
-                        ultimo = agora
-                        intervalo_seg = _sortear_intervalo()
-                # entrada normal (1-3%) a cada 30-50 min (sorteado)
-                elif agora - ultimo >= intervalo_seg:
-                    postar_faixa(*FAIXA_NORMAL, "1-3%")
+                # 1 entrada de 2-5% a cada 30-50 min (sorteado), o dia todo
+                if agora - ultimo >= intervalo_seg:
+                    postar_faixa(*FAIXA_NORMAL, "2-5%")
                     ultimo = agora
-                    intervalo_seg = _sortear_intervalo()   # próximo em 30-50 min
+                    intervalo_seg = _sortear_intervalo()
         except Exception as e:
             print("!! promo loop erro:", e)
         _parar.wait(30)
@@ -302,8 +292,8 @@ def iniciar():
     _parar.clear()
     _thread = threading.Thread(target=_loop, name="promo-telegram", daemon=True)
     _thread.start()
-    print(f">> Promo Telegram iniciado — 1 entrada a cada {INTERVALO_MIN_MIN}-{INTERVALO_MAX_MIN} min "
-          f"+ 5% em {', '.join(HORARIOS_5PCT)} (Brasília).")
+    print(f">> Promo Telegram iniciado — 1 entrada de 2-5% a cada "
+          f"{INTERVALO_MIN_MIN}-{INTERVALO_MAX_MIN} min.")
 
 
 def parar():
