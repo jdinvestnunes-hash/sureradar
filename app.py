@@ -61,6 +61,7 @@ async def lifespan(app):
         cache = auth.feed_cache_get()
         if cache:
             feed.merge_surebets(cache, quando=pipeline._agora_iso() + " (cache)")
+            _recalcular_filtros()      # reconstrói casas/esportes/lucro do cache
             print(f">> Feed restaurado do cache: {len(cache)} surebets.")
     except Exception as e:
         print(f"!! Falha ao restaurar feed do cache: {e}")
@@ -95,6 +96,31 @@ async def _private_network(request, call_next):
 INGESTED_BOOKS = []
 INGESTED_SPORTS = []
 INGESTED_PROFIT = {}
+
+
+def _recalcular_filtros(todos=None):
+    """Reconstrói as opções de filtro (casas/esportes/lucro) a partir do feed vivo.
+
+    Chamado no ingest E na restauração do cache (redeploy) — senão, depois de um
+    redeploy o feed volta mas as casas/esportes ficam vazios até o robô mandar o
+    próximo ciclo, e casas que só existem em apostas de alto lucro (BetBoom, etc.)
+    somem do filtro, zerando as oportunidades."""
+    global INGESTED_BOOKS, INGESTED_SPORTS, INGESTED_PROFIT
+    if todos is None:
+        todos = feed.get_surebets()
+    if not todos:
+        return
+    casas, esportes = {}, {}
+    for c in todos:
+        esportes[c["sport"]] = SPORT_LABELS_PT.get(c["sport"], c["sport"])
+        for l in c["legs"]:
+            casas[l["bookmaker"]] = l["bookmaker_label"]
+    INGESTED_BOOKS = [{"key": k, "label": v} for k, v in
+                      sorted(casas.items(), key=lambda x: x[1].lower())]
+    INGESTED_SPORTS = [{"key": k, "label": v} for k, v in
+                       sorted(esportes.items(), key=lambda x: (x[0] != "Football", x[1]))]
+    vals = [c["profit_pct"] for c in todos]
+    INGESTED_PROFIT = {"min": 0, "max": round(max(vals) + 0.5, 1)}
 
 
 # ---------------------------------------------------------------------------
@@ -719,17 +745,7 @@ def ingest(payload: dict = Body(...)):
     # Casas / esportes / faixa de lucro ESPELHAM TODO o feed vivo (não só este
     # ingest, que é parcial).
     todos = feed.get_surebets()
-    casas, esportes = {}, {}
-    for c in todos:
-        esportes[c["sport"]] = SPORT_LABELS_PT.get(c["sport"], c["sport"])
-        for l in c["legs"]:
-            casas[l["bookmaker"]] = l["bookmaker_label"]
-    INGESTED_BOOKS = [{"key": k, "label": v} for k, v in sorted(casas.items(), key=lambda x: x[1].lower())]
-    INGESTED_SPORTS = [{"key": k, "label": v} for k, v in
-                       sorted(esportes.items(), key=lambda x: (x[0] != "Football", x[1]))]
-    if todos:
-        vals = [c["profit_pct"] for c in todos]
-        INGESTED_PROFIT = {"min": 0, "max": round(max(vals) + 0.5, 1)}
+    _recalcular_filtros(todos)
 
     # persiste o feed pra sobreviver a redeploys
     try:
