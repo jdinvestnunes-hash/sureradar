@@ -41,7 +41,8 @@ body {
   background: rgba(10, 14, 23, 0.85); backdrop-filter: blur(12px);
   position: sticky; top: 0; z-index: 30;
 }
-.brand { display: flex; align-items: center; gap: 11px; }
+.brand { display: flex; align-items: center; gap: 11px; text-decoration: none; color: var(--text); cursor: pointer; transition: opacity 0.15s; }
+.brand:hover { opacity: 0.8; }
 .logo { width: 32px; height: 32px; }
 .brand-name { font-size: 19px; font-weight: 800; letter-spacing: -0.02em; }
 .brand-name span { background: var(--grad); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
