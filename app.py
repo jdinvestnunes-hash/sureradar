@@ -341,6 +341,10 @@ def health():
         "abacatepay_mode": ("prod" if abk.startswith("abc_prod_") else
                             "dev" if abk.startswith("abc_dev_") else "?"),
     }
+    info["email"] = {
+        "resend_key": bool(config.RESEND_API_KEY),
+        "from": config.EMAIL_FROM,
+    }
     return info
 
 
@@ -608,6 +612,16 @@ def perfil_dados(request: Request):
         "tem_assinatura": bool(auth.assinatura_do_user(user["id"])),
         "pagamentos": auth.listar_pagamentos(user["id"]),
     }
+
+
+@app.post("/api/admin/testar-email")
+def admin_testar_email(request: Request):
+    """Manda um e-mail de teste pro próprio admin e devolve a resposta do Resend."""
+    user = _usuario(request)
+    if not _admin_email(user):
+        return JSONResponse({"erro": "só admin"}, status_code=403)
+    ok, detalhe = emailer.testar(user["email"])
+    return {"ok": ok, "para": user["email"], "from": config.EMAIL_FROM, "detalhe": detalhe}
 
 
 @app.post("/api/perfil/whatsapp")

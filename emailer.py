@@ -38,6 +38,25 @@ def enviar(to: str, assunto: str, html: str) -> bool:
     return True
 
 
+def testar(to: str):
+    """Envia um e-mail de teste e devolve (ok, detalhe) — p/ diagnóstico."""
+    if not config.RESEND_API_KEY:
+        return False, "RESEND_API_KEY não configurada"
+    corpo = "<p style='color:#a3b1c9;font-size:14.5px'>Se você recebeu isto, o envio de e-mail está funcionando. 🎯</p>"
+    try:
+        r = requests.post(
+            _API,
+            headers={"Authorization": "Bearer " + config.RESEND_API_KEY},
+            json={"from": config.EMAIL_FROM, "to": [to],
+                  "subject": "Teste de e-mail — SureRadar",
+                  "html": _layout("Teste", corpo)},
+            timeout=20,
+        )
+    except requests.RequestException as e:
+        return False, "erro de rede: " + str(e)[:150]
+    return r.ok, f"HTTP {r.status_code}: {r.text[:250]}"
+
+
 def _layout(titulo: str, corpo_html: str) -> str:
     """Casca visual da marca (dark, verde/ciano) para os e-mails."""
     return f"""\
