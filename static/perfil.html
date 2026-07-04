@@ -99,6 +99,15 @@
         <div><div class="nm" id="nm">—</div><div class="em" id="em">—</div></div>
       </div>
       <div style="margin-top:22px;font-size:13px;color:var(--mute)" id="membro"></div>
+      <div id="whats-box" style="margin-top:20px">
+        <div style="font-size:11.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);margin-bottom:8px">WhatsApp</div>
+        <div style="display:flex;gap:8px">
+          <input id="wa-input" type="tel" inputmode="numeric" maxlength="16" placeholder="(11) 99999-9999"
+                 style="flex:1;background:var(--bg);border:1px solid var(--line2);border-radius:10px;padding:11px 13px;color:var(--text);font-size:14.5px;font-family:var(--font-b);outline:none" />
+          <button id="wa-save" class="btn btn-ghost" style="padding:11px 18px;font-size:14px">Salvar</button>
+        </div>
+        <div id="wa-msg" style="font-size:12.5px;margin-top:7px;min-height:16px"></div>
+      </div>
     </div>
 
     <!-- Plano -->
@@ -136,6 +145,28 @@ async function load(){
   $("#av").textContent = (d.nome||"?").trim()[0].toUpperCase();
   $("#nm").textContent = d.nome;
   $("#em").textContent = d.email;
+
+  // WhatsApp editável (prefill do cadastro; contas Google preenchem aqui)
+  const waIn = $("#wa-input"), waMsg = $("#wa-msg");
+  const fmtWa = digs => { let v=(digs||"").replace(/\D/g,"").slice(0,11);
+    if(v.length>10) v=v.replace(/(\d{2})(\d{5})(\d{0,4})/,"($1) $2-$3");
+    else if(v.length>6) v=v.replace(/(\d{2})(\d{4})(\d{0,4})/,"($1) $2-$3");
+    else if(v.length>2) v=v.replace(/(\d{2})(\d{0,5})/,"($1) $2");
+    else if(v.length>0) v=v.replace(/(\d{0,2})/,"($1");
+    return v; };
+  waIn.value = fmtWa(d.whatsapp || "");
+  waIn.addEventListener("input", ()=>{ waIn.value = fmtWa(waIn.value); });
+  $("#wa-save").onclick = async ()=>{
+    const digs = waIn.value.replace(/\D/g,"");
+    if(digs.length!==10 && digs.length!==11){ waMsg.style.color="#ff6b6b"; waMsg.textContent="WhatsApp inválido — com DDD."; return; }
+    waMsg.style.color="var(--dim)"; waMsg.textContent="Salvando...";
+    try{
+      const r = await fetch("/api/perfil/whatsapp",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({whatsapp:digs})});
+      const j = await r.json().catch(()=>({}));
+      if(r.ok){ waMsg.style.color="var(--green)"; waMsg.textContent="✓ Salvo! Já vai preenchido no Pix."; }
+      else { waMsg.style.color="#ff6b6b"; waMsg.textContent=j.erro||"Não deu pra salvar."; }
+    }catch{ waMsg.style.color="#ff6b6b"; waMsg.textContent="Erro de conexão."; }
+  };
 
   const pro = d.plano === "pro";
   const badge = $("#plan-badge"), chip = $("#plan-chip");

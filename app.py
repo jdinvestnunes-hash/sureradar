@@ -485,6 +485,8 @@ def checkout_pix(request: Request, payload: dict = Body(...)):
     # coleta CPF + celular numa telinha antes de chamar aqui.
     cpf = "".join(ch for ch in str(payload.get("cpf", "")) if ch.isdigit())
     celular = "".join(ch for ch in str(payload.get("celular", "")) if ch.isdigit())
+    if not celular:                       # fallback: usa o WhatsApp salvo no cadastro
+        celular = "".join(ch for ch in str(user.get("whatsapp") or "") if ch.isdigit())
     if len(cpf) != 11:
         return JSONResponse({"erro": "CPF inválido — informe os 11 dígitos."}, status_code=400)
     if len(celular) not in (10, 11):
@@ -583,6 +585,7 @@ def me(request: Request):
     dias = auth.dias_restantes(user)
     return {"nome": user["nome"], "email": user["email"], "plano": _plano_efetivo(user),
             "dias": dias, "aviso_renovar": _aviso_renovar(dias),
+            "whatsapp": user.get("whatsapp") or "",
             "admin": _admin_email(user)}
 
 
@@ -598,9 +601,22 @@ def perfil_dados(request: Request):
         "expira": user.get("plano_expira"),
         "aviso_renovar": _aviso_renovar(dias),
         "admin": _admin_email(user),
+        "whatsapp": user.get("whatsapp") or "",
         "tem_assinatura": bool(auth.assinatura_do_user(user["id"])),
         "pagamentos": auth.listar_pagamentos(user["id"]),
     }
+
+
+@app.post("/api/perfil/whatsapp")
+def perfil_whatsapp(request: Request, payload: dict = Body(...)):
+    """Salva/atualiza o WhatsApp (usado tb p/ contas Google que não têm)."""
+    user = _usuario(request)
+    if not user:
+        return JSONResponse({"erro": "não autenticado"}, status_code=401)
+    ok, res = auth.atualizar_whatsapp(user["id"], payload.get("whatsapp", ""))
+    if not ok:
+        return JSONResponse({"erro": res}, status_code=400)
+    return {"ok": True, "whatsapp": res}
 
 
 # --- Painel ADMIN (dar/renovar PRO com a duração escolhida) ---

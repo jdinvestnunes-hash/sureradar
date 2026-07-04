@@ -210,7 +210,17 @@ async function pagar(plano, metodo, btn, extras){
 // ---- Pix: pede CPF + celular (exigência da AbacatePay v1) ----
 const $id = s => document.getElementById(s);
 let pixCtx = null;
-function abrirPix(plano, btn){ pixCtx = {plano, btn}; $id('pix-err').textContent=''; $id('pix-modal').classList.add('show'); setTimeout(()=>$id('pix-cpf').focus(),50); }
+let ME_WHATS = "";   // WhatsApp salvo no cadastro (prefill do celular no Pix)
+fetch("/api/me").then(r => r.ok ? r.json() : null).then(d => { if (d) ME_WHATS = (d.whatsapp || "").replace(/\D/g, ""); }).catch(() => {});
+function abrirPix(plano, btn){
+  pixCtx = {plano, btn}; $id('pix-err').textContent='';
+  if (ME_WHATS && !$id('pix-cel').value) {            // já vem preenchido com o do cadastro
+    $id('pix-cel').value = ME_WHATS;
+    $id('pix-cel').dispatchEvent(new Event('input')); // aplica a máscara
+  }
+  $id('pix-modal').classList.add('show');
+  setTimeout(()=>$id('pix-cpf').focus(),50);
+}
 function fecharPix(){ $id('pix-modal').classList.remove('show'); }
 $id('pix-cancel').onclick = fecharPix;
 $id('pix-modal').addEventListener('click', e=>{ if(e.target.id==='pix-modal') fecharPix(); });

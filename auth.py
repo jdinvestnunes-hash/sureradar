@@ -579,6 +579,17 @@ def pegar_ou_criar_google(email: str, nome: str):
     return {"id": uid, "nome": nome, "email": email, "plano": "free", "plano_expira": None}
 
 
+def atualizar_whatsapp(user_id, whatsapp):
+    """Salva/atualiza o WhatsApp do usuário. Retorna (ok, digitos_ou_erro)."""
+    whats = "".join(ch for ch in (whatsapp or "") if ch.isdigit())
+    if len(whats) not in (10, 11):
+        return False, "WhatsApp inválido — informe com DDD."
+    with _db() as c:
+        c.execute(_q("UPDATE users SET whatsapp=? WHERE id=?"), (whats, user_id))
+    limpar_cache_sessoes()
+    return True, whats
+
+
 def criar_token_reset(email: str):
     """Gera um token de redefinição de senha p/ o e-mail. Retorna (token, nome) ou
     (None, None) se o e-mail não existe (NÃO revelamos isso ao usuário)."""
@@ -655,7 +666,7 @@ def usuario_da_sessao(token: str):
             return dict(ent[0])
     with _db() as c:
         row = c.execute(_q(
-            """SELECT u.id, u.nome, u.email, u.plano, u.plano_expira, s.criado AS s_criado
+            """SELECT u.id, u.nome, u.email, u.whatsapp, u.plano, u.plano_expira, s.criado AS s_criado
                FROM sessions s JOIN users u ON u.id = s.user_id
                WHERE s.token=?"""), (token,)).fetchone()
         if not row:
@@ -665,7 +676,7 @@ def usuario_da_sessao(token: str):
             return None
         plano, exp = _normalizar_plano(c, row)
     perfil = {"id": row["id"], "nome": row["nome"], "email": row["email"],
-              "plano": plano, "plano_expira": exp}
+              "whatsapp": row["whatsapp"], "plano": plano, "plano_expira": exp}
     with _sess_lock:
         _sess_cache[token] = (dict(perfil), time.time())
     return perfil
