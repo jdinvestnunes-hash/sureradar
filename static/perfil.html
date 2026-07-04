@@ -178,9 +178,9 @@ async function load(){
       <div style="height:10px"></div>
       <button class="btn btn-ghost" id="up-mensal" style="width:100%">Assinar Pro Mensal — R$ 97/mês</button>
       <p style="font-size:12px;color:var(--mute);margin-top:12px;text-align:center">🔒 Pagamento seguro · Garantia de 7 dias</p>`;
-    // ATENÇÃO: botões de teste (sem checkout real ainda)
-    $("#up-anual").onclick = ()=>ativar("anual");
-    $("#up-mensal").onclick = ()=>ativar("mensal");
+    // Vão pra tela de planos (com Cartão/Pix). Já rola pro plano escolhido.
+    $("#up-anual").onclick = ()=>location.href="/planos#anual";
+    $("#up-mensal").onclick = ()=>location.href="/planos#mensal";
   }
 
   // pagamentos
@@ -194,11 +194,6 @@ async function load(){
   }
 }
 
-async function ativar(plano){
-  // provisório: ativa o Pro pra teste. Trocar pelo checkout real (Kirvano/Stripe).
-  await fetch("/api/dev/ativar-pro",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({plano})});
-  load();
-}
 
 $("#sair").onclick = async e => { e.preventDefault(); await fetch("/api/logout",{method:"POST"}); location.href="/login"; };
 load();
