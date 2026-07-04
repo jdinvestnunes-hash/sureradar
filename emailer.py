@@ -17,16 +17,22 @@ import config
 _API = "https://api.resend.com/emails"
 
 
-def enviar(to: str, assunto: str, html: str) -> bool:
-    """Envia um e-mail. Retorna True se o Resend aceitou."""
+def enviar(to: str, assunto: str, html: str = None, texto: str = None) -> bool:
+    """Envia um e-mail. `html` p/ e-mails visuais; `texto` p/ plain text (cai
+    melhor na aba Principal). Retorna True se o Resend aceitou."""
     if not config.RESEND_API_KEY:
         print(f"!! RESEND_API_KEY não configurada — e-mail NÃO enviado: {assunto}")
         return False
+    corpo = {"from": config.EMAIL_FROM, "to": [to], "subject": assunto}
+    if html:
+        corpo["html"] = html
+    if texto:
+        corpo["text"] = texto
     try:
         r = requests.post(
             _API,
             headers={"Authorization": "Bearer " + config.RESEND_API_KEY},
-            json={"from": config.EMAIL_FROM, "to": [to], "subject": assunto, "html": html},
+            json=corpo,
             timeout=20,
         )
     except requests.RequestException as e:
@@ -55,6 +61,64 @@ def testar(to: str):
     except requests.RequestException as e:
         return False, "erro de rede: " + str(e)[:150]
     return r.ok, f"HTTP {r.status_code}: {r.text[:250]}"
+
+
+def _primeiro(nome):
+    return (nome or "").strip().split(" ")[0] or "trader"
+
+
+def enviar_compra(to: str, nome: str) -> bool:
+    """Confirmação de compra (plain text, tom pessoal)."""
+    texto = (
+        f"Parabéns, {_primeiro(nome)}! Seu PRO tá ativo. 🎯\n\n"
+        f"Agora você vê TODAS as entradas, de 1% a 15%+, sem limite.\n"
+        f"Acesse agora: {config.SITE_URL}/app\n\n"
+        f"Bons greens!\nEquipe SureRadar"
+    )
+    return enviar(to, "Seu PRO está ativo 🎯", texto=texto)
+
+
+# Sequência de nudges p/ quem se cadastrou e NÃO comprou (plain text de propósito).
+_NUDGES = {
+    "nudge1": ("viu as entradas de hoje?",
+        "Oi {n}, tudo certo?\n\n"
+        "Vi que você criou sua conta no SureRadar mas ainda está no plano grátis.\n\n"
+        "No grátis você vê só as entradas até 1%. As que valem de verdade — 3%, 5%, 8% — "
+        "ficam no PRO. Uma entrada dessas já paga a mensalidade.\n\n"
+        "Dá uma olhada: {url}/planos\n\n"
+        "Abraço,\nEquipe SureRadar"),
+    "nudge2": ("quanto dá pra tirar com surebet",
+        "Oi {n},\n\n"
+        "Surebet é simples: você cobre todos os resultados em casas diferentes e trava o lucro, "
+        "dê no que der. Não é aposta, é matemática.\n\n"
+        "Com uma banca de R$1.000 e 2 entradas de 5% por dia, dá pra fazer a banca render bem mais "
+        "que qualquer renda fixa — e o PRO te mostra essas entradas prontas.\n\n"
+        "Ver os planos: {url}/planos\n\n"
+        "Abraço,\nEquipe SureRadar"),
+    "nudge3": ("o que te segura?",
+        "Oi {n},\n\n"
+        "Você entrou no SureRadar mas ainda não assinou o PRO. Ficou alguma dúvida?\n\n"
+        "As entradas de maior lucro estão liberando todo dia e quem é PRO já está aproveitando. "
+        "O plano se paga com 1 ou 2 entradas.\n\n"
+        "Assinar: {url}/planos\n\n"
+        "Abraço,\nEquipe SureRadar"),
+    "nudge4": ("as entradas travadas continuam aí",
+        "Oi {n},\n\n"
+        "Só passando pra lembrar: as entradas de 3% a 15% seguem travadas na sua conta grátis.\n\n"
+        "Cada dia parado é entrada que passa. Se quiser destravar tudo, é só assinar o PRO — "
+        "cartão ou Pix, e dá pra cancelar quando quiser.\n\n"
+        "{url}/planos\n\n"
+        "Abraço,\nEquipe SureRadar"),
+}
+
+
+def enviar_nudge(to: str, nome: str, tipo: str) -> bool:
+    par = _NUDGES.get(tipo)
+    if not par:
+        return False
+    assunto, corpo = par
+    texto = corpo.format(n=_primeiro(nome), url=config.SITE_URL)
+    return enviar(to, assunto, texto=texto)
 
 
 def _layout(titulo: str, corpo_html: str) -> str:

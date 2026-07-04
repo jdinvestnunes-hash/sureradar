@@ -36,10 +36,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
+import threading
+
 import auth
 import config
 import emailer
 import feed
+import lifecycle
 import pipeline
 import promo
 
@@ -73,9 +76,14 @@ async def lifespan(app):
         promo.iniciar()               # fluxo de marketing no grupo do Telegram
     except Exception as e:
         print(f"!! Promo Telegram não iniciou: {e}")
+    try:
+        lifecycle.iniciar()           # fluxo de nutrição por e-mail (nudges pró)
+    except Exception as e:
+        print(f"!! Lifecycle de e-mail não iniciou: {e}")
     yield
     pipeline.parar_agendador()
     promo.parar()
+    lifecycle.parar()
 
 
 app = FastAPI(title="Surebet SaaS", version="0.1.0", lifespan=lifespan)
@@ -410,6 +418,18 @@ def _plano_valido(payload):
     return plano, config.PLANOS.get(plano)
 
 
+def _confirmar_compra_email(user_id):
+    """Manda a confirmação de compra UMA vez (dedup), em background."""
+    try:
+        if auth.registrar_email(user_id, "compra"):
+            u = auth.pegar_por_id(user_id)
+            if u:
+                threading.Thread(target=emailer.enviar_compra,
+                                 args=(u["email"], u["nome"]), daemon=True).start()
+    except Exception as e:
+        print("!! email de compra:", e)
+
+
 @app.post("/api/checkout/stripe")
 def checkout_stripe(request: Request, payload: dict = Body(...)):
     """Cria uma sessão de checkout do Stripe (cartão) e devolve a URL."""
@@ -501,7 +521,9 @@ async def webhook_stripe(request: Request):
     if tipo == "checkout.session.completed":
         # 1ª cobrança (assinatura recém-criada OU pagamento único de fallback).
         if obj.get("id"):
-            auth.checkout_pagar("stripe", obj["id"], obj.get("payment_intent"))
+            res = auth.checkout_pagar("stripe", obj["id"], obj.get("payment_intent"))
+            if res:
+                _confirmar_compra_email(res["user_id"])
         sub_id = obj.get("subscription")
         if sub_id and obj.get("client_reference_id"):
             plano = (obj.get("metadata") or {}).get("plano", "mensal")
@@ -608,7 +630,9 @@ async def webhook_abacate(request: Request):
         billing = d.get("billing") or d.get("pixQrCode") or d
         bid = (billing or {}).get("id") or d.get("id")
         if bid:
-            auth.checkout_pagar("abacatepay", bid)
+            res = auth.checkout_pagar("abacatepay", bid)
+            if res:
+                _confirmar_compra_email(res["user_id"])
     return {"ok": True}
 
 

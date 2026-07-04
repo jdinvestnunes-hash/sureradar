@@ -190,6 +190,15 @@ def init():
             user_id BIGINT NOT NULL,
             expira {_NUM} NOT NULL,
             usado {_NUM} NOT NULL DEFAULT 0)""")
+        # Log do fluxo de e-mails (1 linha por user+tipo) — evita reenviar.
+        c.execute(f"""CREATE TABLE IF NOT EXISTS email_enviados(
+            user_id BIGINT NOT NULL,
+            tipo TEXT NOT NULL,
+            criado {_NUM} NOT NULL)""")
+        try:
+            c.execute("CREATE UNIQUE INDEX IF NOT EXISTS ix_email_env ON email_enviados(user_id, tipo)")
+        except Exception:
+            pass
     # Migrações leves para bancos antigos: cada ALTER na SUA transação (no
     # Postgres, um erro aborta a transação inteira). Erro = coluna já existe.
     for tabela, coluna in [("checkouts", "pi TEXT"),
@@ -247,12 +256,44 @@ def pegar_por_email(email):
     return _perfil(row) if row else None
 
 
+def pegar_por_id(user_id):
+    with _db() as c:
+        row = c.execute(_q("SELECT * FROM users WHERE id=?"), (user_id,)).fetchone()
+    return _perfil(row) if row else None
+
+
+def registrar_email(user_id, tipo):
+    """Marca que o e-mail `tipo` foi enviado a este usuário. Retorna True se é a
+    PRIMEIRA vez (ou seja, DEVE enviar); False se já tinha sido enviado."""
+    try:
+        with _db() as c:
+            if PG:
+                row = c.execute(_q("""INSERT INTO email_enviados(user_id,tipo,criado)
+                    VALUES(?,?,?) ON CONFLICT (user_id,tipo) DO NOTHING RETURNING user_id"""),
+                    (user_id, tipo, time.time())).fetchone()
+                return row is not None
+            cur = c.execute("INSERT OR IGNORE INTO email_enviados(user_id,tipo,criado) VALUES(?,?,?)",
+                            (user_id, tipo, time.time()))
+            return cur.rowcount == 1
+    except Exception as e:
+        print("!! registrar_email:", e)
+        return False
+
+
+def usuarios_free_verificados():
+    """Grátis + e-mail confirmado (alvo do fluxo de nudges pró)."""
+    with _db() as c:
+        rows = c.execute(_q("""SELECT id, nome, email, criado FROM users
+            WHERE plano='free' AND email_verificado=1""")).fetchall()
+    return [dict(r) for r in rows]
+
+
 def excluir_usuario(user_id):
     """Apaga a conta e TODOS os dados ligados a ela (sessões, banca, pagamentos,
     checkouts, assinaturas, tokens). Ação irreversível — usada pelo admin."""
     with _db() as c:
         for tabela in ("sessions", "pagamentos", "user_banca", "checkouts",
-                       "assinaturas", "reset_tokens", "confirm_tokens"):
+                       "assinaturas", "reset_tokens", "confirm_tokens", "email_enviados"):
             try:
                 c.execute(_q(f"DELETE FROM {tabela} WHERE user_id=?"), (user_id,))
             except Exception:
