@@ -176,6 +176,12 @@ def init():
             c.execute("CREATE UNIQUE INDEX IF NOT EXISTS ix_assinatura_sub ON assinaturas(sub_id)")
         except Exception:
             pass
+        # Tokens de redefinição de senha (recuperar senha por e-mail).
+        c.execute(f"""CREATE TABLE IF NOT EXISTS reset_tokens(
+            token TEXT PRIMARY KEY,
+            user_id BIGINT NOT NULL,
+            expira {_NUM} NOT NULL,
+            usado {_NUM} NOT NULL DEFAULT 0)""")
     # Migrações leves para bancos antigos: cada ALTER na SUA transação (no
     # Postgres, um erro aborta a transação inteira). Erro = coluna já existe.
     for tabela, coluna in [("checkouts", "pi TEXT"),
@@ -566,6 +572,36 @@ def pegar_ou_criar_google(email: str, nome: str):
             "INSERT INTO users(nome,email,hash,salt,plano,criado) VALUES(?,?,?,?,?,?)",
             (nome, email, _hash(secrets.token_hex(24), salt), salt, "free", time.time()))
     return {"id": uid, "nome": nome, "email": email, "plano": "free", "plano_expira": None}
+
+
+def criar_token_reset(email: str):
+    """Gera um token de redefinição de senha p/ o e-mail. Retorna (token, nome) ou
+    (None, None) se o e-mail não existe (NÃO revelamos isso ao usuário)."""
+    email = (email or "").strip().lower()
+    with _db() as c:
+        row = c.execute(_q("SELECT id, nome FROM users WHERE email=?"), (email,)).fetchone()
+        if not row:
+            return None, None
+        token = secrets.token_urlsafe(32)
+        c.execute(_q("INSERT INTO reset_tokens(token,user_id,expira,usado) VALUES(?,?,?,0)"),
+                  (token, row["id"], time.time() + 3600))   # vale 1 hora
+    return token, row["nome"]
+
+
+def redefinir_senha(token: str, nova_senha: str):
+    """Valida o token e troca a senha. Retorna (ok, erro)."""
+    if len(nova_senha or "") < 6:
+        return False, "A senha precisa ter pelo menos 6 caracteres."
+    with _db() as c:
+        row = c.execute(_q("SELECT * FROM reset_tokens WHERE token=?"), (token or "",)).fetchone()
+        if not row or int(row["usado"]) or row["expira"] < time.time():
+            return False, "Link inválido ou expirado. Peça um novo."
+        salt = secrets.token_bytes(16)
+        c.execute(_q("UPDATE users SET hash=?, salt=? WHERE id=?"),
+                  (_hash(nova_senha, salt), salt, row["user_id"]))
+        c.execute(_q("UPDATE reset_tokens SET usado=1 WHERE token=?"), (token,))
+    limpar_cache_sessoes()   # força reautenticação (senha mudou)
+    return True, None
 
 
 def autenticar(email: str, senha: str):

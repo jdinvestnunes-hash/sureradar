@@ -157,6 +157,7 @@
 
       <div class="swap" id="swap-cad">Já tem conta? <a onclick="modo('login')">Entrar</a></div>
       <div class="swap" id="swap-login" style="display:none">Ainda não tem conta? <a onclick="modo('cadastro')">Criar grátis</a></div>
+      <div class="swap" id="forgot" style="display:none"><a onclick="esqueci()">Esqueci minha senha</a></div>
 
       <p class="terms">Ao continuar, você confirma ter 18+ anos e concorda com os termos de uso.<br>Jogue com responsabilidade.</p>
     </div>
@@ -177,9 +178,27 @@ function modo(m){
   $('#head-login').style.display = cad ? 'none' : '';
   $('#swap-cad').style.display = cad ? '' : 'none';
   $('#swap-login').style.display = cad ? 'none' : '';
+  $('#forgot').style.display = cad ? 'none' : '';
   $('#btn').textContent = cad ? 'Criar conta e ver entradas →' : 'Entrar no painel →';
   $('#erro').style.display = 'none';
   history.replaceState(null, '', cad ? '/cadastro' : '/login');
+}
+
+async function esqueci(){
+  const email = ($('#email').value || '').trim();
+  const e = $('#erro');
+  if (!email || !email.includes('@')) {
+    e.style.color = ''; e.textContent = 'Digite seu e-mail no campo acima e clique de novo em "Esqueci minha senha".';
+    e.style.display = 'block'; return;
+  }
+  try {
+    await fetch('/api/senha/esqueci', {
+      method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ email })
+    });
+  } catch {}
+  e.style.color = '#2ee6a8';
+  e.textContent = 'Se este e-mail tiver conta, enviamos um link pra redefinir a senha. Confira sua caixa (e o spam).';
+  e.style.display = 'block';
 }
 
 // modo inicial: pela URL (/login ou /cadastro)

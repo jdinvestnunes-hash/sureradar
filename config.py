@@ -215,6 +215,12 @@ STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "").strip()
 ABACATEPAY_API_KEY = os.getenv("ABACATEPAY_API_KEY", "").strip()
 ABACATEPAY_WEBHOOK_SECRET = os.getenv("ABACATEPAY_WEBHOOK_SECRET", "").strip()
 
+# E-mail transacional (Resend) — recuperar senha, etc.
+RESEND_API_KEY = os.getenv("RESEND_API_KEY", "").strip()
+# Remetente. Precisa ser de um domínio verificado no Resend (ex.: sureradar.site).
+# Enquanto não verificar o domínio, use "SureRadar <onboarding@resend.dev>" (teste).
+EMAIL_FROM = os.getenv("EMAIL_FROM", "SureRadar <nao-responda@sureradar.site>").strip()
+
 # Fluxo de marketing no grupo (5 posts/dia + prova social). Desligue com PROMO_ATIVO=0.
 PROMO_ATIVO = os.getenv("PROMO_ATIVO", "1") not in ("0", "false", "False", "no")
 

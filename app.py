@@ -38,6 +38,7 @@ from fastapi.staticfiles import StaticFiles
 
 import auth
 import config
+import emailer
 import feed
 import pipeline
 import promo
@@ -230,6 +231,28 @@ def logout(request: Request):
     resp = JSONResponse({"ok": True})
     resp.delete_cookie(COOKIE, path="/")
     return resp
+
+
+@app.post("/api/senha/esqueci")
+def senha_esqueci(payload: dict = Body(...)):
+    """Pede redefinição de senha: manda e-mail com link (se o e-mail existir).
+    Resposta é SEMPRE ok — não revela se o e-mail tem conta (segurança)."""
+    email = (payload.get("email") or "").strip().lower()
+    if "@" in email:
+        token, nome = auth.criar_token_reset(email)
+        if token:
+            link = config.SITE_URL + "/redefinir?token=" + token
+            emailer.enviar_reset_senha(email, nome, link)
+    return {"ok": True}
+
+
+@app.post("/api/senha/redefinir")
+def senha_redefinir(payload: dict = Body(...)):
+    """Troca a senha usando o token do e-mail."""
+    ok, erro = auth.redefinir_senha(payload.get("token", ""), payload.get("senha", ""))
+    if not ok:
+        return JSONResponse({"erro": erro}, status_code=400)
+    return {"ok": True}
 
 
 # --- Login com Google (OAuth) ---
@@ -979,6 +1002,12 @@ def landing():
 def tela_auth():
     """Tela de login/cadastro (a mesma página alterna os dois modos)."""
     return FileResponse(STATIC_DIR / "auth.html")
+
+
+@app.get("/redefinir")
+def tela_redefinir():
+    """Página para criar uma senha nova (chega pelo link do e-mail)."""
+    return FileResponse(STATIC_DIR / "redefinir.html")
 
 
 @app.get("/perfil")

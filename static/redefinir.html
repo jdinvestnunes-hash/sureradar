@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Redefinir senha — SureRadar</title>
+  <meta name="robots" content="noindex" />
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@700;800&family=Inter:wght@400;500;600;700;800&display=swap" media="print" onload="this.media='all'" />
+  <style>
+    :root{
+      --bg:#05070d; --card:#0e1421; --line:#1b2740; --line2:#27395c;
+      --text:#f2f6fc; --dim:#a3b1c9; --mute:#5e6b85;
+      --green:#2ee6a8; --cyan:#38d4f5;
+      --grad:linear-gradient(112deg,#2ee6a8 10%,#38d4f5 90%);
+      --font-d:"Sora","Inter",sans-serif; --font-b:"Inter",system-ui,sans-serif;
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:var(--font-b);background:var(--bg);color:var(--text);min-height:100vh;
+         display:flex;align-items:center;justify-content:center;padding:24px}
+    .box{width:100%;max-width:420px;background:var(--card);border:1px solid var(--line);
+         border-radius:20px;padding:36px 32px}
+    .brand{font-family:var(--font-d);font-weight:800;font-size:22px;margin-bottom:24px}
+    .brand span{background:var(--grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+    h1{font-family:var(--font-d);font-size:22px;font-weight:800;margin-bottom:8px}
+    p.sub{color:var(--dim);font-size:14px;margin-bottom:24px;line-height:1.5}
+    label{display:block;font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);margin-bottom:18px}
+    input{display:block;width:100%;margin-top:7px;background:var(--bg);border:1px solid var(--line2);
+          border-radius:11px;padding:13px 14px;color:var(--text);font-size:15px;font-family:var(--font-b)}
+    input:focus{outline:none;border-color:var(--cyan)}
+    .btn{width:100%;background:var(--grad);color:#052015;font-weight:800;font-size:15px;
+         padding:14px;border:none;border-radius:12px;cursor:pointer;font-family:var(--font-b)}
+    .btn:disabled{opacity:.6;cursor:wait}
+    .msg{font-size:13.5px;margin-top:16px;min-height:18px;text-align:center}
+    .msg.err{color:#ff6b6b} .msg.ok{color:var(--green)}
+    a{color:var(--cyan);text-decoration:none;font-size:14px}
+    .foot{text-align:center;margin-top:20px}
+  </style>
+</head>
+<body>
+  <div class="box">
+    <div class="brand">Sure<span>Radar</span></div>
+    <h1>Criar nova senha</h1>
+    <p class="sub">Escolha uma senha nova para sua conta. Depois é só entrar normalmente.</p>
+
+    <form id="form">
+      <label>Nova senha
+        <input id="senha" type="password" placeholder="Mínimo 6 caracteres" autocomplete="new-password" />
+      </label>
+      <label>Confirmar senha
+        <input id="senha2" type="password" placeholder="Repita a senha" autocomplete="new-password" />
+      </label>
+      <button class="btn" id="btn" type="submit">Salvar nova senha</button>
+    </form>
+    <div class="msg" id="msg"></div>
+    <div class="foot"><a href="/login">← Voltar ao login</a></div>
+  </div>
+
+<script>
+const $ = s => document.getElementById(s);
+const token = new URLSearchParams(location.search).get("token") || "";
+const msg = (t, ok) => { const m = $("msg"); m.textContent = t; m.className = "msg " + (ok ? "ok" : "err"); };
+
+if (!token) msg("Link inválido. Peça uma nova redefinição na tela de login.");
+
+$("form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const s1 = $("senha").value, s2 = $("senha2").value;
+  if (s1.length < 6) return msg("A senha precisa ter pelo menos 6 caracteres.");
+  if (s1 !== s2) return msg("As senhas não são iguais.");
+  const btn = $("btn"); btn.disabled = true; btn.textContent = "Salvando...";
+  try {
+    const r = await fetch("/api/senha/redefinir", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token, senha: s1 }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (r.ok) {
+      msg("Senha alterada! Redirecionando pro login...", true);
+      setTimeout(() => location.href = "/login", 1500);
+      return;
+    }
+    msg(j.erro || "Não foi possível redefinir agora.");
+  } catch { msg("Erro de conexão. Tente de novo."); }
+  btn.disabled = false; btn.textContent = "Salvar nova senha";
+});
+</script>
+</body>
+</html>
