@@ -226,7 +226,13 @@ def metricas():
     n_pro = len(pro_ativos)
     n_free = total - n_pro
 
-    reais = [p for p in pags if (p.get("valor") or 0) > 0]
+    # RECEITA só conta pagamento DE VERDADE (checkout real). Ativações manuais
+    # feitas pelo admin/teste (metodo 'admin'/'teste'/'manual') NÃO são dinheiro.
+    _fake = ("admin", "teste", "manual")
+    def _real(p):
+        m = (p.get("metodo") or "").lower()
+        return (p.get("valor") or 0) > 0 and not any(x in m for x in _fake)
+    reais = [p for p in pags if _real(p)]
     receita_total = sum(p["valor"] for p in reais)
     d30, d7 = now - 30 * 86400, now - 7 * 86400
     receita_30 = sum(p["valor"] for p in reais if p["criado"] > d30)
@@ -243,8 +249,9 @@ def metricas():
         ult_pag[p["user_id"]] = p["valor"]
     mrr = 0.0
     for u in pro_ativos:
-        v = ult_pag.get(u["id"], 97.0)
-        mrr += (v / 12.0) if v >= 300 else v
+        v = ult_pag.get(u["id"])   # só quem tem pagamento REAL entra no MRR
+        if v:
+            mrr += (v / 12.0) if v >= 300 else v
 
     novos_7 = len([u for u in users if u["criado"] > d7])
     novos_30 = len([u for u in users if u["criado"] > d30])
