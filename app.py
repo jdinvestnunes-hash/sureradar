@@ -131,6 +131,18 @@ def _admin_ok(request: Request, user):
     return _admin_email(user) and bool(config.ADMIN_PASSWORD) and _admin_desbloqueado(request)
 
 
+def _client_ip(request: Request):
+    xff = request.headers.get("x-forwarded-for", "")
+    if xff:
+        return xff.split(",")[0].strip()
+    return request.client.host if request.client else ""
+
+
+def _ip_admin_ok(request: Request):
+    """True se NÃO há allowlist de IP, ou se o IP do cliente está nela."""
+    return (not config.ADMIN_IPS) or (_client_ip(request) in config.ADMIN_IPS)
+
+
 def _com_sessao(resp: Response, user_id: int):
     token = auth.criar_sessao(user_id)
     resp.set_cookie(COOKIE, token, httponly=True, samesite="lax",
@@ -310,6 +322,8 @@ def admin_unlock(request: Request, payload: dict = Body(...)):
 
 def _guard_admin(request, user):
     """Devolve (None) se ok, ou um JSONResponse de erro com o motivo."""
+    if not _ip_admin_ok(request):
+        return JSONResponse({"erro": "não encontrado"}, status_code=404)
     if not _admin_email(user):
         return JSONResponse({"erro": "sem permissão"}, status_code=403)
     if not config.ADMIN_PASSWORD or not _admin_desbloqueado(request):
@@ -716,7 +730,10 @@ def tela_planos(request: Request):
 
 @app.get("/admin")
 def tela_admin(request: Request):
-    """Painel do admin — dar/renovar PRO. Só para e-mails em ADMIN_EMAILS."""
+    """Dashboard admin. Gated por IP (allowlist) + e-mail + senha."""
+    # IP fora da allowlist: finge que a página não existe (404).
+    if not _ip_admin_ok(request):
+        return Response("Not Found", status_code=404)
     user = _usuario(request)
     if not user:
         return RedirectResponse("/login", status_code=302)

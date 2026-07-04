@@ -33,6 +33,13 @@ ADMIN_EMAILS = {
 # Railway. Se ficar vazia, o painel admin fica BLOQUEADO (segurança).
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "").strip()
 
+# IPs liberados a acessar o /admin (allowlist). Separe por vírgula em ADMIN_IPS.
+# Se VAZIO, não filtra por IP (vale só e-mail+senha). Se preenchido, SÓ esses IPs
+# passam — quem não estiver na lista nem enxerga a página (404).
+ADMIN_IPS = {
+    ip.strip() for ip in os.getenv("ADMIN_IPS", "").split(",") if ip.strip()
+}
+
 # Avisar no perfil para renovar quando faltar este nº de dias (ou menos).
 AVISO_RENOVACAO_DIAS = 5
 

@@ -82,7 +82,6 @@
   </a>
   <div class="navlinks">
     <a href="/app" class="nlk">← Painel</a>
-    <a href="/admin" id="lk-admin" class="nlk" style="display:none">🛠️ Admin</a>
     <a href="#" id="sair" class="nlk out">Sair</a>
   </div>
 </div></nav>
@@ -138,7 +137,6 @@ async function load(){
   $("#nm").textContent = d.nome;
   $("#em").textContent = d.email;
 
-  if (d.admin) $("#lk-admin").style.display = "";
   const pro = d.plano === "pro";
   const badge = $("#plan-badge"), chip = $("#plan-chip");
   badge.textContent = pro ? "Pro" : "Grátis";
