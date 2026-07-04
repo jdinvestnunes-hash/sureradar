@@ -415,7 +415,9 @@ def checkout_pix(request: Request, payload: dict = Body(...)):
         }],
         "returnUrl": config.SITE_URL + "/planos",
         "completionUrl": config.SITE_URL + "/perfil?pago=1",
-        "customer": {"name": user["nome"], "email": user["email"]},
+        # NÃO enviamos "customer": a v1 exige customer COMPLETO (name, email,
+        # cellphone, taxId/CPF). Como não pedimos telefone/CPF no cadastro, deixamos
+        # a própria AbacatePay coletar esses dados do comprador na tela de Pix dela.
     }
     try:
         r = requests.post("https://api.abacatepay.com/v1/billing/create", json=body,
