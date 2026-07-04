@@ -771,6 +771,29 @@ def admin_plano(request: Request, payload: dict = Body(...)):
             "dias_adicionados": dias, "dias_totais": restantes}
 
 
+@app.post("/api/admin/excluir")
+def admin_excluir(request: Request, payload: dict = Body(...)):
+    """Admin exclui a conta de um usuário (irreversível). Body: {email}.
+    Se houver assinatura Stripe ativa, cancela lá antes (senão continua cobrando)."""
+    user = _usuario(request)
+    erro = _guard_admin(request, user)
+    if erro:
+        return erro
+    alvo = auth.pegar_por_email(payload.get("email", ""))
+    if not alvo:
+        return JSONResponse({"erro": "usuário não encontrado"}, status_code=404)
+    # cancela assinatura recorrente no Stripe (evita cobrança fantasma)
+    a = auth.assinatura_do_user(alvo["id"])
+    if a and a.get("provider") == "stripe" and a.get("sub_id") and config.STRIPE_SECRET_KEY:
+        try:
+            requests.delete("https://api.stripe.com/v1/subscriptions/" + a["sub_id"],
+                            auth=(config.STRIPE_SECRET_KEY, ""), timeout=15)
+        except requests.RequestException:
+            pass
+    auth.excluir_usuario(alvo["id"])
+    return {"ok": True, "email": alvo["email"]}
+
+
 # ATENÇÃO: ativação de teste do Pro. SÓ funciona com ALLOW_DEV_PRO=1 no ambiente
 # (desligado em produção). Em produção, o Pro é ativado pelo webhook do checkout.
 @app.post("/api/dev/ativar-pro")

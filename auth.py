@@ -247,6 +247,20 @@ def pegar_por_email(email):
     return _perfil(row) if row else None
 
 
+def excluir_usuario(user_id):
+    """Apaga a conta e TODOS os dados ligados a ela (sessões, banca, pagamentos,
+    checkouts, assinaturas, tokens). Ação irreversível — usada pelo admin."""
+    with _db() as c:
+        for tabela in ("sessions", "pagamentos", "user_banca", "checkouts",
+                       "assinaturas", "reset_tokens", "confirm_tokens"):
+            try:
+                c.execute(_q(f"DELETE FROM {tabela} WHERE user_id=?"), (user_id,))
+            except Exception:
+                pass
+        c.execute(_q("DELETE FROM users WHERE id=?"), (user_id,))
+    limpar_cache_sessoes()
+
+
 def listar_usuarios():
     """Todos os usuários (para o painel admin), do mais novo ao mais antigo."""
     with _db() as c:

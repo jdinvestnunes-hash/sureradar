@@ -80,6 +80,8 @@
     .b-pro{background:var(--grad);color:#052015}
     .b-pre{background:rgba(255,255,255,.05);color:var(--text);border:1px solid var(--line2)}
     .b-free{background:transparent;color:var(--red);border:1px solid rgba(255,107,107,.4)}
+    .b-del{background:rgba(255,107,107,.14);color:var(--red);border:1px solid rgba(255,107,107,.4)}
+    .b-del:hover{background:var(--red);color:#fff}
 
     .toast{position:fixed;left:50%;bottom:30px;transform:translateX(-50%) translateY(20px);opacity:0;background:var(--card2);border:1px solid var(--line2);border-radius:12px;padding:14px 20px;font-size:14px;font-weight:600;box-shadow:0 20px 50px rgba(0,0,0,.5);transition:.25s;z-index:50}
     .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
@@ -225,6 +227,7 @@ function renderUsuarios(){
         <input type="number" min="1" max="3650" value="30" class="dias-in" />
         <button class="btn b-pro" data-acao="pro">Ativar/Renovar</button>
         <button class="btn b-free" data-acao="free">Free</button>
+        <button class="btn b-del" data-acao="excluir" title="Excluir conta">🗑 Excluir</button>
       </div></div>`;
   }).join("") : '<div class="empty">Nenhum usuário.</div>';
 }
@@ -236,12 +239,24 @@ async function acao(email,acao,dias){
   toast(acao==="free"?`✅ <b>${email}</b> → Free`:`✅ <b>${email}</b> PRO · ${j.dias_totais} dias`);
   carregar();
 }
+async function excluir(email){
+  const r=await fetch("/api/admin/excluir",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email})});
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok){toast("❌ "+(j.erro||"erro"));return;}
+  toast(`🗑 Conta <b>${email}</b> excluída`);
+  carregar();
+}
 document.addEventListener("click",(e)=>{
   const card=e.target.closest(".u"); if(!card)return;
   const email=card.dataset.email;
   if(e.target.dataset.dias){card.querySelector(".dias-in").value=e.target.dataset.dias;return;}
   if(e.target.dataset.acao==="pro"){acao(email,"pro",parseInt(card.querySelector(".dias-in").value)||30);}
   if(e.target.dataset.acao==="free"){if(confirm(`Tirar o PRO de ${email}?`))acao(email,"free");}
+  if(e.target.dataset.acao==="excluir"){
+    if(!confirm(`EXCLUIR a conta de ${email}?\n\nIsso apaga TODOS os dados (banca, pagamentos, assinatura) e cancela a assinatura no cartão, se houver. NÃO dá pra desfazer.`))return;
+    if(prompt(`Confirme digitando EXCLUIR para apagar ${email}:`)!=="EXCLUIR"){toast("Cancelado.");return;}
+    excluir(email);
+  }
 });
 
 async function carregar(){
