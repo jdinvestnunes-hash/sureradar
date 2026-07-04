@@ -206,6 +206,94 @@ def voltar_free(user_id: int):
 
 
 # ---------------------------------------------------------------------------
+# Métricas de negócio (para o dashboard admin)
+# ---------------------------------------------------------------------------
+def metricas():
+    from datetime import datetime, timedelta
+    now = time.time()
+    with _db() as c:
+        users = [dict(r) for r in c.execute(
+            "SELECT id, nome, email, plano, plano_expira, criado FROM users").fetchall()]
+        pags = [dict(r) for r in c.execute(
+            "SELECT user_id, valor, plano, metodo, criado FROM pagamentos").fetchall()]
+
+    def _ativo(u):
+        return u["plano"] == "pro" and (not u["plano_expira"] or u["plano_expira"] > now)
+
+    emails = {u["id"]: u["email"] for u in users}
+    total = len(users)
+    pro_ativos = [u for u in users if _ativo(u)]
+    n_pro = len(pro_ativos)
+    n_free = total - n_pro
+
+    reais = [p for p in pags if (p.get("valor") or 0) > 0]
+    receita_total = sum(p["valor"] for p in reais)
+    d30, d7 = now - 30 * 86400, now - 7 * 86400
+    receita_30 = sum(p["valor"] for p in reais if p["criado"] > d30)
+    receita_7 = sum(p["valor"] for p in reais if p["criado"] > d7)
+    pagantes = len({p["user_id"] for p in reais})
+    ticket = (receita_total / len(reais)) if reais else 0.0
+    conversao = (pagantes / total * 100) if total else 0.0
+    arpu = (receita_total / total) if total else 0.0
+    ltv = (receita_total / pagantes) if pagantes else 0.0
+
+    # MRR: normaliza o último pagamento de cada PRO ativo (anual/12).
+    ult_pag = {}
+    for p in sorted(reais, key=lambda x: x["criado"]):
+        ult_pag[p["user_id"]] = p["valor"]
+    mrr = 0.0
+    for u in pro_ativos:
+        v = ult_pag.get(u["id"], 97.0)
+        mrr += (v / 12.0) if v >= 300 else v
+
+    novos_7 = len([u for u in users if u["criado"] > d7])
+    novos_30 = len([u for u in users if u["criado"] > d30])
+
+    # séries dos últimos 14 dias (novos usuários e receita/dia)
+    dias = [(datetime.now() - timedelta(days=i)).strftime("%d/%m") for i in range(13, -1, -1)]
+    chave = lambda ts: datetime.fromtimestamp(ts).strftime("%d/%m")
+    s_users = {d: 0 for d in dias}
+    s_rev = {d: 0.0 for d in dias}
+    for u in users:
+        k = chave(u["criado"])
+        if k in s_users:
+            s_users[k] += 1
+    for p in reais:
+        k = chave(p["criado"])
+        if k in s_rev:
+            s_rev[k] += p["valor"]
+
+    def dias_rest(u):
+        e = u.get("plano_expira")
+        return max(0, int((e - now) / 86400)) if (u["plano"] == "pro" and e) else None
+
+    recentes = [{"nome": u["nome"], "email": u["email"], "plano": ("pro" if _ativo(u) else "free"),
+                 "dias": dias_rest(u), "criado": u["criado"]}
+                for u in sorted(users, key=lambda x: x["criado"], reverse=True)[:8]]
+    pag_rec = [{"email": emails.get(p["user_id"], "?"), "valor": p["valor"],
+                "plano": p["plano"], "metodo": p.get("metodo"), "criado": p["criado"]}
+               for p in sorted(reais, key=lambda x: x["criado"], reverse=True)[:8]]
+    vencendo = sorted(
+        [{"nome": u["nome"], "email": u["email"], "dias": dias_rest(u)}
+         for u in pro_ativos if dias_rest(u) is not None and dias_rest(u) <= 5],
+        key=lambda x: x["dias"])
+
+    return {
+        "total_usuarios": total, "pro_ativos": n_pro, "free": n_free,
+        "receita_total": round(receita_total, 2), "receita_30d": round(receita_30, 2),
+        "receita_7d": round(receita_7, 2), "mrr": round(mrr, 2),
+        "arr": round(mrr * 12, 2), "ltv": round(ltv, 2), "arpu": round(arpu, 2),
+        "ticket_medio": round(ticket, 2), "conversao": round(conversao, 1),
+        "pagantes": pagantes, "novos_7d": novos_7, "novos_30d": novos_30,
+        "serie_dias": dias,
+        "serie_usuarios": [s_users[d] for d in dias],
+        "serie_receita": [round(s_rev[d], 2) for d in dias],
+        "usuarios_recentes": recentes, "pagamentos_recentes": pag_rec,
+        "vencendo": vencendo,
+    }
+
+
+# ---------------------------------------------------------------------------
 # Cache do FEED (sobrevive a redeploys)
 # ---------------------------------------------------------------------------
 def feed_cache_get():

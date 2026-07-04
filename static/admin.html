@@ -3,167 +3,256 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Admin — SureRadar</title>
+  <title>Dashboard Admin — SureRadar</title>
   <meta name="robots" content="noindex" />
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" media="print" onload="this.media='all'" />
   <style>
     :root{
-      --bg:#05070d; --card:#0e1421; --card2:#121a2b; --line:#1b2740; --line2:#27395c;
-      --text:#f2f6fc; --dim:#a3b1c9; --mute:#5e6b85;
-      --green:#2ee6a8; --cyan:#38d4f5; --gold:#ffc94d; --red:#ff6b6b;
-      --grad:linear-gradient(112deg,#2ee6a8 10%,#38d4f5 90%);
-      --font:"Inter",system-ui,sans-serif;
+      --bg:#05070d; --panel:#0b111d; --card:#0e1524; --card2:#121a2b;
+      --line:#1b2740; --line2:#27395c; --text:#f2f6fc; --dim:#9aa7bd; --mute:#5e6b85;
+      --green:#2ee6a8; --cyan:#38d4f5; --gold:#ffc94d; --red:#ff6b6b; --violet:#a78bfa;
+      --grad:linear-gradient(112deg,#2ee6a8,#38d4f5);
+      --fd:"Sora","Inter",sans-serif; --fb:"Inter",system-ui,sans-serif;
     }
     *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh}
+    body{font-family:var(--fb);background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;min-height:100vh}
     a{color:inherit;text-decoration:none}
-    .wrap{max-width:1000px;margin:0 auto;padding:24px}
-    nav{display:flex;align-items:center;justify-content:space-between;height:60px;border-bottom:1px solid var(--line);margin-bottom:24px}
-    .brand{font-weight:800;font-size:19px}
-    .brand span{background:var(--grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
-    .back{font-size:14px;color:var(--dim);padding:8px 14px;border-radius:9px}
-    .back:hover{background:var(--card);color:var(--text)}
-    h1{font-size:24px;font-weight:800;margin-bottom:4px}
-    .sub{color:var(--dim);font-size:14px;margin-bottom:22px}
-    .search{width:100%;background:var(--card);border:1px solid var(--line2);border-radius:11px;padding:12px 14px;color:var(--text);font-size:14px;margin-bottom:18px}
-    .u{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:12px;display:flex;flex-wrap:wrap;align-items:center;gap:14px}
-    .u-info{flex:1;min-width:220px}
-    .u-nome{font-weight:700;font-size:15px}
-    .u-email{color:var(--dim);font-size:13px}
-    .badge{font-size:11px;font-weight:800;letter-spacing:.04em;padding:3px 9px;border-radius:999px;text-transform:uppercase}
-    .b-free{background:rgba(94,107,133,.2);color:var(--mute)}
-    .b-pro{background:rgba(46,230,168,.16);color:var(--green)}
-    .b-warn{background:rgba(255,201,77,.16);color:var(--gold)}
-    .dias{font-size:13px;color:var(--dim);margin-top:3px}
-    .ctrl{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
-    .ctrl input{width:70px;background:var(--card2);border:1px solid var(--line2);border-radius:9px;padding:9px;color:var(--text);font-size:14px;text-align:center}
-    .btn{border:none;border-radius:9px;padding:9px 13px;font-weight:700;font-size:13px;cursor:pointer;font-family:var(--font);transition:.15s}
+    .grad{background:var(--grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+
+    /* layout aberto: sidebar + conteúdo */
+    .app{display:flex;min-height:100vh}
+    .side{width:230px;flex-shrink:0;background:var(--panel);border-right:1px solid var(--line);padding:22px 16px;display:flex;flex-direction:column;gap:6px;position:sticky;top:0;height:100vh}
+    .brand{display:flex;align-items:center;gap:10px;font-family:var(--fd);font-weight:800;font-size:19px;padding:4px 8px 18px}
+    .brand svg{width:28px;height:28px}
+    .nav a{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:11px;color:var(--dim);font-size:14px;font-weight:600;cursor:pointer}
+    .nav a.on,.nav a:hover{background:var(--card);color:var(--text)}
+    .nav .ic{width:18px;text-align:center}
+    .side .bottom{margin-top:auto;font-size:12px;color:var(--mute);padding:8px}
+
+    .main{flex:1;min-width:0;padding:26px 30px 60px}
+    .head{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px}
+    .head h1{font-family:var(--fd);font-size:26px;font-weight:800;letter-spacing:-.02em}
+    .head p{color:var(--dim);font-size:13.5px;margin-top:3px}
+    .refresh{font-size:13px;font-weight:700;color:var(--cyan);background:var(--card);border:1px solid var(--line2);border-radius:10px;padding:9px 15px;cursor:pointer}
+    .refresh:hover{border-color:var(--cyan)}
+
+    /* KPI cards */
+    .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px}
+    .kpi{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px 20px;position:relative;overflow:hidden}
+    .kpi.big{grid-column:span 1}
+    .kpi .lbl{font-size:12px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.05em;display:flex;align-items:center;gap:7px}
+    .kpi .val{font-family:var(--fd);font-size:30px;font-weight:800;letter-spacing:-.02em;margin-top:8px}
+    .kpi .sub{font-size:12px;color:var(--mute);margin-top:5px}
+    .kpi .dot{width:9px;height:9px;border-radius:50%}
+    .kpis2{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px}
+    .mini{background:var(--card2);border:1px solid var(--line);border-radius:13px;padding:14px 16px}
+    .mini .lbl{font-size:11px;font-weight:700;color:var(--mute);text-transform:uppercase;letter-spacing:.04em}
+    .mini .val{font-size:20px;font-weight:800;margin-top:5px;font-variant-numeric:tabular-nums}
+
+    /* charts + tabelas grid */
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:22px}
+    .panel{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px 20px}
+    .panel h3{font-size:14px;font-weight:800;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between}
+    .panel h3 small{font-weight:600;color:var(--mute);font-size:12px}
+    table{width:100%;border-collapse:collapse;font-size:13px}
+    th{text-align:left;color:var(--mute);font-size:11px;text-transform:uppercase;letter-spacing:.04em;font-weight:700;padding:0 8px 9px}
+    td{padding:9px 8px;border-top:1px solid var(--line);color:var(--dim)}
+    td.b{color:var(--text);font-weight:600}
+    .tag{font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:999px}
+    .t-pro{background:rgba(46,230,168,.15);color:var(--green)}
+    .t-free{background:rgba(94,107,133,.2);color:var(--mute)}
+    .t-warn{background:rgba(255,201,77,.15);color:var(--gold)}
+    .money{color:var(--green);font-weight:800;font-variant-numeric:tabular-nums}
+    .empty{color:var(--mute);text-align:center;padding:24px;font-size:13px}
+
+    /* gestão de usuários */
+    .search{width:100%;background:var(--card2);border:1px solid var(--line2);border-radius:11px;padding:11px 14px;color:var(--text);font-size:14px;margin-bottom:14px}
+    .u{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--card2);border:1px solid var(--line);border-radius:13px;padding:13px 15px;margin-bottom:9px}
+    .u-info{flex:1;min-width:200px}
+    .u-nome{font-weight:700;font-size:14px}
+    .u-email{color:var(--dim);font-size:12.5px}
+    .u-dias{font-size:12px;color:var(--dim);margin-top:2px}
+    .ctrl{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+    .ctrl input{width:64px;background:var(--bg);border:1px solid var(--line2);border-radius:9px;padding:8px;color:var(--text);font-size:13px;text-align:center}
+    .btn{border:none;border-radius:9px;padding:8px 12px;font-weight:700;font-size:12.5px;cursor:pointer;font-family:var(--fb);transition:.15s}
     .btn:hover{filter:brightness(1.08)}
-    .b-pro-act{background:var(--grad);color:#052015}
-    .b-preset{background:rgba(255,255,255,.05);color:var(--text);border:1px solid var(--line2)}
-    .b-free-act{background:transparent;color:var(--red);border:1px solid rgba(255,107,107,.4)}
+    .b-pro{background:var(--grad);color:#052015}
+    .b-pre{background:rgba(255,255,255,.05);color:var(--text);border:1px solid var(--line2)}
+    .b-free{background:transparent;color:var(--red);border:1px solid rgba(255,107,107,.4)}
+
     .toast{position:fixed;left:50%;bottom:30px;transform:translateX(-50%) translateY(20px);opacity:0;background:var(--card2);border:1px solid var(--line2);border-radius:12px;padding:14px 20px;font-size:14px;font-weight:600;box-shadow:0 20px 50px rgba(0,0,0,.5);transition:.25s;z-index:50}
     .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
     .toast b{color:var(--green)}
-    .empty{color:var(--mute);text-align:center;padding:40px}
+    @media(max-width:1000px){.kpis,.kpis2{grid-template-columns:repeat(2,1fr)}.row{grid-template-columns:1fr}.side{display:none}}
   </style>
 </head>
 <body>
-<div class="wrap">
-  <nav>
-    <div class="brand">Sure<span>Radar</span> · Admin</div>
-    <a href="/app" class="back">← Voltar ao painel</a>
-  </nav>
+<div class="app" id="app" style="display:none">
+  <aside class="side">
+    <div class="brand">
+      <svg viewBox="0 0 32 32" fill="none"><defs><linearGradient id="g" x1="0" y1="0" x2="32" y2="32"><stop stop-color="#2EE6A8"/><stop offset="1" stop-color="#38D4F5"/></linearGradient></defs><circle cx="16" cy="16" r="13" stroke="url(#g)" stroke-width="2.4" opacity=".35"/><circle cx="16" cy="16" r="7.5" stroke="url(#g)" stroke-width="2.4" opacity=".7"/><circle cx="16" cy="16" r="2.5" fill="url(#g)"/><path d="M16 16 L27 8" stroke="url(#g)" stroke-width="2.4" stroke-linecap="round"/></svg>
+      Sure<span class="grad">Radar</span>
+    </div>
+    <nav class="nav">
+      <a class="on"><span class="ic">📊</span> Visão geral</a>
+      <a onclick="document.getElementById('sec-users').scrollIntoView({behavior:'smooth'})"><span class="ic">👥</span> Assinantes</a>
+      <a onclick="document.getElementById('sec-pag').scrollIntoView({behavior:'smooth'})"><span class="ic">💳</span> Pagamentos</a>
+      <a href="/app"><span class="ic">↗</span> Ir ao painel</a>
+    </nav>
+    <div class="bottom">SureRadar Admin<br>Atualizado em tempo real</div>
+  </aside>
 
-  <h1>Gerenciar assinaturas</h1>
-  <p class="sub">Dê ou renove o PRO com a duração que quiser. Renovar <b>soma</b> nos dias que faltam.</p>
+  <main class="main">
+    <div class="head">
+      <div>
+        <h1>Dashboard</h1>
+        <p id="head-sub">Visão do negócio — receita, assinantes e crescimento.</p>
+      </div>
+      <button class="refresh" onclick="carregar()">↻ Atualizar</button>
+    </div>
 
-  <input id="busca" class="search" placeholder="🔎 Filtrar por nome ou e-mail…" />
-  <div id="lista"></div>
+    <!-- KPIs principais -->
+    <div class="kpis" id="kpis"></div>
+    <div class="kpis2" id="kpis2"></div>
+
+    <!-- gráficos -->
+    <div class="row">
+      <div class="panel"><h3>Receita (14 dias) <small id="rev-sum"></small></h3><div id="chart-rev"></div></div>
+      <div class="panel"><h3>Novos usuários (14 dias) <small id="usr-sum"></small></h3><div id="chart-usr"></div></div>
+    </div>
+
+    <!-- pagamentos + vencendo -->
+    <div class="row">
+      <div class="panel" id="sec-pag"><h3>Pagamentos recentes</h3><div id="pagamentos"></div></div>
+      <div class="panel"><h3>⏳ Renovações próximas <small>vencem em ≤5 dias</small></h3><div id="vencendo"></div></div>
+    </div>
+
+    <!-- gestão de assinantes -->
+    <div class="panel" id="sec-users">
+      <h3>Assinantes <small>dar / renovar PRO</small></h3>
+      <input id="busca" class="search" placeholder="🔎 Filtrar por nome ou e-mail…" />
+      <div id="lista"></div>
+    </div>
+  </main>
 </div>
 
+<div id="gate" style="max-width:380px;margin:70px auto;text-align:center;padding:0 20px"></div>
 <div class="toast" id="toast"></div>
 
 <script>
-const $ = (s)=>document.querySelector(s);
-const toast = (html)=>{const t=$("#toast");t.innerHTML=html;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),3500);};
-let USERS = [];
-
-function fmtExpira(exp){
-  if(!exp) return "";
-  const d = new Date(exp*1000);
-  return d.toLocaleDateString("pt-BR");
-}
-
-function render(){
-  const q = ($("#busca").value||"").toLowerCase();
-  const lista = $("#lista");
-  const filtrados = USERS.filter(u => (u.nome+" "+u.email).toLowerCase().includes(q));
-  if(!filtrados.length){ lista.innerHTML = '<div class="empty">Nenhum usuário.</div>'; return; }
-  lista.innerHTML = filtrados.map(u=>{
-    const pro = u.plano==="pro";
-    const badge = pro
-      ? (u.aviso_renovar ? '<span class="badge b-warn">PRO · vence</span>' : '<span class="badge b-pro">PRO</span>')
-      : '<span class="badge b-free">FREE</span>';
-    const dias = pro ? `<div class="dias">${u.dias} dia(s) restante(s) · vence ${fmtExpira(u.plano_expira)}</div>` : "";
-    return `<div class="u" data-email="${u.email}">
-      <div class="u-info">
-        <div class="u-nome">${u.nome} ${badge}</div>
-        <div class="u-email">${u.email}</div>
-        ${dias}
-      </div>
-      <div class="ctrl">
-        <button class="btn b-preset" data-dias="30">+30d</button>
-        <button class="btn b-preset" data-dias="365">+365d</button>
-        <input type="number" min="1" max="3650" value="30" class="dias-in" />
-        <button class="btn b-pro-act" data-acao="pro">Ativar / Renovar PRO</button>
-        <button class="btn b-free-act" data-acao="free">Free</button>
-      </div>
-    </div>`;
-  }).join("");
-}
+const $=(s)=>document.querySelector(s);
+const brl=(v)=>"R$ "+Number(v||0).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2});
+const brl0=(v)=>"R$ "+Number(v||0).toLocaleString("pt-BR",{maximumFractionDigits:0});
+const toast=(h)=>{const t=$("#toast");t.innerHTML=h;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),3500);};
+let USERS=[];
 
 function telaSenha(msg){
-  document.querySelector(".wrap").innerHTML = `
-    <nav>
-      <div class="brand">Sure<span>Radar</span> · Admin</div>
-      <a href="/app" class="back">← Voltar</a>
-    </nav>
-    <div style="max-width:380px;margin:60px auto;text-align:center">
-      <div style="font-size:40px;margin-bottom:10px">🔒</div>
-      <h1 style="margin-bottom:6px">Área restrita</h1>
-      <p class="sub">${msg||"Digite a senha do admin para continuar."}</p>
-      <input id="adm-senha" type="password" class="search" placeholder="Senha do admin" style="text-align:center" />
-      <button id="adm-entrar" class="btn b-pro-act" style="width:100%;padding:12px;font-size:15px">Entrar</button>
-      <div id="adm-erro" style="color:var(--red);font-size:13px;margin-top:10px;min-height:18px"></div>
-    </div>`;
-  const entrar = async ()=>{
-    const senha = document.getElementById("adm-senha").value;
-    const r = await fetch("/api/admin/unlock",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({senha})});
-    const j = await r.json();
-    if(r.ok){ location.reload(); return; }
-    document.getElementById("adm-erro").textContent = j.erro||"Erro";
-  };
-  document.getElementById("adm-entrar").onclick = entrar;
-  document.getElementById("adm-senha").addEventListener("keydown",e=>{if(e.key==="Enter")entrar();});
+  $("#app").style.display="none";
+  $("#gate").innerHTML=`
+    <div style="font-size:42px;margin-bottom:10px">🔒</div>
+    <h1 style="font-family:'Sora';font-size:24px;margin-bottom:6px">Área restrita</h1>
+    <p style="color:var(--dim);font-size:14px;margin-bottom:18px">${msg||"Digite a senha do admin."}</p>
+    <input id="adm-senha" type="password" class="search" placeholder="Senha do admin" style="text-align:center" />
+    <button class="btn b-pro" style="width:100%;padding:12px;font-size:15px" onclick="unlock()">Entrar</button>
+    <div id="adm-erro" style="color:var(--red);font-size:13px;margin-top:10px;min-height:18px"></div>`;
+  const inp=$("#adm-senha"); inp.focus();
+  inp.addEventListener("keydown",e=>{if(e.key==="Enter")unlock();});
 }
+async function unlock(){
+  const senha=$("#adm-senha").value;
+  const r=await fetch("/api/admin/unlock",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({senha})});
+  const j=await r.json();
+  if(r.ok){carregar();return;}
+  $("#adm-erro").textContent=j.erro||"Erro";
+}
+
+function barChart(el,labels,values,color,money){
+  const max=Math.max(1,...values), W=560,H=170,pad=26,n=values.length;
+  const step=(W-pad*2)/n, bw=step*0.58;
+  let bars="",lbls="";
+  values.forEach((v,i)=>{
+    const h=Math.max(1,(v/max)*(H-46)), x=pad+i*step+(step-bw)/2, y=H-24-h;
+    bars+=`<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="3" fill="url(#bg2)"><title>${labels[i]}: ${money?brl(v):v}</title></rect>`;
+    if(i%2===1) lbls+=`<text x="${(x+bw/2).toFixed(1)}" y="${H-7}" font-size="9.5" fill="#5e6b85" text-anchor="middle">${labels[i]}</text>`;
+  });
+  el.innerHTML=`<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block"><defs><linearGradient id="bg2" x1="0" y1="0" x2="0" y2="1"><stop stop-color="${color}"/><stop offset="1" stop-color="${color}" stop-opacity=".35"/></linearGradient></defs>${bars}${lbls}</svg>`;
+}
+
+function renderMetricas(m){
+  $("#kpis").innerHTML=[
+    ["💰 Receita total",brl(m.receita_total),`${brl(m.receita_30d)} nos últimos 30d`,"var(--gold)"],
+    ["🔁 MRR (recorrente)",brl(m.mrr),`ARR ${brl0(m.arr)}/ano`,"var(--green)"],
+    ["⭐ Assinantes PRO",m.pro_ativos,`de ${m.total_usuarios} usuários`,"var(--cyan)"],
+    ["📈 LTV por cliente",brl(m.ltv),`${m.pagantes} pagantes`,"var(--violet)"],
+  ].map(([l,v,s,c])=>`<div class="kpi"><div class="lbl"><span class="dot" style="background:${c}"></span>${l}</div><div class="val" style="color:${c}">${v}</div><div class="sub">${s}</div></div>`).join("");
+
+  $("#kpis2").innerHTML=[
+    ["Conversão",m.conversao+"%"],["Ticket médio",brl(m.ticket_medio)],
+    ["ARPU",brl(m.arpu)],["Usuários free",m.free],
+    ["Novos (7d)","+"+m.novos_7d],["Novos (30d)","+"+m.novos_30d],
+    ["Receita 7d",brl(m.receita_7d)],["Total usuários",m.total_usuarios],
+  ].map(([l,v])=>`<div class="mini"><div class="lbl">${l}</div><div class="val">${v}</div></div>`).join("");
+
+  barChart($("#chart-rev"),m.serie_dias,m.serie_receita,"#ffc94d",true);
+  barChart($("#chart-usr"),m.serie_dias,m.serie_usuarios,"#38d4f5",false);
+  $("#rev-sum").textContent=brl(m.serie_receita.reduce((a,b)=>a+b,0));
+  $("#usr-sum").textContent="+"+m.serie_usuarios.reduce((a,b)=>a+b,0);
+
+  $("#pagamentos").innerHTML = m.pagamentos_recentes.length
+    ? `<table><thead><tr><th>Cliente</th><th>Plano</th><th>Método</th><th style="text-align:right">Valor</th></tr></thead><tbody>${
+        m.pagamentos_recentes.map(p=>`<tr><td class="b">${p.email}</td><td>${p.plano}</td><td>${p.metodo||"—"}</td><td style="text-align:right" class="money">${brl(p.valor)}</td></tr>`).join("")}</tbody></table>`
+    : '<div class="empty">Nenhum pagamento ainda.</div>';
+
+  $("#vencendo").innerHTML = m.vencendo.length
+    ? `<table><thead><tr><th>Cliente</th><th style="text-align:right">Vence em</th></tr></thead><tbody>${
+        m.vencendo.map(v=>`<tr><td class="b">${v.nome}<div style="color:var(--mute);font-size:11px">${v.email}</div></td><td style="text-align:right"><span class="tag t-warn">${v.dias} dia(s)</span></td></tr>`).join("")}</tbody></table>`
+    : '<div class="empty">Ninguém vencendo nos próximos 5 dias. 🎉</div>';
+}
+
+function renderUsuarios(){
+  const q=($("#busca").value||"").toLowerCase();
+  const f=USERS.filter(u=>(u.nome+" "+u.email).toLowerCase().includes(q));
+  $("#lista").innerHTML=f.length? f.map(u=>{
+    const pro=u.plano==="pro";
+    const badge=pro?(u.aviso_renovar?'<span class="tag t-warn">PRO · vence</span>':'<span class="tag t-pro">PRO</span>'):'<span class="tag t-free">FREE</span>';
+    const dias=pro&&u.dias!=null?`<div class="u-dias">${u.dias} dia(s) restante(s)</div>`:"";
+    return `<div class="u" data-email="${u.email}">
+      <div class="u-info"><div class="u-nome">${u.nome} ${badge}</div><div class="u-email">${u.email}</div>${dias}</div>
+      <div class="ctrl">
+        <button class="btn b-pre" data-dias="30">+30d</button>
+        <button class="btn b-pre" data-dias="365">+365d</button>
+        <input type="number" min="1" max="3650" value="30" class="dias-in" />
+        <button class="btn b-pro" data-acao="pro">Ativar/Renovar</button>
+        <button class="btn b-free" data-acao="free">Free</button>
+      </div></div>`;
+  }).join("") : '<div class="empty">Nenhum usuário.</div>';
+}
+
+async function acao(email,acao,dias){
+  const r=await fetch("/api/admin/plano",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,acao,dias})});
+  const j=await r.json();
+  if(!r.ok){toast("❌ "+(j.erro||"erro"));return;}
+  toast(acao==="free"?`✅ <b>${email}</b> → Free`:`✅ <b>${email}</b> PRO · ${j.dias_totais} dias`);
+  carregar();
+}
+document.addEventListener("click",(e)=>{
+  const card=e.target.closest(".u"); if(!card)return;
+  const email=card.dataset.email;
+  if(e.target.dataset.dias){card.querySelector(".dias-in").value=e.target.dataset.dias;return;}
+  if(e.target.dataset.acao==="pro"){acao(email,"pro",parseInt(card.querySelector(".dias-in").value)||30);}
+  if(e.target.dataset.acao==="free"){if(confirm(`Tirar o PRO de ${email}?`))acao(email,"free");}
+});
 
 async function carregar(){
-  const r = await fetch("/api/admin/usuarios");
-  if(r.status===403){ document.querySelector(".wrap").innerHTML='<p class="empty">Sem permissão. Só admins.</p>'; return; }
-  if(r.status===401){
-    const j = await r.json().catch(()=>({}));
-    telaSenha(j.sem_senha_configurada ? "Configure a variável ADMIN_PASSWORD no servidor (Railway)." : "Digite a senha do admin para continuar.");
-    return;
-  }
-  const j = await r.json();
-  USERS = j.usuarios||[];
-  render();
+  const rm=await fetch("/api/admin/metricas");
+  if(rm.status===403){$("#app").style.display="none";$("#gate").innerHTML='<p class="empty">Sem permissão. Só admins.</p>';return;}
+  if(rm.status===401){const j=await rm.json().catch(()=>({}));telaSenha(j.sem_senha_configurada?"Configure ADMIN_PASSWORD no servidor (Railway).":"Digite a senha do admin.");return;}
+  $("#gate").innerHTML=""; $("#app").style.display="flex";
+  renderMetricas(await rm.json());
+  const ru=await fetch("/api/admin/usuarios"); if(ru.ok){USERS=(await ru.json()).usuarios||[];renderUsuarios();}
 }
-
-async function acaoPlano(email, acao, dias){
-  const r = await fetch("/api/admin/plano",{method:"POST",headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({email,acao,dias})});
-  const j = await r.json();
-  if(!r.ok){ toast("❌ "+(j.erro||"erro")); return; }
-  if(acao==="free") toast(`✅ <b>${email}</b> voltou pra Free`);
-  else toast(`✅ <b>${email}</b> PRO · +${j.dias_adicionados}d = ${j.dias_totais} dias`);
-  await carregar();
-}
-
-document.addEventListener("click",(e)=>{
-  const card = e.target.closest(".u"); if(!card) return;
-  const email = card.dataset.email;
-  if(e.target.dataset.dias){ card.querySelector(".dias-in").value = e.target.dataset.dias; return; }
-  if(e.target.dataset.acao==="pro"){
-    const dias = parseInt(card.querySelector(".dias-in").value)||30;
-    acaoPlano(email,"pro",dias);
-  }
-  if(e.target.dataset.acao==="free"){
-    if(confirm(`Tirar o PRO de ${email}?`)) acaoPlano(email,"free");
-  }
-});
-$("#busca").addEventListener("input", render);
+document.addEventListener("input",e=>{if(e.target.id==="busca")renderUsuarios();});
 carregar();
 </script>
 </body>

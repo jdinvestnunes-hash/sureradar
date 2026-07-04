@@ -319,6 +319,15 @@ def _guard_admin(request, user):
     return None
 
 
+@app.get("/api/admin/metricas")
+def admin_metricas(request: Request):
+    user = _usuario(request)
+    erro = _guard_admin(request, user)
+    if erro:
+        return erro
+    return auth.metricas()
+
+
 @app.get("/api/admin/usuarios")
 def admin_usuarios(request: Request):
     user = _usuario(request)
