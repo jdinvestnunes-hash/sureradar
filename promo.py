@@ -12,6 +12,7 @@ Roda numa thread de fundo iniciada pelo app.py no startup.
 
 import io
 import threading
+import time as _time
 from datetime import datetime
 
 try:
@@ -24,14 +25,14 @@ import config
 import feed
 import notifier
 
-# Horários (Brasília) das 2 entradas do dia.
-SLOTS = ["10:00", "19:00"]
-# Prova social entre os posts.
-SOCIAL_TIMES = ["13:00", "16:30", "21:00"]
-
-# Regras da entrada que vai pro grupo:
-LUCRO_MIN, LUCRO_MAX = 3.0, 8.0
-# Só estas casas podem aparecer (as 2 pernas). Casa por slug/nome normalizado.
+# Intervalo entre as entradas normais (minutos). TESTE=10, PRODUÇÃO=60.
+INTERVALO_MIN = getattr(config, "TELEGRAM_POST_INTERVAL_MIN", 10)
+# Horários (Brasília) das 2 entradas de ~5% do dia.
+HORARIOS_5PCT = ["17:00", "18:00"]
+# Faixas de lucro (min, max) — normal (a cada intervalo) e as 2 de 5% do dia.
+FAIXA_NORMAL = (1.0001, 3.0)
+FAIXA_5PCT = (4.0, 6.5)
+# Preferência de casas (as 2 pernas); se não achar, relaxa.
 import re as _re
 _CASAS_OK = _re.compile(r"^(betano|bet365|superbet|stake|novibet)", _re.I)
 
@@ -78,14 +79,16 @@ def _pegar(cands):
     return None
 
 
-def _pegar_bet():
-    """Entrada do grupo: lucro 3-8%, só nas casas permitidas, ainda não postada.
-    Fallback: se não houver nenhuma na faixa agora, relaxa o lucro (1-8%)."""
-    cands = [s for s in feed.get_surebets(min_profit=LUCRO_MIN, max_profit=LUCRO_MAX)
-             if _casas_permitidas(s)]
-    if not cands:
-        cands = [s for s in feed.get_surebets(min_profit=1.0001, max_profit=LUCRO_MAX)
-                 if _casas_permitidas(s)]
+def _pegar_faixa(lo, hi):
+    """Melhor entrada não-postada-hoje na faixa [lo, hi]. Prefere as casas
+    conhecidas; se não achar, relaxa casas e depois a faixa — sempre tenta postar."""
+    cands = [s for s in feed.get_surebets(min_profit=lo, max_profit=hi) if _casas_permitidas(s)]
+    if not cands:                                   # relaxa casas
+        cands = feed.get_surebets(min_profit=lo, max_profit=hi)
+    if not cands:                                   # relaxa a faixa (pega o que tiver >=1%)
+        cands = feed.get_surebets(min_profit=1.0001)
+    if not cands:                                   # último recurso: qualquer uma
+        cands = feed.get_surebets(min_profit=0.0)
     return _pegar(cands)
 
 
@@ -196,14 +199,15 @@ def gerar_teaser(sb):
 # ---------------------------------------------------------------------------
 # Posts
 # ---------------------------------------------------------------------------
-def postar_bet():
-    """Posta a entrada do dia (3-8%, casas permitidas), completa com links."""
-    sb = _pegar_bet()
+def postar_faixa(lo, hi, rotulo):
+    """Posta UMA entrada da faixa no grupo (completa, com links)."""
+    sb = _pegar_faixa(lo, hi)
     if not sb:
-        print(">> promo: sem entrada 3-8% nas casas permitidas agora.")
+        print(f">> promo: sem entrada {rotulo} agora.")
         return False
     notifier.enviar_surebet(sb)      # já leva os links das casas + CTA no rodapé
     _estado["postados"].add(sb["id"])
+    print(f">> promo: postou {rotulo} — {float(sb['profit_pct']):.2f}% {sb.get('event','')}")
     return True
 
 
@@ -242,20 +246,27 @@ def postar_social():
 # Agendador
 # ---------------------------------------------------------------------------
 def _loop():
+    intervalo_seg = max(60, INTERVALO_MIN * 60)
+    ultimo = 0.0                      # ts do último post normal (0 = posta logo)
     while not _parar.is_set():
         try:
             a = _agora()
-            hhmm = a.strftime("%H:%M")
             dia = a.strftime("%Y-%m-%d")
+            hhmm = a.strftime("%H:%M")
             if dia != _estado["dia"]:
                 _reset_dia(dia)
+                ultimo = 0.0          # novo dia: pode postar já
             if notifier.ativo():
-                if hhmm in SLOTS and hhmm not in _estado["slots"]:
+                agora = _time.time()
+                # as 2 entradas de ~5% do dia (17:00 e 18:00, uma vez cada)
+                if hhmm in HORARIOS_5PCT and hhmm not in _estado["slots"]:
                     _estado["slots"].add(hhmm)
-                    postar_bet()
-                elif hhmm in SOCIAL_TIMES and hhmm not in _estado["social"]:
-                    _estado["social"].add(hhmm)
-                    postar_social()
+                    if postar_faixa(*FAIXA_5PCT, "5%"):
+                        ultimo = agora
+                # entrada normal (1-3%) a cada INTERVALO
+                elif agora - ultimo >= intervalo_seg:
+                    postar_faixa(*FAIXA_NORMAL, "1-3%")
+                    ultimo = agora    # respeita o intervalo mesmo se não achou
         except Exception as e:
             print("!! promo loop erro:", e)
         _parar.wait(30)
@@ -272,7 +283,8 @@ def iniciar():
     _parar.clear()
     _thread = threading.Thread(target=_loop, name="promo-telegram", daemon=True)
     _thread.start()
-    print(f">> Promo Telegram iniciado — posts em {', '.join(SLOTS)} (Brasília).")
+    print(f">> Promo Telegram iniciado — 1 entrada a cada {INTERVALO_MIN} min "
+          f"+ 5% em {', '.join(HORARIOS_5PCT)} (Brasília).")
 
 
 def parar():
