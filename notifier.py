@@ -144,6 +144,23 @@ def enviar_surebet(sb):
     return enviar_texto(formatar_surebet(sb))
 
 
+def criar_invite_link(nome):
+    """Cria um link de convite nomeado no canal (via bot). Retorna o link ou None."""
+    if not (config.TELEGRAM_BOT_TOKEN and config.TELEGRAM_CHAT_ID):
+        return None
+    try:
+        r = requests.post(API.format(token=config.TELEGRAM_BOT_TOKEN, metodo="createChatInviteLink"),
+                          json={"chat_id": config.TELEGRAM_CHAT_ID, "name": str(nome)[:32]}, timeout=15)
+        d = r.json()
+    except Exception as e:
+        print("!! criar_invite_link:", e)
+        return None
+    if d.get("ok"):
+        return (d.get("result") or {}).get("invite_link")
+    print("!! createChatInviteLink recusou:", str(d)[:200])
+    return None
+
+
 def descobrir_chats():
     """Lê os updates do bot (getUpdates) e lista os grupos que ele 'enxergou'
     — SEM postar nada. Quando você ADICIONA o bot a um grupo, o Telegram gera um

@@ -46,6 +46,7 @@ import lifecycle
 import notifier
 import pipeline
 import promo
+import tg_tracker
 
 BASE_DIR = Path(__file__).parent
 STATIC_DIR = BASE_DIR / "static"
@@ -81,10 +82,15 @@ async def lifespan(app):
         lifecycle.iniciar()           # fluxo de nutrição por e-mail (nudges pró)
     except Exception as e:
         print(f"!! Lifecycle de e-mail não iniciou: {e}")
+    try:
+        tg_tracker.iniciar()          # conta membros por link de campanha (Telegram)
+    except Exception as e:
+        print(f"!! Telegram tracker não iniciou: {e}")
     yield
     pipeline.parar_agendador()
     promo.parar()
     lifecycle.parar()
+    tg_tracker.parar()
 
 
 app = FastAPI(title="Surebet SaaS", version="0.1.0", lifespan=lifespan)
@@ -765,6 +771,59 @@ _MSG_BOASVINDAS = (
     "Essas são exclusivas do <b>PRO</b> 👉 https://sureradar.site\n\n\n"
     "⚠️ +18 • Aposte com responsabilidade"
 )
+
+
+@app.get("/api/admin/campanhas")
+def admin_campanhas(request: Request):
+    user = _usuario(request)
+    erro = _guard_admin(request, user)
+    if erro:
+        return erro
+    camps = auth.listar_campanhas()
+    for c in camps:
+        c["landing"] = config.SITE_URL + "/grupo?c=" + str(c["id"])
+        c["membros"] = int(c.get("membros") or 0)
+    return {"campanhas": camps}
+
+
+@app.post("/api/admin/campanhas")
+def admin_criar_campanha(request: Request, payload: dict = Body(...)):
+    user = _usuario(request)
+    erro = _guard_admin(request, user)
+    if erro:
+        return erro
+    nome = (payload.get("nome") or "").strip()[:60]
+    if len(nome) < 2:
+        return JSONResponse({"erro": "Dê um nome à campanha."}, status_code=400)
+    link = (payload.get("link") or "").strip()
+    if not link:                          # sem link colado -> o bot cria um novo
+        link = notifier.criar_invite_link(nome)
+        if not link:
+            return JSONResponse({"erro": "Não deu pra criar o link no Telegram. "
+                                 "Cole um link de convite existente, ou confira se o bot "
+                                 "é admin do canal com permissão de convidar."}, status_code=400)
+    cid = auth.criar_campanha(nome, link)
+    return {"ok": True, "id": cid, "link": link,
+            "landing": config.SITE_URL + "/grupo?c=" + str(cid)}
+
+
+@app.post("/api/admin/campanhas/excluir")
+def admin_excluir_campanha(request: Request, payload: dict = Body(...)):
+    user = _usuario(request)
+    erro = _guard_admin(request, user)
+    if erro:
+        return erro
+    try:
+        auth.excluir_campanha(int(payload.get("id")))
+    except (TypeError, ValueError):
+        return JSONResponse({"erro": "id inválido"}, status_code=400)
+    return {"ok": True}
+
+
+@app.get("/api/campanha-link")
+def campanha_link_pub(c: int = 0):
+    """Público: a landing /grupo pega o link de convite da campanha pra usar nos botões."""
+    return {"link": auth.campanha_link(c) if c else None}
 
 
 @app.api_route("/api/admin/postar-boasvindas", methods=["GET", "POST"])

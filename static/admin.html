@@ -102,6 +102,7 @@
       <a onclick="mostrarView('dash');setTimeout(()=>document.getElementById('sec-users').scrollIntoView({behavior:'smooth'}),60)"><span class="ic">👥</span> Assinantes</a>
       <a onclick="mostrarView('dash');setTimeout(()=>document.getElementById('sec-pag').scrollIntoView({behavior:'smooth'}),60)"><span class="ic">💳</span> Pagamentos</a>
       <a id="nav-tickets" onclick="mostrarView('tickets')"><span class="ic">🎫</span> Tickets <span id="nav-tk-badge" class="tab-badge" style="display:none"></span></a>
+      <a id="nav-camp" onclick="mostrarView('campanhas')"><span class="ic">📣</span> Campanhas</a>
       <a href="/app"><span class="ic">↗</span> Ir ao painel</a>
     </nav>
     <div class="bottom">SureRadar Admin<br>Atualizado em tempo real</div>
@@ -151,6 +152,20 @@
           <button class="mini tk-tab" data-st="resolvido">Resolvidos</button>
         </div>
         <div id="tickets"></div>
+      </div>
+    </div>
+
+    <!-- VIEW: campanhas -->
+    <div id="view-campanhas" style="display:none">
+      <div class="panel">
+        <h3>📣 Campanhas <small>membros REAIS por link</small></h3>
+        <p style="color:var(--text-dim);font-size:13px;margin:6px 0 14px">Crie 1 campanha por criativo/anúncio. O sistema gera um link de convite do Telegram e conta quantos <b style="color:var(--text)">membros entraram por ele</b>. Use a "landing" no anúncio do Facebook.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px">
+          <input id="camp-nome" class="search" style="flex:2;min-width:170px;margin:0" placeholder="Nome (ex.: FB Criativo 1)" />
+          <input id="camp-link" class="search" style="flex:2;min-width:170px;margin:0" placeholder="(opcional) colar link de convite existente" />
+          <button class="btn b-pro" id="camp-criar">+ Criar</button>
+        </div>
+        <div id="campanhas"></div>
       </div>
     </div>
   </main>
@@ -279,15 +294,55 @@ document.addEventListener("click",(e)=>{
 function escH(s){return (s||"").replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));}
 function dataBR(ts){return new Date(ts*1000).toLocaleDateString("pt-BR");}
 
-// ---- Views (dashboard x tickets) ----
+// ---- Views (dashboard / tickets / campanhas) ----
 function mostrarView(v){
-  $("#view-dash").style.display = v==="tickets" ? "none" : "";
+  $("#view-dash").style.display = v==="dash" ? "" : "none";
   $("#view-tickets").style.display = v==="tickets" ? "" : "none";
+  const vcamp=$("#view-campanhas"); if(vcamp) vcamp.style.display = v==="campanhas" ? "" : "none";
   document.querySelectorAll(".nav a").forEach(a=>a.classList.remove("on"));
-  (v==="tickets"?$("#nav-tickets"):$("#nav-dash")).classList.add("on");
-  $("#head-sub").textContent = v==="tickets" ? "Suporte — tickets dos usuários." : "Visão do negócio — receita, assinantes e crescimento.";
+  const nav = v==="tickets"?$("#nav-tickets") : v==="campanhas"?$("#nav-camp") : $("#nav-dash");
+  if(nav) nav.classList.add("on");
+  $("#head-sub").textContent = v==="tickets" ? "Suporte — tickets dos usuários."
+    : v==="campanhas" ? "Campanhas — membros reais por link de convite."
+    : "Visão do negócio — receita, assinantes e crescimento.";
   if(v==="tickets") loadTickets();
+  if(v==="campanhas") loadCampanhas();
 }
+
+// ---- Campanhas ----
+async function loadCampanhas(){
+  const r=await fetch("/api/admin/campanhas"); if(!r.ok) return;
+  const cs=(await r.json()).campanhas||[];
+  $("#campanhas").innerHTML = cs.length ? cs.map(c=>`
+    <div style="border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:12px;background:var(--bg)">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <b style="font-size:15px">${escH(c.nome)}</b>
+        <span style="font-weight:800;color:var(--green);font-size:20px">${c.membros}<span style="font-size:12px;color:var(--mute);font-weight:600"> membros</span></span>
+      </div>
+      <div style="margin-top:8px;font-size:12.5px;color:var(--dim)">📢 Use no anúncio: <a href="${c.landing}" target="_blank" style="color:var(--cyan)">${escH(c.landing)}</a></div>
+      <div style="margin-top:4px;font-size:11.5px;color:var(--mute);word-break:break-all">Link Telegram: ${escH(c.invite_link||"—")}</div>
+      <button class="btn b-pre" data-delcamp="${c.id}" style="margin-top:8px">Excluir</button>
+    </div>`).join("") : '<div class="empty">Nenhuma campanha ainda. Crie a primeira acima.</div>';
+}
+document.addEventListener("click",(e)=>{
+  if(e.target.id==="camp-criar"){
+    const nome=$("#camp-nome").value.trim(), link=$("#camp-link").value.trim();
+    if(nome.length<2){toast("Dê um nome à campanha.");return;}
+    e.target.disabled=true;
+    fetch("/api/admin/campanhas",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({nome,link})})
+      .then(r=>r.json().then(j=>({ok:r.ok,j}))).then(({ok,j})=>{
+        e.target.disabled=false;
+        if(!ok){toast("❌ "+(j.erro||"erro"));return;}
+        toast("✅ Campanha criada");$("#camp-nome").value="";$("#camp-link").value="";loadCampanhas();
+      }).catch(()=>{e.target.disabled=false;toast("❌ erro de conexão");});
+    return;
+  }
+  if(e.target.dataset.delcamp){
+    if(confirm("Excluir esta campanha? (o link do Telegram continua existindo)"))
+      fetch("/api/admin/campanhas/excluir",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:parseInt(e.target.dataset.delcamp)})}).then(()=>loadCampanhas());
+    return;
+  }
+});
 
 let TK_STATUS="aguardando";
 function tkThread(msgs){ return (msgs||[]).map(m=>{

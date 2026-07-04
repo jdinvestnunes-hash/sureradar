@@ -171,6 +171,17 @@
 <div class="sticky"><a class="cta" href="https://t.me/+tVGChSqLuqBmNGIx" id="ctaS">⚡ ENTRAR NO GRUPO GRÁTIS</a></div>
 
 <script>
+  // Se veio com ?c=<campanha>, usa o link de convite DAQUELA campanha (o Telegram
+  // conta quantos entraram por ele = membros reais por criativo/anúncio).
+  (function(){
+    var c = new URLSearchParams(location.search).get('c');
+    if (!c) return;
+    fetch('/api/campanha-link?c=' + encodeURIComponent(c))
+      .then(function(r){ return r.json(); })
+      .then(function(d){ if (d && d.link) document.querySelectorAll('a.cta').forEach(function(a){ a.href = d.link; }); })
+      .catch(function(){});
+  })();
+
   // dispara o evento Lead quando a pessoa clica pra entrar no grupo (conversão)
   document.querySelectorAll('a.cta').forEach(function(b){
     b.addEventListener('click', function(){

@@ -219,6 +219,18 @@ def init():
         c.execute(f"""CREATE TABLE IF NOT EXISTS posts_grupo(
             post_id TEXT PRIMARY KEY,
             criado {_NUM} NOT NULL)""")
+        # Campanhas de tráfego: cada uma tem um link de convite do Telegram e conta
+        # quantos MEMBROS entraram por ele (o bot atribui o join ao link usado).
+        c.execute(f"""CREATE TABLE IF NOT EXISTS campanhas(
+            id {_SERIAL},
+            nome TEXT NOT NULL,
+            invite_link TEXT,
+            membros {_NUM} NOT NULL DEFAULT 0,
+            criado {_NUM} NOT NULL)""")
+        try:
+            c.execute("CREATE INDEX IF NOT EXISTS ix_campanha_link ON campanhas(invite_link)")
+        except Exception:
+            pass
     # Migrações leves para bancos antigos: cada ALTER na SUA transação (no
     # Postgres, um erro aborta a transação inteira). Erro = coluna já existe.
     for tabela, coluna in [("checkouts", "pi TEXT"),
@@ -356,6 +368,39 @@ def post_ja_enviado(post_id):
     with _db() as c:
         row = c.execute(_q("SELECT 1 FROM posts_grupo WHERE post_id=?"), (str(post_id),)).fetchone()
     return row is not None
+
+
+def criar_campanha(nome, invite_link):
+    with _db() as c:
+        return _insert(c, "INSERT INTO campanhas(nome,invite_link,membros,criado) VALUES(?,?,?,?)",
+                       (nome, invite_link, 0, time.time()))
+
+
+def listar_campanhas():
+    with _db() as c:
+        rows = c.execute(_q("""SELECT id,nome,invite_link,membros,criado FROM campanhas
+                               ORDER BY criado DESC""")).fetchall()
+    return [dict(r) for r in rows]
+
+
+def campanha_link(cid):
+    with _db() as c:
+        row = c.execute(_q("SELECT invite_link FROM campanhas WHERE id=?"), (cid,)).fetchone()
+    return row["invite_link"] if row else None
+
+
+def incrementar_membro(invite_link):
+    """+1 na campanha cujo link foi usado pra entrar (chamado pelo tracker do bot)."""
+    try:
+        with _db() as c:
+            c.execute(_q("UPDATE campanhas SET membros=membros+1 WHERE invite_link=?"), (invite_link,))
+    except Exception as e:
+        print("!! incrementar_membro:", e)
+
+
+def excluir_campanha(cid):
+    with _db() as c:
+        c.execute(_q("DELETE FROM campanhas WHERE id=?"), (cid,))
 
 
 def registrar_post(post_id):
