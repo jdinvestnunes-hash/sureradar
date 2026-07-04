@@ -58,11 +58,12 @@ async def lifespan(app):
               "   O site sobe, mas login/cadastro ficam indisponíveis até corrigir o DATABASE_URL.")
     # Restaura o feed salvo no banco (o feed em memória zera a cada redeploy).
     try:
+        _carregar_catalogo()           # casas/esportes acumulados (sempre todas)
         cache = auth.feed_cache_get()
         if cache:
             feed.merge_surebets(cache, quando=pipeline._agora_iso() + " (cache)")
-            _recalcular_filtros()      # reconstrói casas/esportes/lucro do cache
             print(f">> Feed restaurado do cache: {len(cache)} surebets.")
+        _recalcular_filtros()          # filtro = catálogo inteiro (mesmo sem cache)
     except Exception as e:
         print(f"!! Falha ao restaurar feed do cache: {e}")
 
@@ -96,31 +97,54 @@ async def _private_network(request, call_next):
 INGESTED_BOOKS = []
 INGESTED_SPORTS = []
 INGESTED_PROFIT = {}
+# Catálogo ACUMULADO de casas/esportes já vistos (só cresce, nunca encolhe). O
+# filtro sempre mostra TODAS as casas já raspadas — mesmo que a atualização do
+# momento traga só algumas. Assim o usuário mantém as 26 casas fixas no controle
+# dele (marca/desmarca à vontade) e nunca perde uma casa por causa da raspagem.
+CASAS_CAT = {}     # bookmaker_key -> label
+SPORTS_CAT = {}    # sport_key -> label
+
+
+def _carregar_catalogo():
+    """Carrega o catálogo acumulado do banco (no startup, antes do 1º ingest)."""
+    try:
+        cat = auth.catalogo_get()
+        CASAS_CAT.update(cat.get("casas", {}))
+        SPORTS_CAT.update(cat.get("esportes", {}))
+    except Exception as e:
+        print("!! catalogo nao carregou:", e)
 
 
 def _recalcular_filtros(todos=None):
-    """Reconstrói as opções de filtro (casas/esportes/lucro) a partir do feed vivo.
+    """Atualiza as opções de filtro (casas/esportes/lucro).
 
-    Chamado no ingest E na restauração do cache (redeploy) — senão, depois de um
-    redeploy o feed volta mas as casas/esportes ficam vazios até o robô mandar o
-    próximo ciclo, e casas que só existem em apostas de alto lucro (BetBoom, etc.)
-    somem do filtro, zerando as oportunidades."""
+    As casas/esportes ESPELHAM o catálogo ACUMULADO (todas já vistas), não só o
+    feed do momento — senão uma raspagem parcial faz casas sumirem do filtro. A
+    faixa de lucro reflete o feed atual."""
     global INGESTED_BOOKS, INGESTED_SPORTS, INGESTED_PROFIT
     if todos is None:
         todos = feed.get_surebets()
-    if not todos:
-        return
-    casas, esportes = {}, {}
+    # acumula o que veio agora no catálogo (nunca remove)
+    mudou = False
     for c in todos:
-        esportes[c["sport"]] = SPORT_LABELS_PT.get(c["sport"], c["sport"])
+        if c["sport"] not in SPORTS_CAT:
+            SPORTS_CAT[c["sport"]] = SPORT_LABELS_PT.get(c["sport"], c["sport"]); mudou = True
         for l in c["legs"]:
-            casas[l["bookmaker"]] = l["bookmaker_label"]
+            if l["bookmaker"] not in CASAS_CAT:
+                CASAS_CAT[l["bookmaker"]] = l["bookmaker_label"]; mudou = True
+    # opções do filtro = catálogo inteiro (todas as casas/esportes já vistos)
     INGESTED_BOOKS = [{"key": k, "label": v} for k, v in
-                      sorted(casas.items(), key=lambda x: x[1].lower())]
+                      sorted(CASAS_CAT.items(), key=lambda x: x[1].lower())]
     INGESTED_SPORTS = [{"key": k, "label": v} for k, v in
-                       sorted(esportes.items(), key=lambda x: (x[0] != "Football", x[1]))]
-    vals = [c["profit_pct"] for c in todos]
-    INGESTED_PROFIT = {"min": 0, "max": round(max(vals) + 0.5, 1)}
+                       sorted(SPORTS_CAT.items(), key=lambda x: (x[0] != "Football", x[1]))]
+    if todos:
+        vals = [c["profit_pct"] for c in todos]
+        INGESTED_PROFIT = {"min": 0, "max": round(max(vals) + 0.5, 1)}
+    if mudou:                                  # persiste o catálogo que cresceu
+        try:
+            auth.catalogo_set({"casas": CASAS_CAT, "esportes": SPORTS_CAT})
+        except Exception:
+            pass
 
 
 # ---------------------------------------------------------------------------

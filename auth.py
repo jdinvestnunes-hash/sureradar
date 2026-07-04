@@ -399,6 +399,40 @@ def feed_cache_set(bets):
         print("!! feed_cache_set:", e)
 
 
+def catalogo_get():
+    """Catálogo ACUMULADO de casas/esportes já vistos (linha id=2). O filtro
+    sempre mostra TODAS as casas já raspadas — nunca encolhe, mesmo que uma
+    atualização traga só algumas casas. Sobrevive a redeploy."""
+    import json
+    try:
+        with _db() as c:
+            row = c.execute(_q("SELECT dados FROM feed_cache WHERE id=2")).fetchone()
+        if row:
+            d = json.loads(row["dados"])
+            if isinstance(d, dict):
+                return {"casas": d.get("casas", {}), "esportes": d.get("esportes", {})}
+    except Exception as e:
+        print("!! catalogo_get:", e)
+    return {"casas": {}, "esportes": {}}
+
+
+def catalogo_set(catalogo):
+    import json
+    dados = json.dumps(catalogo or {}, ensure_ascii=False)
+    agora = time.time()
+    try:
+        with _db() as c:
+            if PG:
+                c.execute(_q("""INSERT INTO feed_cache(id,dados,atualizado) VALUES(2,?,?)
+                               ON CONFLICT (id) DO UPDATE SET dados=EXCLUDED.dados,
+                               atualizado=EXCLUDED.atualizado"""), (dados, agora))
+            else:
+                c.execute("INSERT OR REPLACE INTO feed_cache(id,dados,atualizado) VALUES(2,?,?)",
+                          (dados, agora))
+    except Exception as e:
+        print("!! catalogo_set:", e)
+
+
 # ---------------------------------------------------------------------------
 # Banca (entradas lançadas pelo usuário) — persistida no banco
 # ---------------------------------------------------------------------------
