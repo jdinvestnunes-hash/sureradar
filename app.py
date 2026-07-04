@@ -826,6 +826,34 @@ def campanha_link_pub(c: int = 0):
     return {"link": auth.campanha_link(c) if c else None}
 
 
+_CAMPANHAS_SEED = ["FB Criativo 1 - Dor", "FB Criativo 2 - Desejo",
+                   "FB Criativo 3 - Urgencia", "FB Criativo 4 - Autoridade"]
+
+
+@app.api_route("/api/admin/seed-campanhas", methods=["GET", "POST"])
+def admin_seed_campanhas(request: Request):
+    """Cria de uma vez as 4 campanhas dos criativos (não duplica se já existir)."""
+    user = _usuario(request)
+    if not _admin_email(user):
+        return JSONResponse({"erro": "Faça login com seu e-mail de admin primeiro."},
+                            status_code=403)
+    existentes = {c["nome"] for c in auth.listar_campanhas()}
+    resultado = []
+    for nome in _CAMPANHAS_SEED:
+        if nome in existentes:
+            resultado.append({"nome": nome, "status": "já existia"})
+            continue
+        link = notifier.criar_invite_link(nome)
+        if link:
+            cid = auth.criar_campanha(nome, link)
+            resultado.append({"id": cid, "nome": nome,
+                              "landing": config.SITE_URL + "/grupo?c=" + str(cid), "link": link})
+        else:
+            resultado.append({"nome": nome, "erro": "não deu pra criar o link — "
+                             "confira se o bot é admin do canal com permissão de convidar."})
+    return {"resultado": resultado}
+
+
 @app.api_route("/api/admin/postar-boasvindas", methods=["GET", "POST"])
 def admin_postar_boasvindas(request: Request):
     """Posta a mensagem de boas-vindas (formatada) no canal configurado."""
@@ -1379,6 +1407,13 @@ def tela_calculadora(request: Request):
 def tela_grupo():
     """Squeeze page focada em entrar no grupo grátis do Telegram (tráfego Facebook)."""
     return FileResponse(STATIC_DIR / "grupo.html")
+
+
+@app.get("/oportunidade")
+@app.get("/metodo")
+def tela_oportunidade():
+    """Landing 'ponte' neutra (sem termos de aposta) p/ passar na revisão do Facebook."""
+    return FileResponse(STATIC_DIR / "oportunidade.html")
 
 
 @app.get("/termos")
