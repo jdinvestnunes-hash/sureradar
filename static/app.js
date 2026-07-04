@@ -481,7 +481,9 @@ function renderBanca() {
   const previsto = banca.reduce((s, e) => s + e.expected, 0);
   const realizado = banca.filter((e) => e.status === "concluida").reduce((s, e) => s + e.expected, 0);
   $("#bank-metrics").innerHTML = "";
-  [["Entradas", banca.length, ""], ["Total apostado", brl(apostado), "cyan"], ["Lucro previsto", brl(previsto), "green"], ["Lucro realizado", brl(realizado), "green"]]
+  [["Entradas", banca.length, ""], ["Total apostado", brl(apostado), "cyan"],
+   ["Lucro previsto", brl(previsto), previsto < 0 ? "red" : "green"],
+   ["Lucro realizado", brl(realizado), realizado < 0 ? "red" : "green"]]
     .forEach(([k, v, cls]) => { const c = el("div", "metric"); c.appendChild(el("div", "metric-label", k)); c.appendChild(el("div", "metric-val " + cls, v)); $("#bank-metrics").appendChild(c); });
 
   list.innerHTML = "";
@@ -518,7 +520,10 @@ function renderBanca() {
       saveBanca(); renderBanca();
     });
     stakeCol.appendChild(inp); row.appendChild(stakeCol);
-    const profCol = el("div", "bank-col"); profCol.appendChild(el("div", "k", "Lucro")); profCol.appendChild(el("div", "v green", "+" + brl(e.expected))); row.appendChild(profCol);
+    const profCol = el("div", "bank-col"); profCol.appendChild(el("div", "k", "Lucro"));
+    const neg = (e.expected || 0) < 0;
+    profCol.appendChild(el("div", "v " + (neg ? "red" : "green"), (neg ? "" : "+") + brl(e.expected)));
+    row.appendChild(profCol);
     const stBtn = el("button", "bank-status" + (e.status === "concluida" ? " done" : ""), e.status === "concluida" ? "✓ Concluída" : "Pendente");
     stBtn.addEventListener("click", () => { e.status = e.status === "concluida" ? "pendente" : "concluida"; saveBanca(); renderBanca(); });
     row.appendChild(stBtn);
