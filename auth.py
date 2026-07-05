@@ -219,6 +219,11 @@ def init():
         c.execute(f"""CREATE TABLE IF NOT EXISTS posts_grupo(
             post_id TEXT PRIMARY KEY,
             criado {_NUM} NOT NULL)""")
+        # Resumo diário do canal (nº de entradas + lucro somado) p/ o "boa noite".
+        c.execute(f"""CREATE TABLE IF NOT EXISTS dia_resumo(
+            dia TEXT PRIMARY KEY,
+            entradas {_NUM} NOT NULL DEFAULT 0,
+            lucro {_NUM} NOT NULL DEFAULT 0)""")
         # Campanhas de tráfego: cada uma tem um link de convite do Telegram e conta
         # quantos MEMBROS entraram por ele (o bot atribui o join ao link usado).
         c.execute(f"""CREATE TABLE IF NOT EXISTS campanhas(
@@ -368,6 +373,28 @@ def post_ja_enviado(post_id):
     with _db() as c:
         row = c.execute(_q("SELECT 1 FROM posts_grupo WHERE post_id=?"), (str(post_id),)).fetchone()
     return row is not None
+
+
+def somar_dia(dia, lucro):
+    """Acumula +1 entrada e +lucro no resumo do dia (pro 'boa noite')."""
+    try:
+        with _db() as c:
+            if PG:
+                c.execute(_q("""INSERT INTO dia_resumo(dia,entradas,lucro) VALUES(?,1,?)
+                    ON CONFLICT (dia) DO UPDATE SET entradas=dia_resumo.entradas+1,
+                    lucro=dia_resumo.lucro+EXCLUDED.lucro"""), (dia, lucro))
+            else:
+                c.execute("""INSERT INTO dia_resumo(dia,entradas,lucro) VALUES(?,1,?)
+                    ON CONFLICT(dia) DO UPDATE SET entradas=entradas+1, lucro=lucro+?""",
+                    (dia, lucro, lucro))
+    except Exception as e:
+        print("!! somar_dia:", e)
+
+
+def pegar_dia(dia):
+    with _db() as c:
+        row = c.execute(_q("SELECT entradas,lucro FROM dia_resumo WHERE dia=?"), (dia,)).fetchone()
+    return (int(row["entradas"]), float(row["lucro"])) if row else (0, 0.0)
 
 
 def criar_campanha(nome, invite_link):

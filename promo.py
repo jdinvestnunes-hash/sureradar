@@ -34,8 +34,40 @@ INTERVALO_MAX_MIN = int(getattr(config, "TELEGRAM_POST_MAX_MIN", 50))
 
 def _sortear_intervalo():
     return random.randint(INTERVALO_MIN_MIN, INTERVALO_MAX_MIN) * 60
-# Faixa de lucro das entradas do canal: 2% a 5%, sem horário fixo.
+# Faixa de lucro das entradas do canal: 2% a 5%.
 FAIXA_NORMAL = (2.0, 5.0)
+# Janela ativa (Brasília): entradas só entre HORA_INICIO e HORA_FIM. Fora disso, silêncio.
+HORA_INICIO = int(getattr(config, "TELEGRAM_HORA_INICIO", 8))
+HORA_FIM = int(getattr(config, "TELEGRAM_HORA_FIM", 23))
+
+# "Bom dia" variados — 1 por dia, rodando pela lista (não repete na semana).
+BOM_DIA = [
+    "☀️ <b>Bom dia, senhores!</b> Hoje começamos por aqui — as entradas já vão cair 👇",
+    "🌅 <b>Bom dia, time!</b> Mais um dia de green pela frente. Fica ligado 👇",
+    "☀️ <b>Bom dia!</b> Café na mão que as oportunidades de hoje já vêm 👇",
+    "🌅 <b>Bom dia, galera!</b> Dia novo, entradas novas. Bora travar uns lucros 👇",
+    "☀️ <b>Bom dia, senhores!</b> Começou o expediente. Que hoje seja dia de muito green 💚",
+    "🌅 <b>Bom dia!</b> Preparados? As entradas de hoje começam agora 👇",
+    "☀️ <b>Bom dia, time!</b> Bora fazer o dia render. Primeira entrada saindo 👇",
+]
+
+
+def _fmt(v):
+    return f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+def _bom_dia_msg(a):
+    return BOM_DIA[a.timetuple().tm_yday % len(BOM_DIA)]
+
+
+def _postar_boa_noite(dia):
+    ent, lucro = auth.pegar_dia(dia)
+    msg = ("🌙 <b>Boa noite, senhores!</b>\n\n"
+           f"Por hoje é isso — enviamos <b>{ent} entradas</b> hoje. 🎯\n\n"
+           f"💰 Quem pegou TODAS teve <b>R$ {_fmt(lucro)}</b> de lucro garantido "
+           f"(banca R$ 1.000 por entrada).\n\n"
+           f"Amanhã tem mais, a partir das <b>{HORA_INICIO:02d}h</b>. Bons greens! 💚")
+    notifier.enviar_texto(msg)
 # Preferência de casas (as 2 pernas); se não achar, relaxa.
 import re as _re
 _CASAS_OK = _re.compile(r"^(betano|bet365|superbet|stake|novibet)", _re.I)
@@ -64,7 +96,7 @@ SOCIAL_MSGS = [
 
 _parar = threading.Event()
 _thread = None
-_estado = {"dia": None, "slots": set(), "social": set(), "postados": set()}
+_estado = {"dia": None, "slots": set(), "social": set(), "postados": set(), "marcos": set()}
 _social_i = 0
 
 
@@ -73,7 +105,8 @@ def _agora():
 
 
 def _reset_dia(dia):
-    _estado.update({"dia": dia, "slots": set(), "social": set(), "postados": set()})
+    _estado.update({"dia": dia, "slots": set(), "social": set(),
+                    "postados": set(), "marcos": set()})
 
 
 def _pegar(cands):
@@ -222,6 +255,10 @@ def postar_faixa(lo, hi, rotulo):
     notifier.enviar_surebet(sb)      # já leva os links das casas + CTA no rodapé
     _estado["postados"].add(sb["id"])
     auth.registrar_post(sb["id"])    # PERSISTE — nunca reposta esta entrada
+    try:                              # soma no resumo do dia (banca R$1.000)
+        auth.somar_dia(_agora().strftime("%Y-%m-%d"), float(sb["profit_pct"]) * 10.0)
+    except Exception:
+        pass
     print(f">> promo: postou {rotulo} — {float(sb['profit_pct']):.2f}% {sb.get('event','')}")
     return True
 
@@ -267,12 +304,24 @@ def _loop():
         try:
             a = _agora()
             dia = a.strftime("%Y-%m-%d")
+            hhmm = a.strftime("%H:%M")
+            hora = a.hour
             if dia != _estado["dia"]:
                 _reset_dia(dia)
+                ultimo = 0.0
             if notifier.ativo():
                 agora = _time.time()
-                # 1 entrada de 2-5% a cada 30-50 min (sorteado), o dia todo
-                if agora - ultimo >= intervalo_seg:
+                # ☀️ BOM DIA às HORA_INICIO:00 (1x no dia) -> liga o fluxo
+                if hhmm == f"{HORA_INICIO:02d}:00" and "bomdia" not in _estado["marcos"]:
+                    _estado["marcos"].add("bomdia")
+                    notifier.enviar_texto(_bom_dia_msg(a))
+                    ultimo = 0.0
+                # 🌙 BOA NOITE às HORA_FIM:00 (1x no dia) -> resumo e para
+                elif hhmm == f"{HORA_FIM:02d}:00" and "boanoite" not in _estado["marcos"]:
+                    _estado["marcos"].add("boanoite")
+                    _postar_boa_noite(dia)
+                # 🎯 entradas 2-5% só na janela [HORA_INICIO, HORA_FIM), a cada 30-50 min
+                elif HORA_INICIO <= hora < HORA_FIM and agora - ultimo >= intervalo_seg:
                     postar_faixa(*FAIXA_NORMAL, "2-5%")
                     ultimo = agora
                     intervalo_seg = _sortear_intervalo()
@@ -292,8 +341,8 @@ def iniciar():
     _parar.clear()
     _thread = threading.Thread(target=_loop, name="promo-telegram", daemon=True)
     _thread.start()
-    print(f">> Promo Telegram iniciado — 1 entrada de 2-5% a cada "
-          f"{INTERVALO_MIN_MIN}-{INTERVALO_MAX_MIN} min.")
+    print(f">> Promo Telegram iniciado — entradas 2-5% a cada {INTERVALO_MIN_MIN}-"
+          f"{INTERVALO_MAX_MIN} min, das {HORA_INICIO:02d}h às {HORA_FIM:02d}h (bom dia/boa noite).")
 
 
 def parar():
