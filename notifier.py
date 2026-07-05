@@ -34,14 +34,15 @@ def _post(metodo, payload):
         return False
 
 
-def enviar_texto(texto):
+def enviar_texto(texto, preview=False):
+    """`preview=True` mostra a prévia do link (ex.: thumbnail do YouTube)."""
     if not ativo():
         return False
     return _post("sendMessage", {
         "chat_id": config.TELEGRAM_CHAT_ID,
         "text": texto,
         "parse_mode": "HTML",
-        "disable_web_page_preview": True,
+        "disable_web_page_preview": not preview,
     })
 
 

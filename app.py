@@ -854,6 +854,30 @@ def admin_seed_campanhas(request: Request):
     return {"resultado": resultado}
 
 
+_MSG_VIDEO = (
+    "🎬 <b>SAIU VÍDEO NOVO NO CANAL!</b> 🎬\n\n\n"
+    "🔥 <b>Série: DOS R$0 AOS R$500 COM SUREBET</b> 🔥\n\n\n"
+    "Tô mostrando na prática, passo a passo, como transformar uma banca pequena em "
+    "R$500 usando <b>SUREBET</b> — sem achismo, só matemática. 🧮\n\n"
+    "📺 É real, é transparente, e você acompanha cada entrada comigo.\n\n\n"
+    "👉 <b>ASSISTE AGORA:</b>\n"
+    "https://www.youtube.com/@AlquimiadoGreen\n\n\n"
+    "💚 Se inscreve no canal e ativa o 🔔 pra não perder os próximos — a meta é "
+    "chegar nos R$500 juntos!"
+)
+
+
+@app.api_route("/api/admin/postar-video", methods=["GET", "POST"])
+def admin_postar_video(request: Request):
+    """Posta o anúncio do vídeo novo (com prévia do YouTube) no canal."""
+    user = _usuario(request)
+    if not _admin_email(user):
+        return JSONResponse({"erro": "Faça login com seu e-mail de admin primeiro."},
+                            status_code=403)
+    ok = notifier.enviar_texto(_MSG_VIDEO, preview=True)
+    return {"ok": ok, "postou_em_chat_id": config.TELEGRAM_CHAT_ID or "(não configurado)"}
+
+
 @app.api_route("/api/admin/postar-boasvindas", methods=["GET", "POST"])
 def admin_postar_boasvindas(request: Request):
     """Posta a mensagem de boas-vindas (formatada) no canal configurado."""
