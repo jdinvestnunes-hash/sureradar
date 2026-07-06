@@ -194,6 +194,12 @@
 </div>
 
 <script>
+// captura a ORIGEM (utm_source/ref) e guarda num cookie p/ carimbar no cadastro
+try{
+  var _p = new URLSearchParams(location.search);
+  var _src = _p.get('utm_source') || _p.get('ref') || _p.get('fonte');
+  if (_src) document.cookie = 'sr_origem=' + encodeURIComponent(_src.slice(0,40)) + ';path=/;max-age=' + (60*60*24*60) + ';samesite=lax';
+}catch(e){}
 let MODO = 'cadastro';
 const $ = s => document.querySelector(s);
 

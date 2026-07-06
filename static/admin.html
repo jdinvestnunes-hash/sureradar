@@ -251,8 +251,9 @@ function renderUsuarios(){
     const pro=u.plano==="pro";
     const badge=pro?(u.aviso_renovar?'<span class="tag t-warn">PRO · vence</span>':'<span class="tag t-pro">PRO</span>'):'<span class="tag t-free">FREE</span>';
     const dias=pro&&u.dias!=null?`<div class="u-dias">${u.dias} dia(s) restante(s)</div>`:"";
+    const origem=u.origem?`<span style="display:inline-block;margin-left:6px;background:rgba(56,212,245,.14);color:var(--cyan);font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:99px">📍 ${escH(u.origem)}</span>`:`<span style="display:inline-block;margin-left:6px;color:var(--mute);font-size:10.5px">📍 direto/orgânico</span>`;
     return `<div class="u" data-email="${u.email}">
-      <div class="u-info"><div class="u-nome">${u.nome} ${badge}</div><div class="u-email">${u.email}</div>${dias}</div>
+      <div class="u-info"><div class="u-nome">${u.nome} ${badge}</div><div class="u-email">${u.email}${origem}</div>${dias}</div>
       <div class="ctrl">
         <button class="btn b-pre" data-dias="30">+30d</button>
         <button class="btn b-pre" data-dias="365">+365d</button>

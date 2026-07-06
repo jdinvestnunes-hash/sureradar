@@ -546,6 +546,12 @@
 </div></footer>
 
 <script>
+// captura a ORIGEM (utm_source/ref) e guarda num cookie p/ carimbar no cadastro
+try{
+  var _pl = new URLSearchParams(location.search);
+  var _sl = _pl.get('utm_source') || _pl.get('ref') || _pl.get('fonte');
+  if (_sl) document.cookie = 'sr_origem=' + encodeURIComponent(_sl.slice(0,40)) + ';path=/;max-age=' + (60*60*24*60) + ';samesite=lax';
+}catch(e){}
 // duplica o ticker para o loop ficar contínuo
 const tk = document.getElementById('tk');
 tk.innerHTML += tk.innerHTML;

@@ -249,7 +249,7 @@ def register(background_tasks: BackgroundTasks, request: Request, payload: dict 
                             status_code=429)
     user, erro = auth.criar_usuario(
         payload.get("nome", ""), payload.get("email", ""), payload.get("senha", ""),
-        payload.get("whatsapp", ""))
+        payload.get("whatsapp", ""), request.cookies.get("sr_origem", ""))
     if erro:
         return JSONResponse({"erro": erro}, status_code=400)
     # NÃO loga: manda o e-mail de confirmação; a conta só libera após confirmar.
@@ -400,7 +400,8 @@ def google_callback(request: Request, background_tasks: BackgroundTasks, code: s
     email = info.get("email")
     if not email:
         return RedirectResponse("/login?erro=google", status_code=302)
-    user, novo = auth.pegar_ou_criar_google(email, info.get("name", ""))
+    user, novo = auth.pegar_ou_criar_google(email, info.get("name", ""),
+                                            request.cookies.get("sr_origem", ""))
     if novo:
         background_tasks.add_task(emailer.enviar_boas_vindas, user["email"], user["nome"])
     resp = RedirectResponse("/app", status_code=302)

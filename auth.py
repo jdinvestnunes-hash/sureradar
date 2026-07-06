@@ -243,7 +243,8 @@ def init():
                            ("users", "whatsapp TEXT"),
                            ("users", f"email_verificado {_NUM} DEFAULT 1"),
                            ("users", f"email_optout {_NUM} DEFAULT 0"),
-                           ("users", "unsub_token TEXT")]:
+                           ("users", "unsub_token TEXT"),
+                           ("users", "origem TEXT")]:
         try:
             with _db() as c:
                 c.execute(f"ALTER TABLE {tabela} ADD COLUMN {coluna}")
@@ -573,7 +574,7 @@ def listar_usuarios():
     """Todos os usuários (para o painel admin), do mais novo ao mais antigo."""
     with _db() as c:
         rows = c.execute(
-            "SELECT id, nome, email, plano, plano_expira, criado FROM users ORDER BY criado DESC"
+            "SELECT id, nome, email, plano, plano_expira, origem, criado FROM users ORDER BY criado DESC"
         ).fetchall()
     return [dict(r) for r in rows]
 
@@ -871,10 +872,11 @@ def banca_set(user_id: int, entradas: list):
 # ---------------------------------------------------------------------------
 # Cadastro / login
 # ---------------------------------------------------------------------------
-def criar_usuario(nome: str, email: str, senha: str, whatsapp: str = ""):
+def criar_usuario(nome: str, email: str, senha: str, whatsapp: str = "", origem: str = ""):
     nome = (nome or "").strip()
     email = (email or "").strip().lower()
     whats = "".join(ch for ch in (whatsapp or "") if ch.isdigit())
+    origem = (origem or "").strip()[:40] or None
     if len(nome) < 2:
         return None, "Digite seu nome."
     if "@" not in email or "." not in email.split("@")[-1]:
@@ -887,25 +889,26 @@ def criar_usuario(nome: str, email: str, senha: str, whatsapp: str = ""):
     try:
         with _db() as c:
             uid = _insert(c,
-                "INSERT INTO users(nome,email,whatsapp,hash,salt,plano,email_verificado,criado) VALUES(?,?,?,?,?,?,?,?)",
-                (nome, email, whats, _hash(senha, salt), salt, "free", 0, time.time()))
+                "INSERT INTO users(nome,email,whatsapp,origem,hash,salt,plano,email_verificado,criado) VALUES(?,?,?,?,?,?,?,?,?)",
+                (nome, email, whats, origem, _hash(senha, salt), salt, "free", 0, time.time()))
     except UNIQUE_ERR:
         return None, "Este e-mail já tem conta. Faça login."
     return {"id": uid, "nome": nome, "email": email, "plano": "free", "plano_expira": None}, None
 
 
-def pegar_ou_criar_google(email: str, nome: str):
+def pegar_ou_criar_google(email: str, nome: str, origem: str = ""):
     """Login com Google: acha o usuário pelo e-mail ou cria um novo (plano free)."""
     email = (email or "").strip().lower()
     nome = (nome or "").strip() or email.split("@")[0]
+    origem = (origem or "").strip()[:40] or None
     with _db() as c:
         row = c.execute(_q("SELECT * FROM users WHERE email=?"), (email,)).fetchone()
         if row:
             return _perfil(row), False       # já existia
         salt = secrets.token_bytes(16)
         uid = _insert(c,
-            "INSERT INTO users(nome,email,hash,salt,plano,email_verificado,criado) VALUES(?,?,?,?,?,?,?)",
-            (nome, email, _hash(secrets.token_hex(24), salt), salt, "free", 1, time.time()))
+            "INSERT INTO users(nome,email,origem,hash,salt,plano,email_verificado,criado) VALUES(?,?,?,?,?,?,?,?)",
+            (nome, email, origem, _hash(secrets.token_hex(24), salt), salt, "free", 1, time.time()))
     return {"id": uid, "nome": nome, "email": email, "plano": "free", "plano_expira": None}, True
 
 

@@ -115,10 +115,11 @@ def formatar_surebet(sb):
         })
         linhas.append("")
         linhas.append(f'🧮 <b>Tem outra banca?</b> Calcule 👉 '
-                      f'<a href="{config.SITE_URL}/calculadora?{qs}">abrir calculadora</a>')
+                      f'<a href="{config.SITE_URL}/calculadora?{qs}&utm_source=telegram">abrir calculadora</a>')
     if getattr(config, "SITE_URL", ""):
         linhas.append("")
-        linhas.append(f'🆓 <b>Crie sua conta grátis aqui</b> 👉 <a href="{config.SITE_URL}">{config.SITE_URL}</a>')
+        linhas.append(f'🆓 <b>Crie sua conta grátis aqui</b> 👉 '
+                      f'<a href="{config.SITE_URL}/cadastro?utm_source=telegram">{config.SITE_URL}</a>')
     linhas.append("")
     linhas.append("❓ Dúvidas? Chama no @alquimistadogreen")
     return "\n".join(linhas)

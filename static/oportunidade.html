@@ -121,6 +121,12 @@
 
 <script>
   (function(){
+    // captura a ORIGEM (utm_source/ref) e guarda num cookie p/ carimbar no cadastro
+    try{
+      var pp = new URLSearchParams(location.search);
+      var src = pp.get('utm_source') || pp.get('ref') || pp.get('fonte');
+      if (src) document.cookie = 'sr_origem=' + encodeURIComponent(src.slice(0,40)) + ';path=/;max-age=' + (60*60*24*60) + ';samesite=lax';
+    }catch(e){}
     var c = new URLSearchParams(location.search).get('c');
     if (c) {
       fetch('/api/campanha-link?c=' + encodeURIComponent(c))
