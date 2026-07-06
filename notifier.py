@@ -119,6 +119,8 @@ def formatar_surebet(sb):
     if getattr(config, "SITE_URL", ""):
         linhas.append("")
         linhas.append(f'🆓 <b>Crie sua conta grátis aqui</b> 👉 <a href="{config.SITE_URL}">{config.SITE_URL}</a>')
+    linhas.append("")
+    linhas.append("❓ Dúvidas? Chama no @alquimistadogreen")
     return "\n".join(linhas)
 
 
