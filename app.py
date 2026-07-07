@@ -1392,6 +1392,10 @@ def sitemap():
            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
            '<url><loc>https://sureradar.site/</loc>'
            '<changefreq>daily</changefreq><priority>1.0</priority></url>'
+           '<url><loc>https://sureradar.site/calculadora</loc>'
+           '<changefreq>weekly</changefreq><priority>0.9</priority></url>'
+           '<url><loc>https://sureradar.site/grupo</loc>'
+           '<changefreq>weekly</changefreq><priority>0.7</priority></url>'
            '</urlset>')
     return Response(xml, media_type="application/xml")
 
@@ -1418,12 +1422,9 @@ def tela_redefinir():
 
 @app.get("/calculadora")
 def tela_calculadora(request: Request):
-    """Calculadora fica DENTRO do app (aba). Quem não tem conta é mandado a criar
-    uma grátis; logado, abre a aba Calculadora já com as odds do link (Telegram)."""
-    if not _usuario(request):
-        return RedirectResponse("/cadastro", status_code=302)
-    qs = request.url.query
-    return RedirectResponse("/app?view=calc" + ("&" + qs if qs else ""), status_code=302)
+    """Página PÚBLICA da calculadora (SEO: 'calculadora surebet'). Funciona pra todo
+    mundo, sem login, e aceita odds pela URL (?o1=..&o2=..) vindas do Telegram."""
+    return FileResponse(STATIC_DIR / "calculadora.html")
 
 
 @app.get("/grupo")

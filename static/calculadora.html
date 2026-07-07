@@ -3,9 +3,52 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Calculadora de Surebet — SureRadar</title>
-  <meta name="description" content="Calcule quanto apostar em cada casa pra travar o lucro, com a banca que você tem." />
+  <title>Calculadora de Surebet Grátis — Quanto Apostar em Cada Casa | SureRadar</title>
+  <meta name="description" content="Calculadora de surebet grátis e em português: informe as odds e a sua banca que ela divide o valor entre as casas pra travar o lucro — ganhe quem ganhar. Sem cadastro." />
+  <link rel="canonical" href="https://sureradar.site/calculadora" />
+  <meta name="robots" content="index, follow" />
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg" />
+  <!-- Open Graph -->
+  <meta property="og:title" content="Calculadora de Surebet Grátis — Quanto Apostar em Cada Casa" />
+  <meta property="og:description" content="Coloque as odds e a sua banca. A calculadora divide os valores pra você travar o lucro nas apostas de arbitragem." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://sureradar.site/calculadora" />
+  <meta name="twitter:card" content="summary" />
+  <!-- Google tag (gtag.js) - Google Ads -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=AW-17915571478"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'AW-17915571478');
+  </script>
+  <!-- Dados estruturados: aplicativo + FAQ (ajuda o Google a entender e mostrar rich results) -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "Calculadora de Surebet",
+    "url": "https://sureradar.site/calculadora",
+    "applicationCategory": "FinanceApplication",
+    "operatingSystem": "Web",
+    "inLanguage": "pt-BR",
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "BRL" },
+    "description": "Calculadora de surebet gratuita: informe as odds de cada casa e a sua banca para dividir os valores e travar o lucro."
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {"@type":"Question","name":"O que é uma surebet?","acceptedAnswer":{"@type":"Answer","text":"Surebet (ou aposta segura/arbitragem) acontece quando as odds de casas diferentes para o mesmo jogo permitem apostar em todos os resultados e garantir lucro, dê no que der. A calculadora mostra quanto colocar em cada casa."}},
+      {"@type":"Question","name":"A calculadora de surebet é grátis?","acceptedAnswer":{"@type":"Answer","text":"Sim, é 100% gratuita e não precisa criar conta para usar. Você informa as odds e a banca e ela calcula na hora."}},
+      {"@type":"Question","name":"Como sei quanto apostar em cada casa?","acceptedAnswer":{"@type":"Answer","text":"Digite a odd de cada casa e o total que quer apostar (sua banca). A calculadora divide o valor proporcionalmente para o retorno ser igual em qualquer resultado, travando o lucro."}},
+      {"@type":"Question","name":"Preciso de quantas casas de aposta?","acceptedAnswer":{"@type":"Answer","text":"No mínimo duas, cada uma cobrindo um resultado do jogo. Quanto mais casas você tiver conta, mais oportunidades de surebet vai encontrar."}},
+      {"@type":"Question","name":"Surebet tem risco?","acceptedAnswer":{"@type":"Answer","text":"O lucro é matemático enquanto as odds seguem as apostadas. Os riscos reais são práticos: a odd mudar antes de você apostar, errar o valor, ou a casa limitar/cancelar a aposta. Por isso confira tudo antes de confirmar."}}
+    ]
+  }
+  </script>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@700;800&family=Inter:wght@400;500;600;700;800&display=swap" media="print" onload="this.media='all'" />
   <style>
     :root{--bg:#05070d;--card:#0e1421;--card2:#121a2b;--line:#1b2740;--line2:#27395c;
@@ -14,16 +57,16 @@
     *{box-sizing:border-box;margin:0;padding:0}
     body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100vh}
     a{color:inherit;text-decoration:none}
-    nav{border-bottom:1px solid var(--line);background:rgba(5,7,13,.8);backdrop-filter:blur(12px)}
-    .navin{max-width:640px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;height:60px;padding:0 20px}
+    nav{border-bottom:1px solid var(--line);background:rgba(5,7,13,.8);backdrop-filter:blur(12px);position:sticky;top:0;z-index:10}
+    .navin{max-width:680px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;height:60px;padding:0 20px}
     .brand{font-family:var(--fd);font-weight:800;font-size:19px}.brand span{color:var(--green)}
     .navin a.back{font-size:13.5px;color:var(--dim)}
-    .wrap{max-width:640px;margin:0 auto;padding:28px 20px 70px}
-    h1{font-family:var(--fd);font-size:26px;font-weight:800;letter-spacing:-.02em}
-    .sub{color:var(--dim);font-size:14.5px;margin:8px 0 26px;line-height:1.55}
+    .wrap{max-width:680px;margin:0 auto;padding:28px 20px 70px}
+    h1{font-family:var(--fd);font-size:28px;font-weight:800;letter-spacing:-.02em;line-height:1.15}
+    .sub{color:var(--dim);font-size:15px;margin:10px 0 26px;line-height:1.6}
+    .sub b{color:var(--text)}
     .card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:22px}
     .lbl{font-size:11.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--mute);margin-bottom:8px}
-    .row{display:flex;gap:12px;align-items:flex-end}
     .fld{flex:1;margin-bottom:16px}
     input{width:100%;background:var(--bg);border:1px solid var(--line2);border-radius:11px;padding:13px 14px;color:var(--text);font-size:15px;font-family:var(--fb);outline:none}
     input:focus{border-color:var(--cyan)}
@@ -44,20 +87,47 @@
     .result .lb{color:var(--dim);font-size:13.5px;margin-top:2px}
     .result .pct{display:inline-block;margin-top:10px;background:rgba(46,230,168,.15);color:var(--green);font-weight:800;font-size:14px;padding:5px 14px;border-radius:99px}
     .result.bad .pct{background:rgba(255,107,107,.15);color:var(--red)}
-    .foot{margin-top:22px;text-align:center}
-    .foot a{color:var(--green);font-size:13.5px}
     .hint{color:var(--mute);font-size:12.5px;text-align:center;margin-top:10px}
+    .foot{margin-top:18px;text-align:center}
+    .foot a{color:var(--green);font-size:14px;font-weight:600}
+    /* conteúdo SEO */
+    .content{margin-top:44px}
+    .content h2{font-family:var(--fd);font-size:21px;font-weight:800;margin:30px 0 10px;letter-spacing:-.01em}
+    .content h3{font-size:16px;font-weight:800;margin:18px 0 6px;color:var(--text)}
+    .content p{color:var(--dim);font-size:15px;line-height:1.72;margin-bottom:12px}
+    .content ol,.content ul{color:var(--dim);font-size:15px;line-height:1.72;margin:0 0 14px 22px}
+    .content li{margin-bottom:7px}
+    .content b{color:var(--text)}
+    .content code{background:var(--card2);padding:2px 7px;border-radius:6px;font-size:13.5px;color:var(--cyan);font-family:ui-monospace,monospace}
+    .ex{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin:14px 0}
+    .ex .row2{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line);font-size:14.5px;color:var(--dim)}
+    .ex .row2:last-child{border-bottom:none}
+    .ex .row2 b{color:var(--text)}
+    .ex .win{color:var(--green);font-weight:800}
+    .cta-box{background:linear-gradient(160deg,rgba(46,230,168,.1),var(--card));border:1px solid rgba(46,230,168,.35);border-radius:16px;padding:24px 20px;text-align:center;margin:30px 0}
+    .cta-box h2{margin:0 0 6px;font-size:20px}
+    .cta-box p{margin-bottom:6px}
+    .cta-box a.btn{display:inline-block;margin-top:12px;background:var(--grad);color:#052015;font-weight:800;padding:14px 26px;border-radius:12px;font-family:var(--fd);font-size:15px}
+    .faq{margin-top:6px}
+    .faq details{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:15px 17px;margin-bottom:10px}
+    .faq summary{font-weight:700;font-size:15px;cursor:pointer;list-style:none}
+    .faq summary::-webkit-details-marker{display:none}
+    .faq summary::before{content:"＋ ";color:var(--cyan);font-weight:800}
+    .faq details[open] summary::before{content:"− "}
+    .faq p{color:var(--dim);font-size:14.5px;margin-top:10px;line-height:1.65}
+    footer{border-top:1px solid var(--line);text-align:center;padding:26px 20px 90px;color:var(--mute);font-size:12.5px;line-height:1.7}
+    footer a{color:var(--dim)}
   </style>
 </head>
 <body>
 <nav><div class="navin">
   <a href="/" class="brand">Sure<span>Radar</span></a>
-  <a href="/app" class="back">Ir para o painel →</a>
+  <a href="/cadastro" class="back">Criar conta grátis →</a>
 </div></nav>
 
 <div class="wrap">
   <h1>Calculadora de Surebet</h1>
-  <p class="sub">Coloque as <b style="color:var(--text)">odds</b> de cada casa e <b style="color:var(--text)">quanto você quer apostar no total</b> (sua banca). A gente divide certinho pra travar o lucro — dê no que der.</p>
+  <p class="sub">Coloque as <b>odds</b> de cada casa e <b>quanto você quer apostar no total</b> (sua banca). A calculadora divide os valores certinho para você <b>travar o lucro</b> — ganhe quem ganhar. Grátis, em português e <b>sem precisar criar conta</b>.</p>
 
   <div class="card">
     <!-- Perna 1 -->
@@ -100,9 +170,65 @@
   </div>
 
   <div class="foot">
-    <a href="/cadastro">Quer as entradas prontas todo dia? Crie sua conta grátis →</a>
+    <a href="/cadastro">Quer as surebets já prontas todo dia, sem procurar? Crie sua conta grátis →</a>
   </div>
+
+  <!-- CONTEÚDO SEO -->
+  <article class="content">
+    <h2>O que é uma surebet?</h2>
+    <p>Uma <b>surebet</b> (também chamada de <b>aposta segura</b> ou <b>arbitragem esportiva</b>) acontece quando casas de aposta diferentes oferecem <b>odds altas o suficiente</b> para o mesmo jogo, de modo que dá para apostar em <b>todos os resultados possíveis</b> e sair no lucro — não importa quem ganhe.</p>
+    <p>O segredo não é "adivinhar" o resultado, é <b>matemática</b>: você distribui o valor entre as casas de forma que o retorno seja o mesmo em qualquer cenário, e esse retorno é <b>maior do que o total apostado</b>. A <b>calculadora de surebet</b> acima faz exatamente essa divisão para você.</p>
+
+    <h2>Como usar a calculadora de surebet</h2>
+    <ol>
+      <li>Digite a <b>odd</b> de cada casa nos campos <b>Casa 1</b> e <b>Casa 2</b> (cada casa cobre um resultado do jogo).</li>
+      <li>Informe o <b>total que você quer apostar</b> — a sua banca.</li>
+      <li>A calculadora divide automaticamente e mostra <b>quanto apostar em cada casa</b> e o <b>lucro garantido</b>.</li>
+      <li>Se quiser valores redondos, use os botões <b>Arredondar R$1 / R$5 / R$10</b>. O botão <b>⚖ Equilibrar</b> reparte de novo pra igualar o retorno dos dois lados.</li>
+    </ol>
+    <p>Se o resultado aparecer <b>verde</b>, é surebet: lucro travado. Se aparecer <b>vermelho</b>, aquelas odds não fecham lucro — é só ajustar.</p>
+
+    <h2>A fórmula da surebet (como saber se existe)</h2>
+    <p>Some o <b>inverso de cada odd</b> (<code>1 ÷ odd</code>). Se a soma for <b>menor que 1</b> (ou 100%), existe surebet. A diferença para 100% é, aproximadamente, o seu lucro.</p>
+    <p>Exemplo com odds <code>2.50</code> e <code>2.02</code>:</p>
+    <ul>
+      <li><code>1 ÷ 2.50 = 0,40</code> (40%)</li>
+      <li><code>1 ÷ 2.02 = 0,495</code> (49,5%)</li>
+      <li>Soma = <b>0,895 (89,5%)</b> → menor que 100%, então <b>é surebet</b>, com cerca de <b>10,5% de margem</b>.</li>
+    </ul>
+
+    <h2>Exemplo prático</h2>
+    <p>Digamos que você tem <b>R$ 1.000</b> de banca e achou as odds abaixo em duas casas:</p>
+    <div class="ex">
+      <div class="row2"><span>Casa A — odd <b>2.50</b></span><span>apostar <b>R$ 446,85</b></span></div>
+      <div class="row2"><span>Casa B — odd <b>2.02</b></span><span>apostar <b>R$ 553,15</b></span></div>
+      <div class="row2"><span>Se a Casa A ganhar</span><span class="win">recebe ~R$ 1.117</span></div>
+      <div class="row2"><span>Se a Casa B ganhar</span><span class="win">recebe ~R$ 1.117</span></div>
+      <div class="row2"><span><b>Lucro garantido</b></span><span class="win">~R$ 117 (11,7%)</span></div>
+    </div>
+    <p>Ganhe quem ganhar, você recebe cerca de R$ 1.117 sobre os R$ 1.000 apostados. Esse é o poder da arbitragem — e a calculadora faz essa conta em segundos.</p>
+
+    <div class="cta-box">
+      <h2>Cansou de procurar surebet na mão?</h2>
+      <p>No <b>SureRadar</b> a gente varre as casas o dia todo e te entrega as <b>oportunidades já calculadas</b>, prontas pra apostar.</p>
+      <a class="btn" href="/cadastro">Criar minha conta grátis</a>
+    </div>
+
+    <h2>Perguntas frequentes</h2>
+    <div class="faq">
+      <details><summary>A calculadora de surebet é grátis?</summary><p>Sim, é 100% gratuita e você <b>não precisa criar conta</b> para usar. Informe as odds e a banca e ela calcula na hora.</p></details>
+      <details><summary>Preciso de quantas casas de aposta?</summary><p>No mínimo <b>duas</b>, cada uma cobrindo um resultado. Quanto mais casas você tiver conta, mais surebets vai encontrar.</p></details>
+      <details><summary>O que é o botão "Equilibrar"?</summary><p>Ele redistribui os valores entre as casas pra que o <b>retorno seja igual</b> ganhe quem ganhar, usando o total que você informou como banca.</p></details>
+      <details><summary>Surebet tem risco?</summary><p>O lucro é matemático <b>enquanto as odds seguem as que você apostou</b>. Os riscos são práticos: a odd mudar antes de você confirmar, errar o valor digitado, ou a casa limitar/cancelar a aposta. Sempre confira tudo antes de confirmar em cada casa.</p></details>
+      <details><summary>Dá pra usar no celular?</summary><p>Sim. A calculadora funciona direto no navegador do celular, sem instalar nada.</p></details>
+    </div>
+  </article>
 </div>
+
+<footer>
+  <a href="/">SureRadar</a> · <a href="/grupo">Grupo grátis no Telegram</a> · <a href="/cadastro">Criar conta</a> · <a href="/termos">Termos</a> · <a href="/privacidade">Privacidade</a>
+  <div style="margin-top:10px">Conteúdo informativo. Aposte com responsabilidade. Para maiores de 18 anos.</div>
+</footer>
 
 <script>
 const $ = s => document.getElementById(s);
