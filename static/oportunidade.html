@@ -143,7 +143,10 @@
         .catch(function(){});
     }
     document.querySelectorAll('a.cta').forEach(function(b){
-      b.addEventListener('click', function(){ if (window.fbq) fbq('track', 'Lead', { content_name: 'grupo-oportunidade' }); });
+      b.addEventListener('click', function(){
+        if (window.fbq) fbq('track', 'Lead', { content_name: 'grupo-oportunidade' });
+        if (window.gtag) gtag('event', 'conversion', { 'send_to': 'AW-17915571478/NByWCLCV6sscEJba595C' });
+      });
     });
   })();
 </script>

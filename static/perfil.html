@@ -6,6 +6,14 @@
   <title>Meu perfil — SureRadar</title>
   <meta name="robots" content="noindex" />
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg" />
+  <!-- Google tag (gtag.js) - Google Ads -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=AW-17915571478"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'AW-17915571478');
+  </script>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" media="print" onload="this.media='all'" />
   <style>
     :root{
@@ -156,6 +164,20 @@ async function load(){
   $("#av").textContent = (d.nome||"?").trim()[0].toUpperCase();
   $("#nm").textContent = d.nome;
   $("#em").textContent = d.email;
+
+  // conversão de COMPRA (Google Ads) — dispara uma vez ao voltar do pagamento (?pago=1)
+  try {
+    const _p = new URLSearchParams(location.search);
+    if (_p.get("pago") === "1" && window.gtag) {
+      const _val = (d.dias != null && d.dias > 60) ? 497.0 : 97.0; // anual vs mensal
+      gtag('event', 'conversion', {
+        'send_to': 'AW-17915571478/_s7-CK2V6sscEJba595C',
+        'value': _val, 'currency': 'BRL',
+        'transaction_id': 'pro-' + (d.email || '') + '-' + (d.expira || '')
+      });
+      history.replaceState(null, '', '/perfil'); // evita contar de novo se recarregar
+    }
+  } catch (e) {}
 
   // WhatsApp editável (prefill do cadastro; contas Google preenchem aqui)
   const waIn = $("#wa-input"), waMsg = $("#wa-msg");

@@ -318,6 +318,8 @@ $('#form').addEventListener('submit', async (e) => {
       erro.style.color = ''; erro.textContent = j.erro || 'Algo deu errado. Tente de novo.';
       erro.style.display = 'block'; btn.disabled = false; return;
     }
+    // conversão de CADASTRO (Google Ads) — conta criada com sucesso
+    if (MODO === 'cadastro' && window.gtag) gtag('event', 'conversion', { 'send_to': 'AW-17915571478/KL7cCKqV6sscEJba595C' });
     if (MODO === 'cadastro' && j.precisa_confirmar) { mostrarConfirmar(j.email || body.email); btn.disabled = false; return; }
     location.href = '/app';
   } catch {
