@@ -1401,6 +1401,12 @@ def sitemap():
            '<changefreq>daily</changefreq><priority>1.0</priority></url>'
            '<url><loc>https://sureradar.site/calculadora</loc>'
            '<changefreq>weekly</changefreq><priority>0.9</priority></url>'
+           '<url><loc>https://sureradar.site/o-que-e-surebet</loc>'
+           '<changefreq>monthly</changefreq><priority>0.8</priority></url>'
+           '<url><loc>https://sureradar.site/arbitragem-esportiva</loc>'
+           '<changefreq>monthly</changefreq><priority>0.8</priority></url>'
+           '<url><loc>https://sureradar.site/aposta-segura</loc>'
+           '<changefreq>monthly</changefreq><priority>0.8</priority></url>'
            '<url><loc>https://sureradar.site/grupo</loc>'
            '<changefreq>weekly</changefreq><priority>0.7</priority></url>'
            '</urlset>')
@@ -1432,6 +1438,24 @@ def tela_calculadora(request: Request):
     """Página PÚBLICA da calculadora (SEO: 'calculadora surebet'). Funciona pra todo
     mundo, sem login, e aceita odds pela URL (?o1=..&o2=..) vindas do Telegram."""
     return FileResponse(STATIC_DIR / "calculadora.html")
+
+
+@app.get("/o-que-e-surebet")
+def artigo_oque():
+    """Artigo SEO: 'o que é surebet'."""
+    return FileResponse(STATIC_DIR / "o-que-e-surebet.html")
+
+
+@app.get("/arbitragem-esportiva")
+def artigo_arbitragem():
+    """Artigo SEO: 'arbitragem esportiva'."""
+    return FileResponse(STATIC_DIR / "arbitragem-esportiva.html")
+
+
+@app.get("/aposta-segura")
+def artigo_aposta_segura():
+    """Artigo SEO: 'aposta segura / aposta sem risco'."""
+    return FileResponse(STATIC_DIR / "aposta-segura.html")
 
 
 @app.get("/grupo")
