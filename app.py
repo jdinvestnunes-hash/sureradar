@@ -51,6 +51,26 @@ import tg_tracker
 BASE_DIR = Path(__file__).parent
 STATIC_DIR = BASE_DIR / "static"
 
+# Plano de conteúdo de SEO (blog). Cada linha: slug, título, arquivo, data prevista,
+# já_publicado. As páginas com arquivo existente e publicado=0 são RASCUNHOS: aparecem
+# no calendário do /admin e vão ao ar quando você clica "Publicar". As sem arquivo ainda
+# são "a criar". Publicar entra no sitemap automaticamente.
+PLANO_SEO = [
+    ("calculadora", "Calculadora de Surebet", "calculadora.html", "2026-07-07", 1),
+    ("o-que-e-surebet", "O que é surebet?", "o-que-e-surebet.html", "2026-07-07", 1),
+    ("arbitragem-esportiva", "Arbitragem esportiva: guia completo", "arbitragem-esportiva.html", "2026-07-07", 1),
+    ("aposta-segura", "Aposta segura existe?", "aposta-segura.html", "2026-07-07", 1),
+    ("como-fazer-surebet", "Como fazer surebet (passo a passo)", "como-fazer-surebet.html", "2026-07-14", 0),
+    ("melhores-casas-de-aposta", "Melhores casas de aposta para surebet", "melhores-casas-de-aposta.html", "2026-07-16", 0),
+    ("software-surebet", "Software de surebet: vale a pena?", "software-surebet.html", "2026-07-18", 0),
+    ("surebet-ao-vivo", "Surebet ao vivo (live)", "surebet-ao-vivo.html", "2026-07-21", 0),
+    ("surebet-bet365", "Surebet na Bet365", "surebet-bet365.html", "2026-07-23", 0),
+    ("renda-extra-apostas", "Renda extra com apostas", "renda-extra-apostas.html", "2026-07-25", 0),
+    ("surebet-brasil", "Surebet no Brasil", "surebet-brasil.html", "2026-07-28", 0),
+    ("apostas-seguras", "Apostas seguras: como escolher", "apostas-seguras.html", "2026-07-30", 0),
+    ("grupo-de-surebet", "Grupo de surebet no Telegram", "grupo-de-surebet.html", "2026-08-01", 0),
+]
+
 
 @asynccontextmanager
 async def lifespan(app):
@@ -62,6 +82,11 @@ async def lifespan(app):
     except Exception as e:
         print(f"!! FALHA ao conectar no banco: {e}\n"
               "   O site sobe, mas login/cadastro ficam indisponíveis até corrigir o DATABASE_URL.")
+    try:
+        for slug, titulo, arq, data, pub in PLANO_SEO:
+            auth.seed_pagina(slug, titulo, arq, data, pub)
+    except Exception as e:
+        print(f"!! seed do plano de SEO falhou: {e}")
     # Restaura o feed salvo no banco (o feed em memória zera a cada redeploy).
     try:
         _carregar_catalogo()           # casas/esportes acumulados (sempre todas)
@@ -821,6 +846,38 @@ def admin_excluir_campanha(request: Request, payload: dict = Body(...)):
     return {"ok": True}
 
 
+@app.get("/api/admin/conteudo")
+def admin_conteudo(request: Request):
+    """Calendário de conteúdo de SEO: lista as páginas do plano com status."""
+    user = _usuario(request)
+    erro = _guard_admin(request, user)
+    if erro:
+        return erro
+    pgs = auth.listar_paginas()
+    for p in pgs:
+        p["pronto"] = (STATIC_DIR / p["arquivo"]).exists()   # rascunho já escrito?
+        p["url"] = "https://sureradar.site/" + p["slug"]
+    return {"paginas": pgs}
+
+
+@app.post("/api/admin/conteudo/publicar")
+def admin_conteudo_publicar(request: Request, payload: dict = Body(...)):
+    """Publica (ou despublica) uma página de SEO pelo /admin com um clique."""
+    user = _usuario(request)
+    erro = _guard_admin(request, user)
+    if erro:
+        return erro
+    slug = (payload.get("slug") or "").strip()
+    publicar = bool(payload.get("publicar", True))
+    row = next((p for p in auth.listar_paginas() if p["slug"] == slug), None)
+    if not row:
+        return JSONResponse({"erro": "página não encontrada"}, status_code=404)
+    if publicar and not (STATIC_DIR / row["arquivo"]).exists():
+        return JSONResponse({"erro": "essa página ainda não foi criada"}, status_code=400)
+    auth.publicar_pagina(slug, publicar)
+    return {"ok": True, "publicado": publicar}
+
+
 @app.get("/api/campanha-link")
 def campanha_link_pub(c: int = 0):
     """Público: a landing /grupo pega o link de convite da campanha pra usar nos botões."""
@@ -1395,21 +1452,21 @@ def robots():
 
 @app.get("/sitemap.xml")
 def sitemap():
+    urls = ['<url><loc>https://sureradar.site/</loc>'
+            '<changefreq>daily</changefreq><priority>1.0</priority></url>',
+            '<url><loc>https://sureradar.site/grupo</loc>'
+            '<changefreq>weekly</changefreq><priority>0.7</priority></url>']
+    try:
+        for p in auth.listar_paginas():
+            if p["publicado"]:
+                prio = "0.9" if p["slug"] == "calculadora" else "0.8"
+                urls.append(f'<url><loc>https://sureradar.site/{p["slug"]}</loc>'
+                            f'<changefreq>weekly</changefreq><priority>{prio}</priority></url>')
+    except Exception:
+        pass
     xml = ('<?xml version="1.0" encoding="UTF-8"?>'
            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
-           '<url><loc>https://sureradar.site/</loc>'
-           '<changefreq>daily</changefreq><priority>1.0</priority></url>'
-           '<url><loc>https://sureradar.site/calculadora</loc>'
-           '<changefreq>weekly</changefreq><priority>0.9</priority></url>'
-           '<url><loc>https://sureradar.site/o-que-e-surebet</loc>'
-           '<changefreq>monthly</changefreq><priority>0.8</priority></url>'
-           '<url><loc>https://sureradar.site/arbitragem-esportiva</loc>'
-           '<changefreq>monthly</changefreq><priority>0.8</priority></url>'
-           '<url><loc>https://sureradar.site/aposta-segura</loc>'
-           '<changefreq>monthly</changefreq><priority>0.8</priority></url>'
-           '<url><loc>https://sureradar.site/grupo</loc>'
-           '<changefreq>weekly</changefreq><priority>0.7</priority></url>'
-           '</urlset>')
+           + "".join(urls) + '</urlset>')
     return Response(xml, media_type="application/xml")
 
 
@@ -1440,22 +1497,42 @@ def tela_calculadora(request: Request):
     return FileResponse(STATIC_DIR / "calculadora.html")
 
 
+def _seo_page(slug, arquivo):
+    """Serve uma página de SEO só se ela estiver PUBLICADA (controlado no /admin).
+    Rascunho ainda não publicado responde 404 (não vaza pro Google antes da hora)."""
+    if not auth.pagina_publicada(slug):
+        return Response("Página não encontrada.", status_code=404, media_type="text/html")
+    return FileResponse(STATIC_DIR / arquivo)
+
+
 @app.get("/o-que-e-surebet")
 def artigo_oque():
-    """Artigo SEO: 'o que é surebet'."""
-    return FileResponse(STATIC_DIR / "o-que-e-surebet.html")
+    return _seo_page("o-que-e-surebet", "o-que-e-surebet.html")
 
 
 @app.get("/arbitragem-esportiva")
 def artigo_arbitragem():
-    """Artigo SEO: 'arbitragem esportiva'."""
-    return FileResponse(STATIC_DIR / "arbitragem-esportiva.html")
+    return _seo_page("arbitragem-esportiva", "arbitragem-esportiva.html")
 
 
 @app.get("/aposta-segura")
 def artigo_aposta_segura():
-    """Artigo SEO: 'aposta segura / aposta sem risco'."""
-    return FileResponse(STATIC_DIR / "aposta-segura.html")
+    return _seo_page("aposta-segura", "aposta-segura.html")
+
+
+@app.get("/como-fazer-surebet")
+def artigo_como_fazer():
+    return _seo_page("como-fazer-surebet", "como-fazer-surebet.html")
+
+
+@app.get("/melhores-casas-de-aposta")
+def artigo_casas():
+    return _seo_page("melhores-casas-de-aposta", "melhores-casas-de-aposta.html")
+
+
+@app.get("/software-surebet")
+def artigo_software():
+    return _seo_page("software-surebet", "software-surebet.html")
 
 
 @app.get("/grupo")

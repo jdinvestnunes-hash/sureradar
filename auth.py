@@ -242,6 +242,14 @@ def init():
             dia TEXT NOT NULL,
             qtd INTEGER NOT NULL DEFAULT 0,
             PRIMARY KEY(campanha_id, dia))""")
+        # Páginas de SEO (blog): calendário de conteúdo com publicação por clique no /admin.
+        c.execute("""CREATE TABLE IF NOT EXISTS paginas_seo(
+            slug TEXT PRIMARY KEY,
+            titulo TEXT NOT NULL,
+            arquivo TEXT NOT NULL,
+            data_prevista TEXT,
+            publicado INTEGER NOT NULL DEFAULT 0,
+            publicado_em TEXT)""")
     # Migrações leves para bancos antigos: cada ALTER na SUA transação (no
     # Postgres, um erro aborta a transação inteira). Erro = coluna já existe.
     for tabela, coluna in [("checkouts", "pi TEXT"),
@@ -408,6 +416,44 @@ def criar_campanha(nome, invite_link):
     with _db() as c:
         return _insert(c, "INSERT INTO campanhas(nome,invite_link,membros,criado) VALUES(?,?,?,?)",
                        (nome, invite_link, 0, time.time()))
+
+
+# ---------- Páginas de SEO / calendário de conteúdo ----------
+def seed_pagina(slug, titulo, arquivo, data_prevista, publicado=0):
+    """Registra (ou atualiza os metadados de) uma página do plano de SEO.
+    O estado 'publicado' só é gravado na 1ª vez — publicações manuais são preservadas."""
+    with _db() as c:
+        c.execute(_q("""INSERT INTO paginas_seo(slug,titulo,arquivo,data_prevista,publicado)
+            VALUES(?,?,?,?,?)
+            ON CONFLICT(slug) DO UPDATE SET titulo=excluded.titulo,
+                arquivo=excluded.arquivo, data_prevista=excluded.data_prevista"""),
+            (slug, titulo, arquivo, data_prevista, 1 if publicado else 0))
+
+
+def listar_paginas():
+    with _db() as c:
+        rows = c.execute("""SELECT slug,titulo,arquivo,data_prevista,publicado,publicado_em
+                            FROM paginas_seo ORDER BY data_prevista ASC, slug ASC""").fetchall()
+    out = []
+    for r in rows:
+        d = dict(r)
+        d["publicado"] = bool(d["publicado"])
+        out.append(d)
+    return out
+
+
+def publicar_pagina(slug, publicar=True):
+    with _db() as c:
+        c.execute(_q("UPDATE paginas_seo SET publicado=?, publicado_em=? WHERE slug=?"),
+                  (1 if publicar else 0, _dia_br() if publicar else None, slug))
+
+
+def pagina_publicada(slug):
+    """True se a página pode ser servida. Fail-open: slug não gerenciado = público
+    (não quebra páginas antigas). Só esconde quando há linha marcada publicado=0."""
+    with _db() as c:
+        row = c.execute(_q("SELECT publicado FROM paginas_seo WHERE slug=?"), (slug,)).fetchone()
+    return True if row is None else bool(row["publicado"])
 
 
 def _dia_br():
