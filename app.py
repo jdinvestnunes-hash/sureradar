@@ -1372,6 +1372,13 @@ def favicon():
     return FileResponse(STATIC_DIR / "favicon.svg", media_type="image/svg+xml")
 
 
+@app.get("/google86846e3b0041cec2.html")
+def google_site_verification():
+    """Verificação de posse do site no Google Search Console (método Arquivo HTML)."""
+    return Response("google-site-verification: google86846e3b0041cec2.html",
+                    media_type="text/html")
+
+
 @app.get("/robots.txt")
 def robots():
     txt = (
