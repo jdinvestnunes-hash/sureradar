@@ -236,6 +236,12 @@ def init():
             c.execute("CREATE INDEX IF NOT EXISTS ix_campanha_link ON campanhas(invite_link)")
         except Exception:
             pass
+        # Membros por DIA de cada campanha (pra ver a evolução dia a dia no /admin).
+        c.execute("""CREATE TABLE IF NOT EXISTS campanha_dia(
+            campanha_id BIGINT NOT NULL,
+            dia TEXT NOT NULL,
+            qtd INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY(campanha_id, dia))""")
     # Migrações leves para bancos antigos: cada ALTER na SUA transação (no
     # Postgres, um erro aborta a transação inteira). Erro = coluna já existe.
     for tabela, coluna in [("checkouts", "pi TEXT"),
@@ -404,11 +410,32 @@ def criar_campanha(nome, invite_link):
                        (nome, invite_link, 0, time.time()))
 
 
+def _dia_br():
+    """Dia de hoje no fuso de Brasília (YYYY-MM-DD), pra agrupar entradas por dia."""
+    try:
+        from zoneinfo import ZoneInfo
+        from datetime import datetime
+        return datetime.now(ZoneInfo("America/Sao_Paulo")).strftime("%Y-%m-%d")
+    except Exception:
+        from datetime import datetime, timezone, timedelta
+        return (datetime.now(timezone.utc) - timedelta(hours=3)).strftime("%Y-%m-%d")
+
+
 def listar_campanhas():
     with _db() as c:
         rows = c.execute(_q("""SELECT id,nome,invite_link,membros,criado FROM campanhas
                                ORDER BY criado DESC""")).fetchall()
-    return [dict(r) for r in rows]
+        dias = c.execute(_q("""SELECT campanha_id,dia,qtd FROM campanha_dia
+                               ORDER BY dia DESC""")).fetchall()
+    por_camp = {}
+    for d in dias:
+        por_camp.setdefault(d["campanha_id"], []).append({"dia": d["dia"], "qtd": int(d["qtd"])})
+    out = []
+    for r in rows:
+        item = dict(r)
+        item["por_dia"] = por_camp.get(r["id"], [])
+        out.append(item)
+    return out
 
 
 def campanha_link(cid):
@@ -418,10 +445,24 @@ def campanha_link(cid):
 
 
 def incrementar_membro(invite_link):
-    """+1 na campanha cujo link foi usado pra entrar (chamado pelo tracker do bot)."""
+    """+1 na campanha cujo link foi usado pra entrar (chamado pelo tracker do bot).
+    Registra também no dia de hoje (campanha_dia) pra ver a evolução dia a dia."""
     try:
         with _db() as c:
-            c.execute(_q("UPDATE campanhas SET membros=membros+1 WHERE invite_link=?"), (invite_link,))
+            row = c.execute(_q("SELECT id FROM campanhas WHERE invite_link=?"),
+                            (invite_link,)).fetchone()
+            if not row:
+                return
+            cid = row["id"]
+            c.execute(_q("UPDATE campanhas SET membros=membros+1 WHERE id=?"), (cid,))
+            dia = _dia_br()
+            if PG:
+                c.execute(_q("""INSERT INTO campanha_dia(campanha_id,dia,qtd) VALUES(?,?,1)
+                    ON CONFLICT (campanha_id,dia) DO UPDATE SET qtd=campanha_dia.qtd+1"""),
+                    (cid, dia))
+            else:
+                c.execute("""INSERT INTO campanha_dia(campanha_id,dia,qtd) VALUES(?,?,1)
+                    ON CONFLICT(campanha_id,dia) DO UPDATE SET qtd=qtd+1""", (cid, dia))
     except Exception as e:
         print("!! incrementar_membro:", e)
 
