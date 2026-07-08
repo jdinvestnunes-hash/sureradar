@@ -891,9 +891,21 @@ def admin_conteudo_publicar(request: Request, payload: dict = Body(...)):
 
 
 def _norm_nome(s):
-    """Normaliza nome pra casar campanha interna x conjunto do Facebook."""
-    s = unicodedata.normalize("NFKD", (s or "")).encode("ascii", "ignore").decode()
-    return " ".join(s.lower().split())
+    """Normaliza nome pra casar campanha interna x conjunto do Facebook.
+    Remove acentos, caixa, e os marcadores de duplicata do Facebook ('Cópia'/'Copy'
+    e o número que os segue) — assim 'Video CTV 1 — Cópia 2' casa com 'Video CTV 1'."""
+    s = unicodedata.normalize("NFKD", (s or "")).encode("ascii", "ignore").decode().lower()
+    out, pular_num = [], False
+    for t in s.split():
+        if t in ("copia", "copy"):
+            pular_num = True
+            continue
+        if pular_num and t.isdigit():
+            pular_num = False
+            continue
+        pular_num = False
+        out.append(t)
+    return " ".join(out)
 
 
 _BR_TZ = timezone(timedelta(hours=-3))
@@ -935,32 +947,50 @@ def admin_fb_gastos(request: Request, preset: str = "hoje", level: str = "adset"
         return JSONResponse({"configurado": True, "erro": str(e)}, status_code=502)
     por_nome = {_norm_nome(c["nome"]): c for c in auth.listar_campanhas()}
     dias_set = _dias_do_periodo(preset)
-    linhas = []
-    tot_gasto = tot_membros = tot_leads = tot_cliques = 0.0
-    membros_conhecidos = 0   # membros só das linhas que casaram (pra custo médio justo)
-    gasto_casado = 0.0
+    # Agrupa os conjuntos do FB pela campanha interna (soma as cópias); o que não
+    # casa com nenhuma campanha aqui fica solto (sem membros).
+    grupos, soltas = {}, []
     for g in gastos:
         c = por_nome.get(_norm_nome(g["nome"]))
-        matched = c is not None
-        membros = _membros_no_periodo(c, dias_set) if matched else None
-        membros_total = int(c["membros"]) if matched else None   # todos, desde sempre
-        cpm = round(g["gasto"] / membros, 2) if (membros and membros > 0) else None
-        tot_gasto += g["gasto"]
-        tot_leads += g.get("leads_fb", 0)
-        tot_cliques += g.get("cliques", 0)
-        if matched:
-            tot_membros += (membros or 0)
-            if (membros or 0) > 0:
-                membros_conhecidos += membros
-                gasto_casado += g["gasto"]
-        linhas.append({**g, "matched": matched, "membros": membros,
-                       "membros_total": membros_total, "custo_por_membro": cpm,
-                       "campanha_id": c["id"] if c else None})
+        if c:
+            grp = grupos.get(c["id"])
+            if grp is None:
+                grp = grupos[c["id"]] = {
+                    "nome": c["nome"], "gasto": 0.0, "leads_fb": 0, "cliques": 0,
+                    "impressoes": 0, "conjuntos": 0, "matched": True, "campanha_id": c["id"],
+                    "membros": _membros_no_periodo(c, dias_set),
+                    "membros_total": int(c["membros"]),
+                }
+            grp["gasto"] += g["gasto"]
+            grp["leads_fb"] += g.get("leads_fb", 0)
+            grp["cliques"] += g.get("cliques", 0)
+            grp["impressoes"] += g.get("impressoes", 0)
+            grp["conjuntos"] += 1
+        else:
+            soltas.append({**g, "matched": False, "membros": None,
+                           "membros_total": None, "custo_por_membro": None, "conjuntos": 1})
+    linhas = []
+    tot_membros = membros_conhecidos = 0
+    gasto_casado = 0.0
+    for grp in grupos.values():
+        grp["gasto"] = round(grp["gasto"], 2)
+        m = grp["membros"] or 0
+        grp["custo_por_membro"] = round(grp["gasto"] / m, 2) if m > 0 else None
+        tot_membros += m
+        if m > 0:
+            membros_conhecidos += m
+            gasto_casado += grp["gasto"]
+        linhas.append(grp)
+    linhas.extend(soltas)
+    tot_gasto = round(sum(r["gasto"] for r in linhas), 2)
+    tot_leads = sum(r.get("leads_fb", 0) for r in linhas)
+    tot_cliques = sum(r.get("cliques", 0) for r in linhas)
+    linhas.sort(key=lambda x: x["gasto"], reverse=True)
     custo_medio = round(gasto_casado / membros_conhecidos, 2) if membros_conhecidos else None
     return {
         "configurado": True, "preset": preset, "level": level,
         "kpis": {
-            "gasto": round(tot_gasto, 2),
+            "gasto": tot_gasto,
             "membros": int(tot_membros),
             "leads_fb": int(tot_leads),
             "cliques": int(tot_cliques),
