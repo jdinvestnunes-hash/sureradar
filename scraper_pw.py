@@ -60,10 +60,11 @@ JS_RASPAR = r"""
     const nome = book.textContent.trim();
     let sport = "";
     if (bk) { const p = bk.textContent.split("\n").map(s=>s.trim()).filter(s=>s&&s!==nome); sport = p.length?p[p.length-1]:""; }
-    // descrição humana do mercado (o balãozinho): tenta title/aria em .coeff e filhos
-    const tip = (e)=> e ? (e.getAttribute("title")||e.getAttribute("data-original-title")||e.getAttribute("aria-label")||"") : "";
-    let desc = tip(co);
-    if (!desc && co) { const h = co.querySelector("[title],[data-original-title],[aria-label]"); desc = tip(h); }
+    // descrição humana do mercado = tooltip do <abbr> dentro do .coeff.
+    // Bootstrap 5 guarda o texto em data-bs-original-title (antes de iniciar, em title).
+    const ab = co ? co.querySelector("abbr") : null;
+    const tip = (e)=> e ? (e.getAttribute("data-bs-original-title")||e.getAttribute("title")||e.getAttribute("aria-label")||"") : "";
+    let desc = tip(ab) || tip(co);
     return { bookmaker: nome, market: co?co.textContent.trim():"", odd, desc: (desc||"").trim(),
       teams: ev?((ev.querySelector("a")||ev).textContent||"").trim():"", sport,
       link: vl?vl.href:null };
