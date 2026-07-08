@@ -60,7 +60,11 @@ JS_RASPAR = r"""
     const nome = book.textContent.trim();
     let sport = "";
     if (bk) { const p = bk.textContent.split("\n").map(s=>s.trim()).filter(s=>s&&s!==nome); sport = p.length?p[p.length-1]:""; }
-    return { bookmaker: nome, market: co?co.textContent.trim():"", odd,
+    // descrição humana do mercado (o balãozinho): tenta title/aria em .coeff e filhos
+    const tip = (e)=> e ? (e.getAttribute("title")||e.getAttribute("data-original-title")||e.getAttribute("aria-label")||"") : "";
+    let desc = tip(co);
+    if (!desc && co) { const h = co.querySelector("[title],[data-original-title],[aria-label]"); desc = tip(h); }
+    return { bookmaker: nome, market: co?co.textContent.trim():"", odd, desc: (desc||"").trim(),
       teams: ev?((ev.querySelector("a")||ev).textContent||"").trim():"", sport,
       link: vl?vl.href:null };
   }).filter(Boolean);

@@ -268,7 +268,13 @@ function opEl(sb, teaser) {
   sb.legs.forEach((l) => {
     const box = el("div", "op-box");
     const main = el("div", "op-box-main");
-    main.appendChild(el("div", "op-box-label", l.outcome));
+    // rótulo legível (ex.: "AC d'Escaldes — classificação"); código técnico fica pequeno embaixo
+    main.appendChild(el("div", "op-box-label", l.desc || l.outcome));
+    if (l.desc && l.outcome && l.desc !== l.outcome) {
+      const codeEl = el("div", null, l.outcome);
+      codeEl.style.cssText = "font-size:11px;color:var(--muted,#647388);margin-top:2px";
+      main.appendChild(codeEl);
+    }
     const book = el("div", "op-box-book");
     book.appendChild(el("span", null, l.bookmaker_label || l.bookmaker));
     // só mostra "ir para a casa" se o link for da CASA (nunca surebet.com)

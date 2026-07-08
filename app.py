@@ -1263,6 +1263,46 @@ def _sem_link_surebet(lista):
     return limpos
 
 
+def _split_teams(teams):
+    """Separa 'Time A – Time B' em (Time A, Time B)."""
+    for sep in (" – ", " — ", " vs ", " x ", " X ", " - "):
+        if sep in teams:
+            a, b = teams.split(sep, 1)
+            return a.strip(), b.strip()
+    return teams.strip(), ""
+
+
+_MKT_SUBS = [
+    ("classificações", "classificação"), ("classificação", "classificação"),
+    ("TE + DP", "prorrogação + pênaltis"), ("TE+DP", "prorrogação + pênaltis"),
+    ("sem empate", "empate anula"),
+    ("Mais de", "acima de"), ("Menos de", "abaixo de"),
+    ("ambas marcam", "ambas marcam"),
+]
+
+
+def _mercado_legivel(code, t1="", t2=""):
+    """Deixa o código de mercado do surebet mais claro (fallback quando não veio a
+    descrição do balão). Conservador: prefixa o TIME certo e traduz termos conhecidos,
+    sem inventar semântica. O código técnico continua visível no painel."""
+    if not code:
+        return ""
+    partes = code.strip().split()
+    lado = partes[0].lower() if partes else ""
+    nome = {
+        "1": t1 or "Casa", "2": t2 or "Fora", "x": "Empate",
+        "1x": f"{t1 or 'Casa'} ou empate", "12": f"{t1 or 'Casa'} ou {t2 or 'Fora'}",
+        "x2": f"empate ou {t2 or 'Fora'}",
+    }.get(lado)
+    resto = " ".join(partes[1:]) if (nome and len(partes) > 1) else ("" if nome else code)
+    for a, b in _MKT_SUBS:
+        resto = resto.replace(a, b)
+    resto = resto.replace(" - ", " · ").strip(" ·-")
+    if nome:
+        return f"{nome} — {resto}".strip(" —") if resto else nome
+    return resto
+
+
 def _converter_raspagem(records):
     """Converte os registros raspados do DOM da surebet.com no contrato do painel."""
     contratos = []
@@ -1281,11 +1321,17 @@ def _converter_raspagem(records):
             continue   # descarta anomalias (escanteios bugados de 30-400%)
         banca = config.BANCA
         margem = sum(1.0 / o for o in odds)
+        teams = max((l.get("teams", "") for l in legs), key=len)
+        t1, t2 = _split_teams(teams)
         pernas = []
         for l, o in zip(legs, odds):
             stake = banca * (1.0 / o) / margem
+            code = l.get("market", "")
+            # descrição legível: usa o balão do surebet se veio; senão traduz o código
+            desc = (l.get("desc") or "").strip() or _mercado_legivel(code, t1, t2)
             pernas.append({
-                "outcome": l.get("market", ""),
+                "outcome": code,
+                "desc": desc,
                 "odd": round(o, 3),
                 "bookmaker": _slug(l.get("bookmaker", "")),
                 "bookmaker_label": l.get("bookmaker", ""),
@@ -1294,7 +1340,6 @@ def _converter_raspagem(records):
                 "stake_brl": round(stake, 2),
                 "link": _link_casa(l.get("link")),   # só link da casa; nunca surebet.com
             })
-        teams = max((l.get("teams", "") for l in legs), key=len)
         sport = _norm_sport(legs[0].get("sport", ""))
         if sport == "?":   # raspagem sem esporte: tenta deduzir pelo mercado
             sport = _inferir_sport([l.get("market", "") for l in legs]) or "?"
