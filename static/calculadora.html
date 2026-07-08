@@ -231,6 +231,14 @@
 </footer>
 
 <script>
+// captura ORIGEM (utm_source, ex.: youtube) e CAMPANHA (c/utm_campaign) p/ carimbar no cadastro
+try{
+  var _pc = new URLSearchParams(location.search);
+  var _sc = _pc.get('utm_source') || _pc.get('ref') || _pc.get('fonte');
+  if (_sc) document.cookie = 'sr_origem=' + encodeURIComponent(_sc.slice(0,40)) + ';path=/;max-age=' + (60*60*24*60) + ';samesite=lax';
+  var _cc = _pc.get('c') || _pc.get('utm_campaign');
+  if (_cc) document.cookie = 'sr_camp=' + encodeURIComponent(String(_cc).slice(0,40)) + ';path=/;max-age=' + (60*60*24*60) + ';samesite=lax';
+}catch(e){}
 const $ = s => document.getElementById(s);
 const num = v => {
   v = (v||"").toString().trim();
