@@ -438,7 +438,7 @@ def google_callback(request: Request, background_tasks: BackgroundTasks, code: s
 
 
 @app.get("/api/health")
-def health():
+def health(fb: int = 0):
     """Diagnóstico: qual banco está em uso e se a conexão funciona (sem expor segredos)."""
     info = {"db_type": "postgres" if auth.PG else "sqlite", "db_ok": False}
     try:
@@ -469,6 +469,15 @@ def health():
         "chat_id": bool(config.TELEGRAM_CHAT_ID),
         "promo_ativo": config.PROMO_ATIVO,
     }
+    # Facebook Ads: só faz a chamada real à API do Meta com ?fb=1 (não expõe o gasto).
+    info["facebook"] = {"configurado": meta_ads.configurado()}
+    if fb and meta_ads.configurado():
+        t = meta_ads.testar()
+        info["facebook"]["token_ok"] = bool(t.get("ok"))
+        if t.get("ok"):
+            info["facebook"]["conjuntos"] = t.get("conjuntos")
+        else:
+            info["facebook"]["erro"] = t.get("erro", "")
     return info
 
 
