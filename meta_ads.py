@@ -47,7 +47,7 @@ def gastos(preset="hoje", level="adset"):
     url = f"{_BASE}/{config.META_API_VER}/{_ad_account()}/insights"
     params = {
         "level": level,
-        "fields": f"{campo_id},{campo_nome},spend",
+        "fields": f"{campo_id},{campo_nome},spend,impressions,clicks,actions",
         "date_preset": date_preset,
         "limit": 300,
         "access_token": config.META_ACCESS_TOKEN,
@@ -64,14 +64,23 @@ def gastos(preset="hoje", level="adset"):
         raise RuntimeError(f"Facebook recusou: {msg}")
     out = []
     for row in data.get("data", []):
-        try:
-            g = float(row.get("spend", 0) or 0)
-        except (TypeError, ValueError):
-            g = 0.0
+        def _num(v):
+            try:
+                return float(v or 0)
+            except (TypeError, ValueError):
+                return 0.0
+        # "leads" segundo o Facebook = soma das actions cujo tipo contém "lead"
+        leads = 0
+        for a in (row.get("actions") or []):
+            if "lead" in (a.get("action_type") or ""):
+                leads += int(_num(a.get("value")))
         out.append({
             "id": row.get(campo_id, ""),
             "nome": row.get(campo_nome, ""),
-            "gasto": round(g, 2),
+            "gasto": round(_num(row.get("spend")), 2),
+            "cliques": int(_num(row.get("clicks"))),
+            "impressoes": int(_num(row.get("impressions"))),
+            "leads_fb": leads,
         })
     out.sort(key=lambda x: x["gasto"], reverse=True)
     return out

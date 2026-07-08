@@ -29,7 +29,7 @@ except (AttributeError, ValueError):
     pass
 
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import BackgroundTasks, Body, FastAPI, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -896,9 +896,33 @@ def _norm_nome(s):
     return " ".join(s.lower().split())
 
 
+_BR_TZ = timezone(timedelta(hours=-3))
+
+
+def _dias_do_periodo(preset):
+    """Conjunto de datas (YYYY-MM-DD, fuso BR) que o período cobre — pra somar os
+    membros REAIS no mesmo intervalo do gasto do Facebook."""
+    hoje = datetime.now(_BR_TZ).date()
+    if preset == "ontem":
+        dias = [hoje - timedelta(days=1)]
+    elif preset == "7dias":
+        dias = [hoje - timedelta(days=i) for i in range(7)]
+    elif preset == "30dias":
+        dias = [hoje - timedelta(days=i) for i in range(30)]
+    else:
+        dias = [hoje]
+    return {d.isoformat() for d in dias}
+
+
+def _membros_no_periodo(camp, dias_set):
+    """Quantos membros entraram por essa campanha nas datas do período."""
+    return sum(int(d.get("qtd", 0)) for d in (camp.get("por_dia") or [])
+               if d.get("dia") in dias_set)
+
+
 @app.get("/api/admin/fb-gastos")
 def admin_fb_gastos(request: Request, preset: str = "hoje", level: str = "adset"):
-    """Gasto do Facebook por campanha/conjunto, cruzado com os membros (custo/membro)."""
+    """Dashboard de gastos do Facebook: gasto + leads(FB) x membros REAIS + custo/membro."""
     user = _usuario(request)
     erro = _guard_admin(request, user)
     if erro:
@@ -909,18 +933,39 @@ def admin_fb_gastos(request: Request, preset: str = "hoje", level: str = "adset"
         gastos = meta_ads.gastos(preset=preset, level=level)
     except Exception as e:
         return JSONResponse({"configurado": True, "erro": str(e)}, status_code=502)
-    # cruza com as campanhas internas pelo nome (normalizado)
     por_nome = {_norm_nome(c["nome"]): c for c in auth.listar_campanhas()}
-    linhas, total = [], 0.0
+    dias_set = _dias_do_periodo(preset)
+    linhas = []
+    tot_gasto = tot_membros = tot_leads = tot_cliques = 0.0
+    membros_conhecidos = 0   # membros só das linhas que casaram (pra custo médio justo)
+    gasto_casado = 0.0
     for g in gastos:
-        total += g["gasto"]
         c = por_nome.get(_norm_nome(g["nome"]))
-        membros = c["membros"] if c else None
+        matched = c is not None
+        membros = _membros_no_periodo(c, dias_set) if matched else None
         cpm = round(g["gasto"] / membros, 2) if (membros and membros > 0) else None
-        linhas.append({**g, "membros": membros, "custo_por_membro": cpm,
-                       "campanha_id": c["id"] if c else None})
-    return {"configurado": True, "preset": preset, "level": level,
-            "total": round(total, 2), "gastos": linhas}
+        tot_gasto += g["gasto"]
+        tot_leads += g.get("leads_fb", 0)
+        tot_cliques += g.get("cliques", 0)
+        if matched:
+            tot_membros += (membros or 0)
+            if (membros or 0) > 0:
+                membros_conhecidos += membros
+                gasto_casado += g["gasto"]
+        linhas.append({**g, "matched": matched, "membros": membros,
+                       "custo_por_membro": cpm, "campanha_id": c["id"] if c else None})
+    custo_medio = round(gasto_casado / membros_conhecidos, 2) if membros_conhecidos else None
+    return {
+        "configurado": True, "preset": preset, "level": level,
+        "kpis": {
+            "gasto": round(tot_gasto, 2),
+            "membros": int(tot_membros),
+            "leads_fb": int(tot_leads),
+            "cliques": int(tot_cliques),
+            "custo_por_membro": custo_medio,
+        },
+        "gastos": linhas,
+    }
 
 
 @app.get("/api/campanha-link")
