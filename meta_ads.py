@@ -1,0 +1,89 @@
+"""
+Integração com a Marketing API do Facebook (Meta) — puxa o GASTO dos anúncios
+por campanha/conjunto pra cruzar com os membros e mostrar o custo por membro.
+
+Config (Railway): META_ACCESS_TOKEN (ads_read), META_AD_ACCOUNT_ID, META_API_VER.
+Nunca lançamos exceção "crua" pra fora: devolvemos mensagem amigável em pt-BR.
+"""
+import requests
+
+import config
+
+_BASE = "https://graph.facebook.com"
+
+# períodos aceitos (mapeiam pro date_preset da API do Facebook)
+PRESETS = {
+    "hoje": "today",
+    "ontem": "yesterday",
+    "7dias": "last_7d",
+    "30dias": "last_30d",
+    "mes": "this_month",
+}
+
+
+def configurado():
+    return bool(config.META_ACCESS_TOKEN and config.META_AD_ACCOUNT_ID)
+
+
+def _ad_account():
+    aid = (config.META_AD_ACCOUNT_ID or "").strip()
+    if not aid:
+        return ""
+    return aid if aid.startswith("act_") else "act_" + aid
+
+
+def gastos(preset="hoje", level="adset"):
+    """Devolve [{id, nome, gasto}] com o gasto por campanha/conjunto no período.
+
+    level: 'adset' (conjunto — casa com 1 criativo por campanha interna) ou
+           'campaign' (campanha inteira). preset: chave de PRESETS.
+    Levanta RuntimeError com mensagem pt-BR se não configurado / erro da API."""
+    if not configurado():
+        raise RuntimeError("Configure META_ACCESS_TOKEN e META_AD_ACCOUNT_ID no Railway.")
+    date_preset = PRESETS.get(preset, "today")
+    level = "campaign" if level == "campaign" else "adset"
+    campo_id = "campaign_id" if level == "campaign" else "adset_id"
+    campo_nome = "campaign_name" if level == "campaign" else "adset_name"
+    url = f"{_BASE}/{config.META_API_VER}/{_ad_account()}/insights"
+    params = {
+        "level": level,
+        "fields": f"{campo_id},{campo_nome},spend",
+        "date_preset": date_preset,
+        "limit": 300,
+        "access_token": config.META_ACCESS_TOKEN,
+    }
+    try:
+        r = requests.get(url, params=params, timeout=15)
+        data = r.json() if r.content else {}
+    except requests.RequestException as e:
+        raise RuntimeError(f"Falha ao falar com o Facebook: {e}")
+    except ValueError:
+        raise RuntimeError("Resposta inválida do Facebook.")
+    if r.status_code != 200 or "error" in data:
+        msg = ((data.get("error") or {}).get("message")) or f"HTTP {r.status_code}"
+        raise RuntimeError(f"Facebook recusou: {msg}")
+    out = []
+    for row in data.get("data", []):
+        try:
+            g = float(row.get("spend", 0) or 0)
+        except (TypeError, ValueError):
+            g = 0.0
+        out.append({
+            "id": row.get(campo_id, ""),
+            "nome": row.get(campo_nome, ""),
+            "gasto": round(g, 2),
+        })
+    out.sort(key=lambda x: x["gasto"], reverse=True)
+    return out
+
+
+def testar():
+    """Diagnóstico rápido pra tela de admin."""
+    if not configurado():
+        return {"ok": False, "erro": "Falta META_ACCESS_TOKEN e/ou META_AD_ACCOUNT_ID."}
+    try:
+        linhas = gastos(preset="hoje", level="adset")
+        return {"ok": True, "conjuntos": len(linhas),
+                "total_hoje": round(sum(x["gasto"] for x in linhas), 2)}
+    except Exception as e:
+        return {"ok": False, "erro": str(e)}

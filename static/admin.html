@@ -168,6 +168,22 @@
         </div>
         <div id="campanhas"></div>
       </div>
+
+      <div class="panel">
+        <h3>💸 Gastos no Facebook <small id="fb-total"></small></h3>
+        <div id="fb-setup" style="display:none;background:rgba(255,201,77,.1);border:1px solid rgba(255,201,77,.35);border-radius:11px;padding:14px 16px;font-size:13px;color:var(--text-dim);line-height:1.6">
+          ⚙️ <b style="color:var(--text)">Integração não configurada.</b> Pra puxar o gasto automático, adicione no Railway:
+          <code>META_ACCESS_TOKEN</code> (token com <code>ads_read</code>) e <code>META_AD_ACCOUNT_ID</code> (ID da conta de anúncios).
+        </div>
+        <p style="color:var(--text-dim);font-size:13px;margin:6px 0 12px">Gasto por conjunto de anúncio, cruzado com os membros que entraram (custo por membro). Casa pelo <b style="color:var(--text)">nome</b> — deixe a campanha aqui com o mesmo nome do conjunto no Facebook.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+          <button class="mini fb-per on" data-per="hoje">Hoje</button>
+          <button class="mini fb-per" data-per="ontem">Ontem</button>
+          <button class="mini fb-per" data-per="7dias">7 dias</button>
+          <button class="mini fb-per" data-per="30dias">30 dias</button>
+        </div>
+        <div id="fb-gastos"></div>
+      </div>
     </div>
 
     <!-- VIEW: conteúdo / SEO -->
@@ -319,7 +335,7 @@ function mostrarView(v){
     : v==="conteudo" ? "Conteúdo — calendário de SEO e publicação."
     : "Visão do negócio — receita, assinantes e crescimento.";
   if(v==="tickets") loadTickets();
-  if(v==="campanhas") loadCampanhas();
+  if(v==="campanhas"){ loadCampanhas(); loadFbGastos(); }
   if(v==="conteudo") loadConteudo();
 }
 
@@ -362,6 +378,37 @@ document.addEventListener("click",(e)=>{
       fetch("/api/admin/campanhas/excluir",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:parseInt(e.target.dataset.delcamp)})}).then(()=>loadCampanhas());
     return;
   }
+});
+
+// ---- Gastos no Facebook ----
+let FB_PER = "hoje";
+async function loadFbGastos(){
+  const box=$("#fb-gastos"), setup=$("#fb-setup"), tot=$("#fb-total");
+  box.innerHTML='<div class="empty">Carregando…</div>';
+  const r=await fetch("/api/admin/fb-gastos?level=adset&preset="+FB_PER);
+  const d=await r.json().catch(()=>({}));
+  if(d.configurado===false){ setup.style.display="block"; box.innerHTML=""; tot.textContent=""; return; }
+  setup.style.display="none";
+  if(d.erro){ box.innerHTML=`<div class="empty">⚠️ ${escH(d.erro)}</div>`; tot.textContent=""; return; }
+  const gs=d.gastos||[];
+  tot.textContent = gs.length ? ("· total "+brl(d.total)) : "";
+  if(!gs.length){ box.innerHTML='<div class="empty">Sem gasto nesse período.</div>'; return; }
+  box.innerHTML=gs.map(g=>{
+    const temMatch=g.membros!=null;
+    const cpm=g.custo_por_membro!=null?brl(g.custo_por_membro)+"/membro":(temMatch?"sem membro ainda":"");
+    const mem=temMatch?`👥 ${g.membros} membro(s)`:'<span style="color:var(--text-dim)">sem campanha com esse nome aqui</span>';
+    return `<div style="display:flex;justify-content:space-between;align-items:center;border:1px solid var(--line);border-radius:11px;padding:12px 14px;margin-bottom:8px;background:var(--bg)">
+      <div><div style="font-weight:700;font-size:14px">${escH(g.nome||"—")}</div>
+        <div style="font-size:12px;margin-top:3px">${mem}</div></div>
+      <div style="text-align:right"><div style="font-weight:800;font-size:15px">${brl(g.gasto)}</div>
+        <div style="font-size:12px;color:${g.custo_por_membro!=null?'var(--green)':'var(--text-dim)'};margin-top:2px">${cpm}</div></div>
+    </div>`;
+  }).join("");
+}
+document.addEventListener("click",(e)=>{
+  if(!e.target.classList||!e.target.classList.contains("fb-per")) return;
+  document.querySelectorAll(".fb-per").forEach(b=>b.classList.remove("on"));
+  e.target.classList.add("on"); FB_PER=e.target.dataset.per; loadFbGastos();
 });
 
 // ---- Conteúdo / SEO ----

@@ -237,3 +237,13 @@ TELEGRAM_POST_MAX_MIN = int(os.getenv("TELEGRAM_POST_MAX_MIN", "50"))
 # Teto de lucro "são": surebets acima disso são ANOMALIAS (ex.: escanteios com
 # odd bugada dando 30-400%) e são descartadas na ingestão. Real vai até ~25%.
 MAX_LUCRO_SANO = float(os.getenv("MAX_LUCRO_SANO", "25"))
+
+# ---------------------------------------------------------------------------
+# FACEBOOK / META — Marketing API (gasto dos anúncios por campanha/conjunto)
+# ---------------------------------------------------------------------------
+# Cruza com o contador de membros pra mostrar o CUSTO POR MEMBRO no /admin.
+#   META_ACCESS_TOKEN  -> token com permissão ads_read (gere no Meta Business).
+#   META_AD_ACCOUNT_ID -> ID da conta de anúncios (só os números OU "act_123...").
+META_ACCESS_TOKEN = os.getenv("META_ACCESS_TOKEN", "").strip()
+META_AD_ACCOUNT_ID = os.getenv("META_AD_ACCOUNT_ID", "").strip()
+META_API_VER = os.getenv("META_API_VER", "v21.0").strip()

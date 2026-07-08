@@ -38,11 +38,14 @@ from fastapi.staticfiles import StaticFiles
 
 import threading
 
+import unicodedata
+
 import auth
 import config
 import emailer
 import feed
 import lifecycle
+import meta_ads
 import notifier
 import pipeline
 import promo
@@ -876,6 +879,39 @@ def admin_conteudo_publicar(request: Request, payload: dict = Body(...)):
         return JSONResponse({"erro": "essa página ainda não foi criada"}, status_code=400)
     auth.publicar_pagina(slug, publicar)
     return {"ok": True, "publicado": publicar}
+
+
+def _norm_nome(s):
+    """Normaliza nome pra casar campanha interna x conjunto do Facebook."""
+    s = unicodedata.normalize("NFKD", (s or "")).encode("ascii", "ignore").decode()
+    return " ".join(s.lower().split())
+
+
+@app.get("/api/admin/fb-gastos")
+def admin_fb_gastos(request: Request, preset: str = "hoje", level: str = "adset"):
+    """Gasto do Facebook por campanha/conjunto, cruzado com os membros (custo/membro)."""
+    user = _usuario(request)
+    erro = _guard_admin(request, user)
+    if erro:
+        return erro
+    if not meta_ads.configurado():
+        return {"configurado": False}
+    try:
+        gastos = meta_ads.gastos(preset=preset, level=level)
+    except Exception as e:
+        return JSONResponse({"configurado": True, "erro": str(e)}, status_code=502)
+    # cruza com as campanhas internas pelo nome (normalizado)
+    por_nome = {_norm_nome(c["nome"]): c for c in auth.listar_campanhas()}
+    linhas, total = [], 0.0
+    for g in gastos:
+        total += g["gasto"]
+        c = por_nome.get(_norm_nome(g["nome"]))
+        membros = c["membros"] if c else None
+        cpm = round(g["gasto"] / membros, 2) if (membros and membros > 0) else None
+        linhas.append({**g, "membros": membros, "custo_por_membro": cpm,
+                       "campanha_id": c["id"] if c else None})
+    return {"configurado": True, "preset": preset, "level": level,
+            "total": round(total, 2), "gastos": linhas}
 
 
 @app.get("/api/campanha-link")
