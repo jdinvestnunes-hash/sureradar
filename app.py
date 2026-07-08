@@ -943,6 +943,7 @@ def admin_fb_gastos(request: Request, preset: str = "hoje", level: str = "adset"
         c = por_nome.get(_norm_nome(g["nome"]))
         matched = c is not None
         membros = _membros_no_periodo(c, dias_set) if matched else None
+        membros_total = int(c["membros"]) if matched else None   # todos, desde sempre
         cpm = round(g["gasto"] / membros, 2) if (membros and membros > 0) else None
         tot_gasto += g["gasto"]
         tot_leads += g.get("leads_fb", 0)
@@ -953,7 +954,8 @@ def admin_fb_gastos(request: Request, preset: str = "hoje", level: str = "adset"
                 membros_conhecidos += membros
                 gasto_casado += g["gasto"]
         linhas.append({**g, "matched": matched, "membros": membros,
-                       "custo_por_membro": cpm, "campanha_id": c["id"] if c else None})
+                       "membros_total": membros_total, "custo_por_membro": cpm,
+                       "campanha_id": c["id"] if c else None})
     custo_medio = round(gasto_casado / membros_conhecidos, 2) if membros_conhecidos else None
     return {
         "configurado": True, "preset": preset, "level": level,

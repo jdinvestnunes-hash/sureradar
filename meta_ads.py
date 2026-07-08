@@ -69,11 +69,20 @@ def gastos(preset="hoje", level="adset"):
                 return float(v or 0)
             except (TypeError, ValueError):
                 return 0.0
-        # "leads" segundo o Facebook = soma das actions cujo tipo contém "lead"
+        # "leads" do Facebook: o mesmo lead vem em VÁRIOS action_type (lead,
+        # offsite_conversion.fb_pixel_lead, lead_grouped...). Somar duplicaria.
+        # Pegamos UM só, na ordem de prioridade (não somamos).
+        acts = {(a.get("action_type") or ""): _num(a.get("value"))
+                for a in (row.get("actions") or [])}
         leads = 0
-        for a in (row.get("actions") or []):
-            if "lead" in (a.get("action_type") or ""):
-                leads += int(_num(a.get("value")))
+        for tipo in ("offsite_conversion.fb_pixel_lead", "onsite_conversion.lead_grouped",
+                     "lead", "leadgen_grouped", "leadgen.other"):
+            if tipo in acts:
+                leads = int(acts[tipo])
+                break
+        else:
+            cand = [v for t, v in acts.items() if "lead" in t]
+            leads = int(max(cand)) if cand else 0
         out.append({
             "id": row.get(campo_id, ""),
             "nome": row.get(campo_nome, ""),

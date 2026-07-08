@@ -427,8 +427,10 @@ async function loadFbGastos(){
     const temMatch=g.matched;
     const membros = temMatch ? (g.membros||0) : null;
     const cpmR = g.custo_por_membro!=null ? brl(g.custo_por_membro) : (temMatch?"—":"");
+    const totTxt = (temMatch && g.membros_total!=null && g.membros_total!==membros)
+      ? `<span style="color:var(--text-dim);font-size:11px"> (${g.membros_total} no total)</span>` : "";
     const memCel = temMatch
-      ? `<b style="color:var(--green)">${membros}</b>`
+      ? `<b style="color:var(--green)">${membros}</b>${totTxt}`
       : `<span style="color:var(--text-dim);font-size:11.5px">sem match de nome</span>`;
     return `<tr style="border-top:1px solid var(--line)">
       <td style="padding:11px 10px;font-weight:600">${escH(g.nome||"—")}</td>
