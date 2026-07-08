@@ -207,6 +207,8 @@ try{
   var _p = new URLSearchParams(location.search);
   var _src = _p.get('utm_source') || _p.get('ref') || _p.get('fonte');
   if (_src) document.cookie = 'sr_origem=' + encodeURIComponent(_src.slice(0,40)) + ';path=/;max-age=' + (60*60*24*60) + ';samesite=lax';
+  var _camp = _p.get('c') || _p.get('utm_campaign');
+  if (_camp) document.cookie = 'sr_camp=' + encodeURIComponent(String(_camp).slice(0,40)) + ';path=/;max-age=' + (60*60*24*60) + ';samesite=lax';
 }catch(e){}
 let MODO = 'cadastro';
 const $ = s => document.querySelector(s);

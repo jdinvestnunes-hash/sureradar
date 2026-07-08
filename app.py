@@ -277,7 +277,8 @@ def register(background_tasks: BackgroundTasks, request: Request, payload: dict 
                             status_code=429)
     user, erro = auth.criar_usuario(
         payload.get("nome", ""), payload.get("email", ""), payload.get("senha", ""),
-        payload.get("whatsapp", ""), request.cookies.get("sr_origem", ""))
+        payload.get("whatsapp", ""), request.cookies.get("sr_origem", ""),
+        request.cookies.get("sr_camp", ""))
     if erro:
         return JSONResponse({"erro": erro}, status_code=400)
     # NÃO loga: manda o e-mail de confirmação; a conta só libera após confirmar.
@@ -429,7 +430,8 @@ def google_callback(request: Request, background_tasks: BackgroundTasks, code: s
     if not email:
         return RedirectResponse("/login?erro=google", status_code=302)
     user, novo = auth.pegar_ou_criar_google(email, info.get("name", ""),
-                                            request.cookies.get("sr_origem", ""))
+                                            request.cookies.get("sr_origem", ""),
+                                            request.cookies.get("sr_camp", ""))
     if novo:
         background_tasks.add_task(emailer.enviar_boas_vindas, user["email"], user["nome"])
     resp = RedirectResponse("/app", status_code=302)
@@ -947,6 +949,7 @@ def admin_fb_gastos(request: Request, preset: str = "hoje", level: str = "adset"
         return JSONResponse({"configurado": True, "erro": str(e)}, status_code=502)
     por_nome = {_norm_nome(c["nome"]): c for c in auth.listar_campanhas()}
     dias_set = _dias_do_periodo(preset)
+    met = auth.metricas_por_campanha()   # cadastros/vendas/receita por campanha (id)
     # Agrupa os conjuntos do FB pela campanha interna (soma as cópias); o que não
     # casa com nenhuma campanha aqui fica solto (sem membros).
     grupos, soltas = {}, []
@@ -955,11 +958,15 @@ def admin_fb_gastos(request: Request, preset: str = "hoje", level: str = "adset"
         if c:
             grp = grupos.get(c["id"])
             if grp is None:
+                m = met.get(str(c["id"]), {})
                 grp = grupos[c["id"]] = {
                     "nome": c["nome"], "gasto": 0.0, "leads_fb": 0, "cliques": 0,
                     "impressoes": 0, "conjuntos": 0, "matched": True, "campanha_id": c["id"],
                     "membros": _membros_no_periodo(c, dias_set),
                     "membros_total": int(c["membros"]),
+                    "cadastros": int(m.get("cadastros", 0)),
+                    "vendas": int(m.get("vendas", 0)),
+                    "receita": float(m.get("receita", 0.0)),
                 }
             grp["gasto"] += g["gasto"]
             grp["leads_fb"] += g.get("leads_fb", 0)
@@ -970,13 +977,17 @@ def admin_fb_gastos(request: Request, preset: str = "hoje", level: str = "adset"
             soltas.append({**g, "matched": False, "membros": None,
                            "membros_total": None, "custo_por_membro": None, "conjuntos": 1})
     linhas = []
-    tot_membros = membros_conhecidos = 0
-    gasto_casado = 0.0
+    tot_membros = membros_conhecidos = tot_cadastros = tot_vendas = 0
+    gasto_casado = tot_receita = 0.0
     for grp in grupos.values():
         grp["gasto"] = round(grp["gasto"], 2)
         m = grp["membros"] or 0
         grp["custo_por_membro"] = round(grp["gasto"] / m, 2) if m > 0 else None
+        grp["roi"] = round(grp["receita"] - grp["gasto"], 2)   # lucro (receita − gasto)
         tot_membros += m
+        tot_cadastros += grp["cadastros"]
+        tot_vendas += grp["vendas"]
+        tot_receita += grp["receita"]
         if m > 0:
             membros_conhecidos += m
             gasto_casado += grp["gasto"]
@@ -995,6 +1006,10 @@ def admin_fb_gastos(request: Request, preset: str = "hoje", level: str = "adset"
             "leads_fb": int(tot_leads),
             "cliques": int(tot_cliques),
             "custo_por_membro": custo_medio,
+            "cadastros": int(tot_cadastros),
+            "vendas": int(tot_vendas),
+            "receita": round(tot_receita, 2),
+            "roi": round(tot_receita - tot_gasto, 2),
         },
         "gastos": linhas,
     }

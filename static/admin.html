@@ -417,11 +417,14 @@ async function loadFbGastos(){
   if(d.erro){ kpis.innerHTML=""; tab.innerHTML=`<div class="empty">⚠️ ${escH(d.erro)}</div>`; return; }
   const k=d.kpis||{}, gs=d.gastos||[];
   const cpm = k.custo_por_membro!=null ? brl(k.custo_por_membro) : "—";
+  const roiCor = (k.roi||0) >= 0 ? "var(--green)" : "#ff6b6b";
   kpis.innerHTML =
     fbKpi("Gasto no período", brl(k.gasto||0), FB_PER==="hoje"?"hoje":FB_PER) +
     fbKpi("Membros reais", (k.membros||0), "entraram no grupo", "var(--green)") +
     fbKpi("Custo por membro", cpm, "gasto ÷ membros reais", "var(--cyan,#38d4f5)") +
-    fbKpi("Leads (Facebook)", (k.leads_fb||0), `${k.cliques||0} cliques · o Face conta`, "var(--gold,#ffc94d)");
+    fbKpi("Leads (Facebook)", (k.leads_fb||0), `${k.cliques||0} cliques · o Face conta`, "var(--gold,#ffc94d)") +
+    fbKpi("Receita", brl(k.receita||0), `${k.vendas||0} venda(s) · ${k.cadastros||0} cadastros`, "var(--green)") +
+    fbKpi("Lucro (ROI)", brl(k.roi||0), "receita − gasto", roiCor);
   if(!gs.length){ tab.innerHTML='<div class="empty">Sem gasto nesse período.</div>'; return; }
   const linhas = gs.map(g=>{
     const temMatch=g.matched;
@@ -433,24 +436,31 @@ async function loadFbGastos(){
       ? `<b style="color:var(--green)">${membros}</b>${totTxt}`
       : `<span style="color:var(--text-dim);font-size:11.5px">sem match de nome</span>`;
     const nConj = (g.conjuntos && g.conjuntos>1) ? ` <span style="color:var(--text-dim);font-size:11px;font-weight:500">· ${g.conjuntos} conjuntos</span>` : "";
+    const cad = temMatch ? (g.cadastros||0) : "—";
+    const rec = temMatch ? brl(g.receita||0) : "—";
+    const roi = temMatch ? (g.roi||0) : null;
+    const roiTxt = roi!=null ? brl(roi) : "—";
+    const roiCor = roi==null ? "var(--text-dim)" : (roi>=0 ? "var(--green)" : "#ff6b6b");
     return `<tr style="border-top:1px solid var(--line)">
       <td style="padding:11px 10px;font-weight:600">${escH(g.nome||"—")}${nConj}</td>
       <td style="padding:11px 10px;text-align:right">${brl(g.gasto)}</td>
       <td style="padding:11px 10px;text-align:center;color:var(--gold,#ffc94d)">${g.leads_fb||0}</td>
-      <td style="padding:11px 10px;text-align:center;color:var(--text-dim)">${g.cliques||0}</td>
       <td style="padding:11px 10px;text-align:center">${memCel}</td>
-      <td style="padding:11px 10px;text-align:right;font-weight:700;color:${g.custo_por_membro!=null?'var(--cyan,#38d4f5)':'var(--text-dim)'}">${cpmR}</td>
+      <td style="padding:11px 10px;text-align:center;color:var(--cyan,#38d4f5)">${cad}</td>
+      <td style="padding:11px 10px;text-align:right">${rec}</td>
+      <td style="padding:11px 10px;text-align:right;font-weight:800;color:${roiCor}">${roiTxt}</td>
     </tr>`;
   }).join("");
   tab.innerHTML =
-    `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13.5px;min-width:560px">
+    `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13.5px;min-width:640px">
       <thead><tr style="color:var(--text-dim);font-size:11.5px;text-transform:uppercase;letter-spacing:.04em">
         <th style="padding:0 10px 8px;text-align:left">Campanha (conjunto FB)</th>
         <th style="padding:0 10px 8px;text-align:right">Gasto</th>
         <th style="padding:0 10px 8px;text-align:center">Leads FB</th>
-        <th style="padding:0 10px 8px;text-align:center">Cliques</th>
         <th style="padding:0 10px 8px;text-align:center">Entraram</th>
-        <th style="padding:0 10px 8px;text-align:right">R$/membro</th>
+        <th style="padding:0 10px 8px;text-align:center">Cadastros</th>
+        <th style="padding:0 10px 8px;text-align:right">Receita</th>
+        <th style="padding:0 10px 8px;text-align:right">Lucro</th>
       </tr></thead><tbody>${linhas}</tbody></table></div>`;
 }
 document.addEventListener("click",(e)=>{

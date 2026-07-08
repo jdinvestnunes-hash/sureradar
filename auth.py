@@ -258,7 +258,8 @@ def init():
                            ("users", f"email_verificado {_NUM} DEFAULT 1"),
                            ("users", f"email_optout {_NUM} DEFAULT 0"),
                            ("users", "unsub_token TEXT"),
-                           ("users", "origem TEXT")]:
+                           ("users", "origem TEXT"),
+                           ("users", "campanha TEXT")]:
         try:
             with _db() as c:
                 c.execute(f"ALTER TABLE {tabela} ADD COLUMN {coluna}")
@@ -666,6 +667,27 @@ def listar_usuarios():
     return [dict(r) for r in rows]
 
 
+def metricas_por_campanha():
+    """Por campanha (id em users.campanha): cadastros, vendas pagas e receita.
+    Só cobre quem chegou ao SITE com a tag da campanha e se cadastrou (last-click)."""
+    out = {}
+    with _db() as c:
+        cad = c.execute("SELECT campanha, COUNT(*) AS n FROM users "
+                        "WHERE campanha IS NOT NULL GROUP BY campanha").fetchall()
+        rev = c.execute(_q("""SELECT u.campanha AS campanha, COUNT(*) AS vendas,
+                                     COALESCE(SUM(ck.valor),0) AS receita
+                              FROM checkouts ck JOIN users u ON u.id = ck.user_id
+                              WHERE ck.status = ? AND u.campanha IS NOT NULL
+                              GROUP BY u.campanha"""), ("pago",)).fetchall()
+    for r in cad:
+        out[str(r["campanha"])] = {"cadastros": int(r["n"]), "vendas": 0, "receita": 0.0}
+    for r in rev:
+        d = out.setdefault(str(r["campanha"]), {"cadastros": 0, "vendas": 0, "receita": 0.0})
+        d["vendas"] = int(r["vendas"])
+        d["receita"] = round(float(r["receita"]), 2)
+    return out
+
+
 def voltar_free(user_id: int):
     """Tira o PRO na marra (volta pra free, zera a expiração)."""
     with _db() as c:
@@ -959,11 +981,13 @@ def banca_set(user_id: int, entradas: list):
 # ---------------------------------------------------------------------------
 # Cadastro / login
 # ---------------------------------------------------------------------------
-def criar_usuario(nome: str, email: str, senha: str, whatsapp: str = "", origem: str = ""):
+def criar_usuario(nome: str, email: str, senha: str, whatsapp: str = "",
+                  origem: str = "", campanha: str = ""):
     nome = (nome or "").strip()
     email = (email or "").strip().lower()
     whats = "".join(ch for ch in (whatsapp or "") if ch.isdigit())
     origem = (origem or "").strip()[:40] or None
+    campanha = (campanha or "").strip()[:40] or None
     if len(nome) < 2:
         return None, "Digite seu nome."
     if "@" not in email or "." not in email.split("@")[-1]:
@@ -976,26 +1000,27 @@ def criar_usuario(nome: str, email: str, senha: str, whatsapp: str = "", origem:
     try:
         with _db() as c:
             uid = _insert(c,
-                "INSERT INTO users(nome,email,whatsapp,origem,hash,salt,plano,email_verificado,criado) VALUES(?,?,?,?,?,?,?,?,?)",
-                (nome, email, whats, origem, _hash(senha, salt), salt, "free", 0, time.time()))
+                "INSERT INTO users(nome,email,whatsapp,origem,campanha,hash,salt,plano,email_verificado,criado) VALUES(?,?,?,?,?,?,?,?,?,?)",
+                (nome, email, whats, origem, campanha, _hash(senha, salt), salt, "free", 0, time.time()))
     except UNIQUE_ERR:
         return None, "Este e-mail já tem conta. Faça login."
     return {"id": uid, "nome": nome, "email": email, "plano": "free", "plano_expira": None}, None
 
 
-def pegar_ou_criar_google(email: str, nome: str, origem: str = ""):
+def pegar_ou_criar_google(email: str, nome: str, origem: str = "", campanha: str = ""):
     """Login com Google: acha o usuário pelo e-mail ou cria um novo (plano free)."""
     email = (email or "").strip().lower()
     nome = (nome or "").strip() or email.split("@")[0]
     origem = (origem or "").strip()[:40] or None
+    campanha = (campanha or "").strip()[:40] or None
     with _db() as c:
         row = c.execute(_q("SELECT * FROM users WHERE email=?"), (email,)).fetchone()
         if row:
             return _perfil(row), False       # já existia
         salt = secrets.token_bytes(16)
         uid = _insert(c,
-            "INSERT INTO users(nome,email,origem,hash,salt,plano,email_verificado,criado) VALUES(?,?,?,?,?,?,?,?)",
-            (nome, email, origem, _hash(secrets.token_hex(24), salt), salt, "free", 1, time.time()))
+            "INSERT INTO users(nome,email,origem,campanha,hash,salt,plano,email_verificado,criado) VALUES(?,?,?,?,?,?,?,?,?)",
+            (nome, email, origem, campanha, _hash(secrets.token_hex(24), salt), salt, "free", 1, time.time()))
     return {"id": uid, "nome": nome, "email": email, "plano": "free", "plano_expira": None}, True
 
 

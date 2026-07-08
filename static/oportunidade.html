@@ -136,6 +136,11 @@
       if (src) document.cookie = 'sr_origem=' + encodeURIComponent(src.slice(0,40)) + ';path=/;max-age=' + (60*60*24*60) + ';samesite=lax';
     }catch(e){}
     var c = new URLSearchParams(location.search).get('c');
+    // guarda a CAMPANHA (c=id ou utm_campaign) num cookie p/ atribuir no cadastro/venda
+    try{
+      var camp = c || new URLSearchParams(location.search).get('utm_campaign');
+      if (camp) document.cookie = 'sr_camp=' + encodeURIComponent(String(camp).slice(0,40)) + ';path=/;max-age=' + (60*60*24*60) + ';samesite=lax';
+    }catch(e){}
     if (c) {
       fetch('/api/campanha-link?c=' + encodeURIComponent(c))
         .then(function(r){ return r.json(); })
