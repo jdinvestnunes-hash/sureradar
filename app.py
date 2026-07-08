@@ -1275,9 +1275,11 @@ def _split_teams(teams):
 _MKT_SUBS = [
     ("classificações", "classificação"), ("classificação", "classificação"),
     ("TE + DP", "prorrogação + pênaltis"), ("TE+DP", "prorrogação + pênaltis"),
-    ("sem empate", "empate anula"),
+    ("sem empate", "empate anula"), ("DNB", "empate anula (DNB)"),
+    ("Tempo Extra", "tempo extra"), ("lay (contra)", "lay (aposta contra)"),
     ("Mais de", "acima de"), ("Menos de", "abaixo de"),
-    ("ambas marcam", "ambas marcam"),
+    ("Acima", "acima de"), ("Abaixo", "abaixo de"),
+    ("escanteios", "escanteios"), (" o time", ""),
 ]
 
 
@@ -1297,7 +1299,9 @@ def _mercado_legivel(code, t1="", t2=""):
     resto = " ".join(partes[1:]) if (nome and len(partes) > 1) else ("" if nome else code)
     for a, b in _MKT_SUBS:
         resto = resto.replace(a, b)
-    resto = resto.replace(" - ", " · ").strip(" ·-")
+    resto = resto.replace(" - ", " · ").replace(" / ", " ").strip(" ·-/")
+    while "  " in resto:
+        resto = resto.replace("  ", " ")
     if nome:
         return f"{nome} — {resto}".strip(" —") if resto else nome
     return resto
