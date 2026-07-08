@@ -1245,6 +1245,24 @@ def _mercado_completo(market, sport):
     return f"{m} {assunto}" if assunto else m
 
 
+def _link_casa(link):
+    """Devolve o link SÓ se for da casa de aposta. NUNCA deixa passar um link do
+    surebet.com (o site que o robô lê) — senão o usuário é mandado pro concorrente."""
+    if link and "surebet.com" not in str(link).lower():
+        return link
+    return None
+
+
+def _sem_link_surebet(lista):
+    """Passa a lista de surebets removendo qualquer link que aponte pro surebet.com."""
+    limpos = []
+    for s in lista:
+        c = dict(s)
+        c["legs"] = [{**l, "link": _link_casa(l.get("link"))} for l in s["legs"]]
+        limpos.append(c)
+    return limpos
+
+
 def _converter_raspagem(records):
     """Converte os registros raspados do DOM da surebet.com no contrato do painel."""
     contratos = []
@@ -1274,7 +1292,7 @@ def _converter_raspagem(records):
                 "bookmaker_type": _tipo_casa(l.get("bookmaker", "")),
                 "stake_pct": round(stake / banca * 100, 1),
                 "stake_brl": round(stake, 2),
-                "link": l.get("link"),   # link que abre a casa (redirect da surebet)
+                "link": _link_casa(l.get("link")),   # só link da casa; nunca surebet.com
             })
         teams = max((l.get("teams", "") for l in legs), key=len)
         sport = _norm_sport(legs[0].get("sport", ""))
@@ -1416,7 +1434,7 @@ def surebets(
             locked.append(c)
 
     return {
-        "surebets": resultados,
+        "surebets": _sem_link_surebet(resultados),   # blindagem: nunca vaza link do surebet.com
         "locked": locked,
         "status": feed.status(),
         "plano": _plano_efetivo(user),

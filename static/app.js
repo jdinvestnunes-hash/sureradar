@@ -271,11 +271,13 @@ function opEl(sb, teaser) {
     main.appendChild(el("div", "op-box-label", l.outcome));
     const book = el("div", "op-box-book");
     book.appendChild(el("span", null, l.bookmaker_label || l.bookmaker));
-    if (l.link && !teaser) book.appendChild(el("span", "ext", "↗ ir para a casa"));
+    // só mostra "ir para a casa" se o link for da CASA (nunca surebet.com)
+    const linkCasa = (l.link && !/surebet\.com/i.test(l.link)) ? l.link : null;
+    if (linkCasa && !teaser) book.appendChild(el("span", "ext", "↗ ir para a casa"));
     main.appendChild(book);
     box.appendChild(main);
     box.appendChild(el("div", "op-box-odd", Number(l.odd).toFixed(2)));
-    if (l.link && !teaser) box.addEventListener("click", () => window.open(l.link, "_blank", "noopener"));
+    if (linkCasa && !teaser) box.addEventListener("click", () => window.open(linkCasa, "_blank", "noopener"));
     odds.appendChild(box);
   });
   body.appendChild(odds);

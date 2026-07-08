@@ -97,6 +97,8 @@ def resolver_link(ctx, pg, nav_url):
                 final = pg.url
         except Exception:
             pass
+    if _e_surebet(final):   # NÃO resolveu: não vaza link do surebet; tenta de novo depois
+        return None
     LINK_CACHE[nav_url] = final
     return final
 
@@ -112,7 +114,8 @@ def resolver_todos(ctx, bets):
         for b in bets:
             for leg in b.get("legs", []):
                 if leg.get("link"):
-                    leg["link"] = resolver_link(ctx, pg, leg["link"])
+                    r = resolver_link(ctx, pg, leg["link"])
+                    leg["link"] = r if (r and not _e_surebet(r)) else None
     finally:
         pg.close()
     if faltam:
