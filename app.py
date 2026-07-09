@@ -440,7 +440,7 @@ def google_callback(request: Request, background_tasks: BackgroundTasks, code: s
 
 
 @app.get("/api/health")
-def health(fb: int = 0):
+def health(fb: int = 0, venda: int = 0):
     """Diagnóstico: qual banco está em uso e se a conexão funciona (sem expor segredos)."""
     info = {"db_type": "postgres" if auth.PG else "sqlite", "db_ok": False}
     try:
@@ -469,8 +469,15 @@ def health(fb: int = 0):
     info["telegram"] = {
         "bot_token": bool(config.TELEGRAM_BOT_TOKEN),
         "chat_id": bool(config.TELEGRAM_CHAT_ID),
+        "admin_chat": bool(config.ADMIN_TELEGRAM_CHAT_ID),
         "promo_ativo": config.PROMO_ATIVO,
     }
+    # Teste do aviso de venda: /api/health?venda=1 manda uma mensagem de teste pro admin.
+    if venda:
+        ok = notifier.enviar_admin("🧪 <b>Teste de aviso de venda</b>\n\n"
+                                   "Se você recebeu isso, os avisos de venda estão "
+                                   "funcionando! ✅ Toda venda vai cair aqui.")
+        info["telegram"]["teste_venda_enviado"] = bool(ok)
     # Facebook Ads: só faz a chamada real à API do Meta com ?fb=1 (não expõe o gasto).
     info["facebook"] = {"configurado": meta_ads.configurado()}
     if fb and meta_ads.configurado():
@@ -501,6 +508,25 @@ def _confirmar_compra_email(user_id):
                                  args=(u["email"], u["nome"]), daemon=True).start()
     except Exception as e:
         print("!! email de compra:", e)
+
+
+def _avisar_venda_admin(res):
+    """Avisa VOCÊ no Telegram (chat privado) sempre que cai uma venda."""
+    try:
+        u = auth.pegar_por_id(res.get("user_id")) or {}
+        valor = float(res.get("valor", 0) or 0)
+        msg = (
+            "💰 <b>NOVA VENDA!</b> 🎉\n\n"
+            f"👤 {notifier._esc(u.get('nome', '?'))}\n"
+            f"✉️ {notifier._esc(u.get('email', '?'))}\n"
+            f"📦 Plano: <b>{notifier._esc(str(res.get('plano', '?')))}</b>\n"
+            f"💵 Valor: <b>R$ {valor:.2f}</b>\n"
+            f"💳 {notifier._esc(str(res.get('metodo', '?')))}\n"
+            f"📍 Origem: {notifier._esc(str(u.get('origem') or 'direto'))}"
+        )
+        notifier.enviar_admin(msg)
+    except Exception as e:
+        print("!! aviso de venda (admin):", e)
 
 
 @app.post("/api/checkout/stripe")
@@ -597,6 +623,7 @@ async def webhook_stripe(request: Request):
             res = auth.checkout_pagar("stripe", obj["id"], obj.get("payment_intent"))
             if res:
                 _confirmar_compra_email(res["user_id"])
+                _avisar_venda_admin(res)
         sub_id = obj.get("subscription")
         if sub_id and obj.get("client_reference_id"):
             plano = (obj.get("metadata") or {}).get("plano", "mensal")
@@ -706,6 +733,7 @@ async def webhook_abacate(request: Request):
             res = auth.checkout_pagar("abacatepay", bid)
             if res:
                 _confirmar_compra_email(res["user_id"])
+                _avisar_venda_admin(res)
     return {"ok": True}
 
 

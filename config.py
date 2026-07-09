@@ -190,6 +190,9 @@ MIN_CREDITOS_PARAR = 40
 #   TELEGRAM_CHAT_ID=-1001234567890    (ID do grupo; negativo p/ grupos)
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "").strip()
+# Chat PRIVADO do admin (você) — recebe aviso de cada VENDA. Vazio = desligado.
+# Pegue o seu chat_id mandando qualquer mensagem pro bot e vendo em /api/admin/telegram-chats.
+ADMIN_TELEGRAM_CHAT_ID = os.getenv("ADMIN_TELEGRAM_CHAT_ID", "").strip()
 
 # Grupo FREE do Telegram: recebe as surebets até este lucro (%), no máximo N por
 # ciclo (evita flood). As de maior lucro ficam pro PRO (funil).

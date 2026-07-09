@@ -46,6 +46,20 @@ def enviar_texto(texto, preview=False):
     })
 
 
+def enviar_admin(texto):
+    """Mensagem PRIVADA pro admin (config.ADMIN_TELEGRAM_CHAT_ID) — ex.: aviso de
+    venda. No-op silencioso se o chat do admin não estiver configurado."""
+    chat = getattr(config, "ADMIN_TELEGRAM_CHAT_ID", "")
+    if not (config.TELEGRAM_BOT_TOKEN and chat):
+        return False
+    return _post("sendMessage", {
+        "chat_id": chat,
+        "text": texto,
+        "parse_mode": "HTML",
+        "disable_web_page_preview": True,
+    })
+
+
 def testar():
     """Diagnóstico: valida o token (getMe) e tenta postar no grupo (sendMessage).
     Devolve a resposta crua do Telegram — mostra token errado / bot fora do grupo."""
