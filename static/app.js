@@ -555,8 +555,65 @@ function switchView(v) {
   if (vc) vc.classList.toggle("hidden", v !== "calc");
   const vl = document.getElementById("view-learn");
   if (vl) vl.classList.toggle("hidden", v !== "learn");
+  const va = document.getElementById("view-alertas");
+  if (va) va.classList.toggle("hidden", v !== "alertas");
   if (v === "bank") renderBanca();
   if (v === "learn") renderLearn();
+  if (v === "alertas") renderAlertas();
+}
+
+// ---------- Alertas no Telegram (aba própria, beta) ----------
+async function renderAlertas() {
+  const box = document.getElementById("view-alertas-body");
+  if (!box) return;
+  box.innerHTML = '<div class="empty">Carregando…</div>';
+  let d;
+  try { d = await (await fetch("/api/alerta")).json(); } catch { box.innerHTML = '<div class="empty">Erro ao carregar.</div>'; return; }
+  if (!d || !d.liberado) { box.innerHTML = '<div class="empty">Indisponível na sua conta.</div>'; return; }
+  const casas = (META && META.bookmakers) || [];
+  const sel = new Set(d.casas || []);
+  const checks = casas.map((b) =>
+    `<label style="display:flex;align-items:center;gap:8px;font-size:13.5px;padding:7px 10px;border:1px solid var(--border,#1b2740);border-radius:9px;cursor:pointer;background:var(--bg,#05070d);min-width:0">
+       <input type="checkbox" class="al-casa" value="${b.key}" ${sel.has(b.key) ? "checked" : ""} style="flex:0 0 auto"/>
+       <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${b.label}</span>
+     </label>`).join("");
+  const conn = d.conectado
+    ? `<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+         <div style="color:var(--green,#2ee6a8);font-weight:800;font-size:15px">✅ Telegram conectado</div>
+         <button id="al-desc" class="cv-mini">Desconectar</button>
+       </div>`
+    : `<a href="${d.connect_url || '#'}" target="_blank" rel="noopener" class="cv-launch" style="display:inline-block;width:auto;text-decoration:none;padding:13px 26px">🔔 Conectar meu Telegram</a>
+       <p style="color:var(--muted,#647388);font-size:12.5px;margin-top:10px">Clica no botão, aperta <b>Iniciar</b> no bot e volta aqui. Depois <button id="al-refresh" style="background:none;border:none;color:var(--cyan,#38d4f5);cursor:pointer;padding:0;font:inherit">atualiza a página</button>.</p>`;
+  box.innerHTML =
+    `<div style="background:var(--surface,#0e1421);border:1px solid var(--border,#1b2740);border-radius:16px;padding:22px">
+       ${conn}
+       <div style="height:1px;background:var(--border,#1b2740);margin:20px 0"></div>
+       <div style="font-weight:800;font-size:13.5px;margin-bottom:9px">Lucro mínimo</div>
+       <div style="display:flex;align-items:center;gap:10px;margin-bottom:22px">
+         <input id="al-min" type="number" min="0" step="0.5" value="${d.min_pct}" style="width:100px;background:var(--bg,#05070d);border:1px solid var(--border2,#27395c);border-radius:10px;padding:11px 13px;color:var(--text,#f2f6fc);font-size:15px"/>
+         <span style="color:var(--dim,#a3b1c9)">% ou mais</span>
+       </div>
+       <div style="font-weight:800;font-size:13.5px;margin-bottom:9px">Só nessas casas <span style="font-weight:500;color:var(--muted,#647388);font-size:12px">· nenhuma marcada = todas</span></div>
+       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(165px,1fr));gap:8px;align-items:stretch">${checks}</div>
+       <label style="display:flex;align-items:center;gap:9px;margin-top:20px;font-size:14.5px;cursor:pointer">
+         <input id="al-ativo" type="checkbox" ${d.ativo ? "checked" : ""}/> Alertas ativos
+       </label>
+       <button id="al-save" class="cv-launch" style="margin-top:18px">Salvar preferências</button>
+       <div id="al-msg" style="font-size:13px;margin-top:10px;min-height:16px;text-align:center"></div>
+     </div>`;
+  const rf = document.getElementById("al-refresh"); if (rf) rf.onclick = () => location.reload();
+  const ds = document.getElementById("al-desc"); if (ds) ds.onclick = async () => { await fetch("/api/alerta/desconectar", { method: "POST" }); renderAlertas(); };
+  document.getElementById("al-save").onclick = async () => {
+    const cs = [...document.querySelectorAll(".al-casa:checked")].map((c) => c.value);
+    const min_pct = parseFloat(document.getElementById("al-min").value) || 0;
+    const ativo = document.getElementById("al-ativo").checked;
+    const msg = document.getElementById("al-msg"); msg.style.color = "var(--dim,#a3b1c9)"; msg.textContent = "Salvando…";
+    try {
+      const r = await fetch("/api/alerta", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ casas: cs, min_pct, ativo }) });
+      if (r.ok) { msg.style.color = "var(--green,#2ee6a8)"; msg.textContent = "✓ Preferências salvas!"; }
+      else { msg.style.color = "#ff6b6b"; msg.textContent = "Não deu pra salvar."; }
+    } catch { msg.style.color = "#ff6b6b"; msg.textContent = "Erro de conexão."; }
+  };
 }
 
 // ---------- Aprenda (vídeos do YouTube) ----------
@@ -680,6 +737,8 @@ async function initUser() {
       location.href = "/login";
     });
   }
+  // aba de Alertas (beta): só aparece pra e-mails liberados
+  if (me && me.alertas) { const ta = document.getElementById("tab-alertas"); if (ta) ta.style.display = ""; }
   return true;
 }
 

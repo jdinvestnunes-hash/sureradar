@@ -41,6 +41,7 @@
       <button class="tab" data-view="bank">Minha Banca <span id="bank-count" class="tab-badge">0</span></button>
       <button class="tab" data-view="calc" title="Calculadora de surebet">🧮 Calculadora</button>
       <button class="tab" data-view="learn" title="Aprenda a fazer apostas seguras">🎓 Aprenda</button>
+      <button class="tab" id="tab-alertas" data-view="alertas" title="Alertas no Telegram" style="display:none">🔔 Alertas</button>
     </nav>
 
     <div class="topbar-right">
@@ -198,6 +199,15 @@
     </div>
   </div>
 
+  <!-- VIEW: ALERTAS (Telegram) -->
+  <div class="bank-view hidden" id="view-alertas">
+    <div class="bank-head" style="text-align:center">
+      <h1>🔔 Alertas no Telegram</h1>
+      <p class="subtitle" style="max-width:560px;margin:8px auto 0">Escolha as <b>casas</b> e o <b>lucro mínimo</b> — as surebets que baterem chegam na sua <b>DM do Telegram</b>.</p>
+    </div>
+    <div id="view-alertas-body" style="max-width:640px;margin:22px auto 0;padding:0 6px"></div>
+  </div>
+
   <!-- MODAL CALCULADORA -->
   <div id="calc-overlay" class="overlay hidden">
     <div class="modal" role="dialog" aria-modal="true">
@@ -260,7 +270,7 @@
     </div>
   </div>
 
-  <script src="/static/app.js?v=3"></script>
+  <script src="/static/app.js?v=4"></script>
 
   <style>
     #view-calc .cv-leg{background:var(--surface2,#121a2b);border:1px solid var(--border,#1b2740);border-radius:14px;padding:16px;margin-bottom:14px}
