@@ -384,7 +384,17 @@ function renderCalc() {
     oddInp.value = (CALC_ODDS[i] || Number(leg.odd)).toFixed(2);
     oddInp.addEventListener("input", () => {
       CALC_ODDS[i] = parseFloat(oddInp.value) || 0;
-      updateCalcTotals();          // mantém os valores; mostra o lucro novo
+      // mudou a odd -> REEQUILIBRA os dois lados (mesmo retorno em cada casa),
+      // mantendo o total. Antes ele mantinha os valores e os lados ficavam
+      // desiguais (um dava 1168, outro 1111). Agora recalcula certinho.
+      const total = CALC_STAKES.reduce((s, v) => s + (Number(v) || 0), 0);
+      CALC_STAKES = splitEquilibrado(total);
+      const its = $("#calc-legs").children;
+      CALC_SB.legs.forEach((lg, j) => {
+        const si = its[j] && its[j].querySelector(".calc-stake-input");
+        if (si) si.value = Math.round((Number(CALC_STAKES[j]) || 0) * 100) / 100;
+      });
+      updateCalcTotals();
     });
     oddWrap.appendChild(oddInp);
     t.appendChild(oddWrap);
