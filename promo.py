@@ -34,9 +34,16 @@ INTERVALO_MAX_MIN = int(getattr(config, "TELEGRAM_POST_MAX_MIN", 50))
 
 def _sortear_intervalo():
     return random.randint(INTERVALO_MIN_MIN, INTERVALO_MAX_MIN) * 60
-# Faixa de lucro das entradas do canal: 2% a 5%.
-FAIXA_NORMAL = (2.0, 5.0)
-# Janela ativa (Brasília): entradas só entre HORA_INICIO e HORA_FIM. Fora disso, silêncio.
+# Faixa de lucro das entradas do canal (amostra grátis, completa): 2% a 4%.
+FAIXA_NORMAL = (2.0, 4.0)
+# Teto de entradas normais por dia (segurança; com ~80-100 min cai em ~9-10).
+MAX_ENTRADAS_DIA = 15
+# Iscas PRO: entradas de alto lucro (8-12%), só times + %, 2x/dia.
+ISCA_MIN_PCT = 8.0
+ISCA_MAX_PCT = 12.0
+PRO_MENSAL = 97
+# Janela ativa (Brasília). O bom dia/boa noite agora saem em HORÁRIO ALEATÓRIO
+# dentro dessas faixas (nunca cravado) — ver _reset_dia.
 HORA_INICIO = int(getattr(config, "TELEGRAM_HORA_INICIO", 8))
 HORA_FIM = int(getattr(config, "TELEGRAM_HORA_FIM", 23))
 
@@ -96,7 +103,9 @@ SOCIAL_MSGS = [
 
 _parar = threading.Event()
 _thread = None
-_estado = {"dia": None, "slots": set(), "social": set(), "postados": set(), "marcos": set()}
+_estado = {"dia": None, "slots": set(), "social": set(), "postados": set(),
+           "marcos": set(), "bomdia_min": 0, "boanoite_min": 0,
+           "isca_alvos": [], "iscas": set(), "entradas": 0}
 _social_i = 0
 
 
@@ -105,8 +114,18 @@ def _agora():
 
 
 def _reset_dia(dia):
-    _estado.update({"dia": dia, "slots": set(), "social": set(),
-                    "postados": set(), "marcos": set()})
+    """Zera o dia e SORTEIA os horários (nunca cravados):
+    bom dia 08:00–08:59, boa noite 22:00–22:59, e 2 janelas de isca."""
+    _estado.update({
+        "dia": dia, "slots": set(), "social": set(),
+        "postados": set(), "marcos": set(),
+        "bomdia_min": 8 * 60 + random.randint(0, 59),       # 08:00–08:59
+        "boanoite_min": 22 * 60 + random.randint(0, 59),    # 22:00–22:59
+        "isca_alvos": sorted([random.randint(11 * 60, 14 * 60),    # 1ª isca 11h–14h
+                              random.randint(17 * 60, 20 * 60)]),  # 2ª isca 17h–20h
+        "iscas": set(),
+        "entradas": 0,
+    })
 
 
 def _pegar(cands):
@@ -263,6 +282,42 @@ def postar_faixa(lo, hi, rotulo):
     return True
 
 
+def _pct_txt(p):
+    """8.0 -> '8'  ·  10.4 -> '10,4'  (formato BR, sem zero à toa)."""
+    s = f"{float(p):.1f}".rstrip("0").rstrip(".")
+    return s.replace(".", ",")
+
+
+def postar_isca():
+    """ISCA PRO: entrada REAL de alto lucro (8-12%), mostrando SÓ os times + o %
+    (sem odds/casa). Puxa pro PRO com o pitch de 'em 1-2 entradas você tira o
+    investimento'. Nunca repete (dedup persistente). Retorna True se postou."""
+    sb = _pegar(feed.get_surebets(min_profit=ISCA_MIN_PCT, max_profit=ISCA_MAX_PCT))
+    if not sb:
+        return False
+    pct = float(sb["profit_pct"])
+    # banca de exemplo R$500–1.000, escolhida pra o "1-2 entradas paga o PRO" ser sempre verdade
+    banca = random.choice([500, 1000]) if pct >= 10 else 1000
+    lucro = banca * pct / 100.0
+    banca_txt = "500" if banca == 500 else "1.000"
+    msg = (
+        f"🎯 <b>ENTRADA PRO — {_pct_txt(pct)}% DE RETORNO</b>\n\n"
+        f"⚽ {notifier._esc(str(sb.get('event','')))}\n\n"
+        f"Quem é PRO pegou essa agora — com as casas e as odds pra travar o lucro. 🔒\n\n"
+        f"💰 Com <b>R$ {banca_txt}</b> nessa jogada, o lucro travado é <b>R$ {_fmt(lucro)}</b> "
+        f"— ganhe quem ganhar, sem risco.\n"
+        f"Em <b>1-2 entradas</b> dessas você já tira o investimento do PRO "
+        f"(R$ {PRO_MENSAL}). O resto é <b>lucro no bolso</b>. 💸\n\n"
+        f"No grátis você vê até 4%. No PRO, essas de 8%, 10%, 12%+ chegam na hora. 👇\n"
+        f"👉 {config.SITE_URL}/cadastro"
+    )
+    notifier.enviar_texto(msg)
+    _estado["postados"].add(sb["id"])
+    auth.registrar_post(sb["id"])        # PERSISTE — nunca reposta esta entrada
+    print(f">> promo: ISCA {_pct_txt(pct)}% {sb.get('event','')}")
+    return True
+
+
 def postar_vip():
     """(Fora do fluxo diário — mantido p/ uso manual/futuro.) Teaser borrado."""
     sb = _pegar(feed.get_surebets(min_profit=8.0))
@@ -311,20 +366,37 @@ def _loop():
                 ultimo = 0.0
             if notifier.ativo():
                 agora = _time.time()
-                # ☀️ BOM DIA às HORA_INICIO:00 (1x no dia) -> liga o fluxo
-                if hhmm == f"{HORA_INICIO:02d}:00" and "bomdia" not in _estado["marcos"]:
-                    _estado["marcos"].add("bomdia")
+                minuto = a.hour * 60 + a.minute
+                marcos = _estado["marcos"]
+                # ☀️ BOM DIA — horário SORTEADO 08:00–09:00 (1x/dia) -> liga o fluxo
+                if minuto >= _estado["bomdia_min"] and "bomdia" not in marcos:
+                    marcos.add("bomdia")
                     notifier.enviar_texto(_bom_dia_msg(a))
                     ultimo = 0.0
-                # 🌙 BOA NOITE às HORA_FIM:00 (1x no dia) -> resumo e para
-                elif hhmm == f"{HORA_FIM:02d}:00" and "boanoite" not in _estado["marcos"]:
-                    _estado["marcos"].add("boanoite")
+                    intervalo_seg = 0          # 1ª entrada sai logo após o bom dia
+                # 🌙 BOA NOITE — horário SORTEADO 22:00–23:00 (1x/dia) -> resumo e fecha
+                elif "bomdia" in marcos and "boanoite" not in marcos \
+                        and minuto >= _estado["boanoite_min"]:
+                    marcos.add("boanoite")
                     _postar_boa_noite(dia)
-                # 🎯 entradas 2-5% só na janela [HORA_INICIO, HORA_FIM), a cada 30-50 min
-                elif HORA_INICIO <= hora < HORA_FIM and agora - ultimo >= intervalo_seg:
-                    postar_faixa(*FAIXA_NORMAL, "2-5%")
-                    ultimo = agora
-                    intervalo_seg = _sortear_intervalo()
+                # janela ativa: SÓ entre o bom dia e o boa noite (fora disso, silêncio)
+                elif "bomdia" in marcos and "boanoite" not in marcos:
+                    postou_isca = False
+                    # 🔒 ISCAS PRO (8-12%, 2x/dia) — disparam no horário do slot
+                    for i, alvo in enumerate(_estado["isca_alvos"]):
+                        if i in _estado["iscas"] or minuto < alvo:
+                            continue
+                        if postar_isca():
+                            _estado["iscas"].add(i)
+                            postou_isca = True
+                        break                  # no máx. 1 tentativa de isca por tick
+                    # 🎯 ENTRADA NORMAL 2-4% (~80-100 min, teto MAX_ENTRADAS_DIA/dia)
+                    if (not postou_isca and _estado["entradas"] < MAX_ENTRADAS_DIA
+                            and agora - ultimo >= intervalo_seg):
+                        if postar_faixa(*FAIXA_NORMAL, "2-4%"):
+                            _estado["entradas"] += 1
+                        ultimo = agora
+                        intervalo_seg = _sortear_intervalo()
         except Exception as e:
             print("!! promo loop erro:", e)
         _parar.wait(30)
@@ -341,8 +413,9 @@ def iniciar():
     _parar.clear()
     _thread = threading.Thread(target=_loop, name="promo-telegram", daemon=True)
     _thread.start()
-    print(f">> Promo Telegram iniciado — entradas 2-5% a cada {INTERVALO_MIN_MIN}-"
-          f"{INTERVALO_MAX_MIN} min, das {HORA_INICIO:02d}h às {HORA_FIM:02d}h (bom dia/boa noite).")
+    print(f">> Promo Telegram iniciado — entradas 2-4% (~{INTERVALO_MIN_MIN}-{INTERVALO_MAX_MIN} min, "
+          f"máx {MAX_ENTRADAS_DIA}/dia) + 2 iscas PRO {int(ISCA_MIN_PCT)}-{int(ISCA_MAX_PCT)}%. "
+          f"Bom dia 8-9h / boa noite 22-23h (aleatórios).")
 
 
 def parar():
