@@ -498,6 +498,7 @@ function renderBanca() {
    ["Lucro realizado", brl(realizado), realizado < 0 ? "red" : "green"]]
     .forEach(([k, v, cls]) => { const c = el("div", "metric"); c.appendChild(el("div", "metric-label", k)); c.appendChild(el("div", "metric-val " + cls, v)); $("#bank-metrics").appendChild(c); });
 
+  renderBankChart();
   list.innerHTML = "";
   if (!banca.length) { empty.classList.remove("hidden"); return; }
   empty.classList.add("hidden");
@@ -552,7 +553,82 @@ function switchView(v) {
   $("#view-bank").classList.toggle("hidden", v !== "bank");
   const vc = document.getElementById("view-calc");
   if (vc) vc.classList.toggle("hidden", v !== "calc");
+  const vl = document.getElementById("view-learn");
+  if (vl) vl.classList.toggle("hidden", v !== "learn");
   if (v === "bank") renderBanca();
+  if (v === "learn") renderLearn();
+}
+
+// ---------- Aprenda (vídeos do YouTube) ----------
+const LEARN_VIDEOS = [
+  { id: "m22EW4JDmf8", t: "Como lucrar todo dia — o método matemático" },
+  { id: "Pu4uTm19uDQ", t: "Surebet do ZERO: lucro garantido nos 2 lados" },
+  { id: "QsqbpVrYdqQ", t: "Surebet do ZERO aos R$500 · #3" },
+  { id: "IYNEYCGIdAc", t: "Surebet do ZERO aos R$500 · #2" },
+];
+let _learnDone = false;
+function renderLearn() {
+  const grid = document.getElementById("learn-grid");
+  if (!grid || _learnDone) return;
+  _learnDone = true;
+  grid.innerHTML = "";
+  LEARN_VIDEOS.forEach((v) => {
+    const card = el("div", null);
+    card.style.cssText = "cursor:pointer;border:1px solid var(--border,#1b2740);border-radius:12px;overflow:hidden;background:var(--surface2,#121a2b);transition:transform .12s";
+    card.onmouseenter = () => card.style.transform = "translateY(-3px)";
+    card.onmouseleave = () => card.style.transform = "";
+    card.innerHTML =
+      `<div style="position:relative;padding-top:56.25%">
+         <img src="https://i.ytimg.com/vi/${v.id}/hqdefault.jpg" loading="lazy"
+              style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover" />
+         <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center">
+           <div style="width:46px;height:46px;border-radius:50%;background:rgba(255,0,0,.9);display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px">▶</div>
+         </div>
+       </div>
+       <div style="padding:10px 12px;font-size:13px;font-weight:600;color:var(--text,#f2f6fc);line-height:1.3">${v.t}</div>`;
+    card.addEventListener("click", () => {
+      const pl = document.getElementById("learn-player");
+      if (pl) pl.src = "https://www.youtube.com/embed/" + v.id + "?autoplay=1&rel=0";
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+    grid.appendChild(card);
+  });
+}
+
+// ---------- Gráfico de evolução do lucro (banca) ----------
+function renderBankChart() {
+  const box = document.getElementById("bank-chart");
+  if (!box) return;
+  const done = banca.filter((e) => e.status === "concluida");
+  if (done.length < 2) { box.style.display = "none"; box.innerHTML = ""; return; }
+  box.style.display = "";
+  const parse = (s) => { const p = (s || "").split("/"); return p.length === 3 ? new Date(+p[2], +p[1] - 1, +p[0]).getTime() : 0; };
+  const sorted = done.slice().sort((a, b) => parse(a.created) - parse(b.created));
+  let acc = 0; const pts = [0];
+  sorted.forEach((e) => { acc += (e.expected || 0); pts.push(acc); });
+  const W = 700, H = 200, pad = 10;
+  const min = Math.min(...pts, 0), max = Math.max(...pts, 0), rng = (max - min) || 1;
+  const X = (i) => pad + i * (W - 2 * pad) / (pts.length - 1);
+  const Y = (v) => H - pad - (v - min) * (H - 2 * pad) / rng;
+  const line = pts.map((v, i) => (i ? "L" : "M") + X(i).toFixed(1) + " " + Y(v).toFixed(1)).join(" ");
+  const area = line + ` L ${X(pts.length - 1).toFixed(1)} ${(H - pad).toFixed(1)} L ${pad} ${(H - pad).toFixed(1)} Z`;
+  const pos = acc >= 0, cor = pos ? "#2ee6a8" : "#ff6b6b", zeroY = Y(0).toFixed(1);
+  box.innerHTML =
+    `<div style="background:var(--surface,#0e1421);border:1px solid var(--border,#1b2740);border-radius:16px;padding:18px 18px 10px;margin-bottom:18px">
+       <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px">
+         <div style="font-weight:800;font-size:14px">📈 Evolução do lucro</div>
+         <div style="font-weight:800;font-size:19px;color:${cor}">${pos ? "+" : ""}${brl(acc)}</div>
+       </div>
+       <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">
+         <defs><linearGradient id="bcg" x1="0" y1="0" x2="0" y2="1">
+           <stop offset="0" stop-color="${cor}" stop-opacity="0.28"/><stop offset="1" stop-color="${cor}" stop-opacity="0"/>
+         </linearGradient></defs>
+         <line x1="${pad}" y1="${zeroY}" x2="${W - pad}" y2="${zeroY}" stroke="#27395c" stroke-width="1" stroke-dasharray="4 4"/>
+         <path d="${area}" fill="url(#bcg)"/>
+         <path d="${line}" fill="none" stroke="${cor}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+       </svg>
+       <div style="font-size:11.5px;color:var(--muted,#647388);text-align:center;margin-top:6px">lucro acumulado das ${sorted.length} entradas concluídas</div>
+     </div>`;
 }
 
 // ---------- Eventos ----------
