@@ -270,7 +270,7 @@
     </div>
   </div>
 
-  <script src="/static/app.js?v=4"></script>
+  <script src="/static/app.js?v=5"></script>
 
   <style>
     #view-calc .cv-leg{background:var(--surface2,#121a2b);border:1px solid var(--border,#1b2740);border-radius:14px;padding:16px;margin-bottom:14px}
@@ -282,8 +282,8 @@
     #view-calc .cv-in{width:100%;background:var(--bg,#05070d);border:1px solid var(--border2,#27395c);border-radius:11px;padding:12px 13px;color:var(--text,#f2f6fc);font-size:15px;font-family:inherit;outline:none}
     #view-calc .cv-in:focus{border-color:var(--cyan,#38d4f5)}
     #view-calc .cv-btns{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0}
-    #view-calc .cv-mini{background:rgba(255,255,255,.05);border:1px solid var(--border2,#27395c);color:var(--text,#f2f6fc);border-radius:9px;padding:9px 12px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit}
-    #view-calc .cv-mini:hover{border-color:var(--cyan,#38d4f5)}
+    #view-calc .cv-mini,#view-alertas .cv-mini{background:rgba(255,255,255,.05);border:1px solid var(--border2,#27395c);color:var(--text,#f2f6fc);border-radius:9px;padding:9px 12px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit}
+    #view-calc .cv-mini:hover,#view-alertas .cv-mini:hover{border-color:var(--cyan,#38d4f5)}
     #view-calc .cv-result{margin-top:18px;border-radius:15px;padding:20px;text-align:center;background:linear-gradient(160deg,rgba(46,230,168,.12),var(--surface2,#121a2b));border:1px solid rgba(46,230,168,.4)}
     #view-calc .cv-result.bad{background:linear-gradient(160deg,rgba(255,107,107,.1),var(--surface2,#121a2b));border-color:rgba(255,107,107,.4)}
     #view-calc .cv-big{font-size:32px;font-weight:800;color:var(--green,#2ee6a8)}
@@ -292,9 +292,9 @@
     #view-calc .cv-pct{display:inline-block;margin-top:10px;background:rgba(46,230,168,.15);color:var(--green,#2ee6a8);font-weight:800;font-size:14px;padding:5px 14px;border-radius:99px}
     #view-calc .cv-result.bad .cv-pct{background:rgba(255,107,107,.15);color:#ff6b6b}
     #view-calc .cv-hint{color:var(--muted,#647388);font-size:12.5px;text-align:center;margin-top:10px}
-    #view-calc .cv-launch{width:100%;margin-top:14px;background:var(--grad,linear-gradient(112deg,#2ee6a8,#38d4f5));color:#052015;font-weight:800;font-size:15px;padding:14px;border:none;border-radius:12px;cursor:pointer;font-family:inherit}
-    #view-calc .cv-launch:hover{filter:brightness(1.05)}
-    #view-calc .cv-launch:disabled{opacity:.6;cursor:default}
+    #view-calc .cv-launch,#view-alertas .cv-launch{width:100%;margin-top:14px;background:var(--grad,linear-gradient(112deg,#2ee6a8,#38d4f5));color:#052015;font-weight:800;font-size:15px;padding:14px;border:none;border-radius:12px;cursor:pointer;font-family:inherit}
+    #view-calc .cv-launch:hover,#view-alertas .cv-launch:hover{filter:brightness(1.05)}
+    #view-calc .cv-launch:disabled,#view-alertas .cv-launch:disabled{opacity:.6;cursor:default}
   </style>
   <script>
   (function(){

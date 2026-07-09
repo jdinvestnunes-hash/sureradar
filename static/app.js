@@ -573,33 +573,53 @@ async function renderAlertas() {
   const casas = (META && META.bookmakers) || [];
   const sel = new Set(d.casas || []);
   const checks = casas.map((b) =>
-    `<label style="display:flex;align-items:center;gap:8px;font-size:13.5px;padding:7px 10px;border:1px solid var(--border,#1b2740);border-radius:9px;cursor:pointer;background:var(--bg,#05070d);min-width:0">
+    `<label style="display:flex;align-items:center;gap:9px;font-size:13.5px;padding:9px 12px;border:1px solid var(--border,#1b2740);border-radius:10px;cursor:pointer;background:var(--bg,#05070d);min-width:0">
        <input type="checkbox" class="al-casa" value="${b.key}" ${sel.has(b.key) ? "checked" : ""} style="flex:0 0 auto"/>
        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${b.label}</span>
      </label>`).join("");
-  const conn = d.conectado
-    ? `<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-         <div style="color:var(--green,#2ee6a8);font-weight:800;font-size:15px">✅ Telegram conectado</div>
+  // ---- topo: conectar (passo a passo) OU status conectado ----
+  const passo = (n, txt) =>
+    `<div style="display:flex;gap:13px;align-items:flex-start;text-align:left;margin-bottom:13px">
+       <div style="width:28px;height:28px;flex:0 0 auto;border-radius:50%;background:var(--grad,linear-gradient(112deg,#2ee6a8,#38d4f5));color:#052015;font-weight:800;font-size:14px;display:flex;align-items:center;justify-content:center">${n}</div>
+       <div style="font-size:14.5px;color:var(--dim,#a3b1c9);padding-top:3px;line-height:1.45">${txt}</div>
+     </div>`;
+  const topo = d.conectado
+    ? `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:rgba(46,230,168,.09);border:1px solid rgba(46,230,168,.35);border-radius:13px;padding:16px 18px">
+         <div style="color:var(--green,#2ee6a8);font-weight:800;font-size:15.5px">✅ Telegram conectado</div>
          <button id="al-desc" class="cv-mini">Desconectar</button>
        </div>`
-    : `<a href="${d.connect_url || '#'}" target="_blank" rel="noopener" class="cv-launch" style="display:inline-block;width:auto;text-decoration:none;padding:13px 26px">🔔 Conectar meu Telegram</a>
-       <p style="color:var(--muted,#647388);font-size:12.5px;margin-top:10px">Clica no botão, aperta <b>Iniciar</b> no bot e volta aqui. Depois <button id="al-refresh" style="background:none;border:none;color:var(--cyan,#38d4f5);cursor:pointer;padding:0;font:inherit">atualiza a página</button>.</p>`;
+    : `<div style="background:var(--bg,#05070d);border:1px solid var(--border2,#27395c);border-radius:14px;padding:22px 20px">
+         <div style="font-family:var(--fd,'Sora',sans-serif);font-weight:800;font-size:18px;text-align:center;margin-bottom:6px">Conecte seu Telegram</div>
+         <div style="color:var(--dim,#a3b1c9);font-size:13.5px;text-align:center;margin-bottom:22px">3 passos rápidos pra as surebets caírem na sua DM 👇</div>
+         ${passo(1, 'Clique no botão <b style="color:var(--text,#f2f6fc)">"Conectar meu Telegram"</b> aqui embaixo.')}
+         ${passo(2, 'No Telegram que abrir, aperte o botão <b style="color:var(--text,#f2f6fc)">INICIAR</b> (Start) do bot. Ele vai confirmar: <i>"✅ Telegram conectado"</i>.')}
+         ${passo(3, 'Volte NESTA página e clique em <b style="color:var(--text,#f2f6fc)">"Já conectei — Atualizar"</b>.')}
+         <a href="${d.connect_url || '#'}" target="_blank" rel="noopener" class="cv-launch" style="display:block;text-align:center;text-decoration:none;margin-top:20px">🔔 Conectar meu Telegram</a>
+         <button id="al-refresh" class="cv-mini" style="width:100%;margin-top:10px;padding:12px">🔄 Já conectei — Atualizar</button>
+       </div>`;
   box.innerHTML =
-    `<div style="background:var(--surface,#0e1421);border:1px solid var(--border,#1b2740);border-radius:16px;padding:22px">
-       ${conn}
-       <div style="height:1px;background:var(--border,#1b2740);margin:20px 0"></div>
-       <div style="font-weight:800;font-size:13.5px;margin-bottom:9px">Lucro mínimo</div>
-       <div style="display:flex;align-items:center;gap:10px;margin-bottom:22px">
-         <input id="al-min" type="number" min="0" step="0.5" value="${d.min_pct}" style="width:100px;background:var(--bg,#05070d);border:1px solid var(--border2,#27395c);border-radius:10px;padding:11px 13px;color:var(--text,#f2f6fc);font-size:15px"/>
-         <span style="color:var(--dim,#a3b1c9)">% ou mais</span>
+    `<div style="background:var(--surface,#0e1421);border:1px solid var(--border,#1b2740);border-radius:18px;padding:30px 28px">
+       ${topo}
+       <div style="height:1px;background:var(--border,#1b2740);margin:28px 0"></div>
+       <div style="font-family:var(--fd,'Sora',sans-serif);font-weight:800;font-size:16px;margin-bottom:4px">O que você quer receber</div>
+       <div style="color:var(--muted,#647388);font-size:13px;margin-bottom:20px">Ajuste abaixo e clique em salvar. Vale mesmo antes de conectar.</div>
+
+       <div style="font-weight:800;font-size:14px;margin-bottom:10px">💰 Lucro mínimo</div>
+       <div style="display:flex;align-items:center;gap:11px;margin-bottom:26px">
+         <input id="al-min" type="number" min="0" step="0.5" value="${d.min_pct}" style="width:110px;background:var(--bg,#05070d);border:1px solid var(--border2,#27395c);border-radius:11px;padding:13px 15px;color:var(--text,#f2f6fc);font-size:16px;font-weight:700"/>
+         <span style="color:var(--dim,#a3b1c9);font-size:14.5px">% ou mais</span>
        </div>
-       <div style="font-weight:800;font-size:13.5px;margin-bottom:9px">Só nessas casas <span style="font-weight:500;color:var(--muted,#647388);font-size:12px">· nenhuma marcada = todas</span></div>
-       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(165px,1fr));gap:8px;align-items:stretch">${checks}</div>
-       <label style="display:flex;align-items:center;gap:9px;margin-top:20px;font-size:14.5px;cursor:pointer">
-         <input id="al-ativo" type="checkbox" ${d.ativo ? "checked" : ""}/> Alertas ativos
+
+       <div style="font-weight:800;font-size:14px;margin-bottom:4px">🏦 Só nessas casas</div>
+       <div style="color:var(--muted,#647388);font-size:12.5px;margin-bottom:12px">Deixe todas desmarcadas pra receber de qualquer casa.</div>
+       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:9px;align-items:stretch">${checks}</div>
+
+       <label style="display:flex;align-items:center;gap:10px;margin-top:26px;font-size:15px;cursor:pointer;font-weight:600">
+         <input id="al-ativo" type="checkbox" ${d.ativo ? "checked" : ""} style="width:18px;height:18px"/> Alertas ativos
        </label>
-       <button id="al-save" class="cv-launch" style="margin-top:18px">Salvar preferências</button>
-       <div id="al-msg" style="font-size:13px;margin-top:10px;min-height:16px;text-align:center"></div>
+
+       <button id="al-save" class="cv-launch" style="width:100%;margin-top:22px;padding:16px;font-size:16px">💾 Salvar preferências</button>
+       <div id="al-msg" style="font-size:13.5px;margin-top:12px;min-height:18px;text-align:center;font-weight:600"></div>
      </div>`;
   const rf = document.getElementById("al-refresh"); if (rf) rf.onclick = () => location.reload();
   const ds = document.getElementById("al-desc"); if (ds) ds.onclick = async () => { await fetch("/api/alerta/desconectar", { method: "POST" }); renderAlertas(); };
