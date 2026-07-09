@@ -374,10 +374,11 @@ def _loop():
                 if "bomdia" not in marcos and minuto >= _estado["bomdia_min"]:
                     if minuto < 10 * 60:            # ainda é de manhã -> posta
                         notifier.enviar_texto(_bom_dia_msg(a))
-                        ultimo = 0.0
-                        intervalo_seg = 0
-                    else:                          # restart tarde -> não posta
                         ultimo = agora
+                        intervalo_seg = 10 * 60     # 1ª entrada ~10 min após o bom dia
+                    else:                          # restart tarde -> NÃO posta e espera
+                        ultimo = agora
+                        intervalo_seg = _sortear_intervalo()   # e aguarda 80-100 min
                     marcos.add("bomdia")
                 # dia ABERTO: só age entre o bom dia e o boa noite
                 if "bomdia" in marcos and "boanoite" not in marcos:
