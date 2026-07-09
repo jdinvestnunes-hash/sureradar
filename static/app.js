@@ -569,7 +569,23 @@ async function renderAlertas() {
   box.innerHTML = '<div class="empty">Carregando…</div>';
   let d;
   try { d = await (await fetch("/api/alerta")).json(); } catch { box.innerHTML = '<div class="empty">Erro ao carregar.</div>'; return; }
-  if (!d || !d.liberado) { box.innerHTML = '<div class="empty">Indisponível na sua conta.</div>'; return; }
+  if (!d) { box.innerHTML = '<div class="empty">Erro ao carregar.</div>'; return; }
+  if (!d.liberado) {
+    // FREE: tela de upgrade (é função PRO)
+    box.innerHTML =
+      `<div style="background:var(--surface,#0e1421);border:1px solid var(--border,#1b2740);border-radius:18px;padding:40px 28px;text-align:center">
+         <div style="font-size:46px;margin-bottom:6px">🔒</div>
+         <div style="font-family:var(--fd,'Sora',sans-serif);font-weight:800;font-size:22px;margin-bottom:10px">Alertas no Telegram é <span style="color:var(--gold,#ffc94d)">PRO</span></div>
+         <p style="color:var(--dim,#a3b1c9);font-size:15px;line-height:1.6;max-width:450px;margin:0 auto">Escolha as <b style="color:var(--text,#f2f6fc)">casas</b> e o <b style="color:var(--text,#f2f6fc)">lucro mínimo</b> — e as surebets que baterem chegam <b style="color:var(--text,#f2f6fc)">na sua DM do Telegram</b>, na hora. Sem ficar olhando o painel.</p>
+         <ul style="list-style:none;padding:0;margin:20px auto;max-width:340px;text-align:left;color:var(--dim,#a3b1c9);font-size:14.5px;display:flex;flex-direction:column;gap:9px">
+           <li>✅ Só das casas que você usa</li>
+           <li>✅ A partir do lucro que você escolher</li>
+           <li>✅ Direto no Telegram, na hora</li>
+         </ul>
+         <button onclick="location.href='/planos'" class="cv-launch" style="max-width:320px;margin:8px auto 0">🚀 Fazer upgrade pro PRO</button>
+       </div>`;
+    return;
+  }
   const casas = (META && META.bookmakers) || [];
   const sel = new Set(d.casas || []);
   const checks = casas.map((b) =>
@@ -757,8 +773,8 @@ async function initUser() {
       location.href = "/login";
     });
   }
-  // aba de Alertas (beta): só aparece pra e-mails liberados
-  if (me && me.alertas) { const ta = document.getElementById("tab-alertas"); if (ta) ta.style.display = ""; }
+  // aba de Alertas: aparece pra todo mundo logado (FREE vê a tela de upgrade)
+  if (me) { const ta = document.getElementById("tab-alertas"); if (ta) ta.style.display = ""; }
   return true;
 }
 

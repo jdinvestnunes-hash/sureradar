@@ -784,9 +784,11 @@ def me(request: Request):
 
 
 def _alerta_liberado(user):
-    """BETA: alertas no Telegram liberados só para os e-mails de config.ALERTA_BETA_EMAILS."""
+    """Alertas no Telegram: função PRO (ou e-mails do beta em ALERTA_BETA_EMAILS)."""
     if not user:
         return False
+    if _plano_efetivo(user) == "pro":
+        return True
     emails = [e.strip().lower() for e in (config.ALERTA_BETA_EMAILS or "").split(",") if e.strip()]
     return user.get("email", "").strip().lower() in emails
 
@@ -797,7 +799,7 @@ def alerta_config(request: Request):
     if not user:
         return JSONResponse({"erro": "não autenticado"}, status_code=401)
     if not _alerta_liberado(user):
-        return {"liberado": False}
+        return {"liberado": False, "precisa_pro": True}
     cfg = auth.alerta_get(user["id"]) or {}
     connect_url = ""
     if not cfg.get("conectado"):
