@@ -42,6 +42,9 @@ MAX_ENTRADAS_DIA = 15
 ISCA_MIN_PCT = 8.0
 ISCA_MAX_PCT = 12.0
 PRO_MENSAL = 97
+ISCA_MAX_DIA = 2                    # no MÁX. 2 iscas por dia (contador persistente)
+ISCA_JANELA = (11 * 60, 20 * 60)   # só entre 11h e 20h
+ISCA_GAP_SEG = int(3.5 * 3600)     # mín. 3h30 entre uma isca e outra
 # Janela ativa (Brasília). O bom dia/boa noite agora saem em HORÁRIO ALEATÓRIO
 # dentro dessas faixas (nunca cravado) — ver _reset_dia.
 HORA_INICIO = int(getattr(config, "TELEGRAM_HORA_INICIO", 8))
@@ -105,7 +108,7 @@ _parar = threading.Event()
 _thread = None
 _estado = {"dia": None, "slots": set(), "social": set(), "postados": set(),
            "marcos": set(), "bomdia_min": 0, "boanoite_min": 0,
-           "isca_alvos": [], "iscas": set(), "entradas": 0}
+           "iscas_feitas": 0, "ultima_isca": 0.0, "entradas": 0}
 _social_i = 0
 
 
@@ -114,18 +117,47 @@ def _agora():
 
 
 def _reset_dia(dia):
-    """Zera o dia e SORTEIA os horários (nunca cravados):
-    bom dia 08:00–08:59, boa noite 22:00–22:59, e 2 janelas de isca."""
+    """Começa o dia SORTEANDO os horários (bom dia/boa noite nunca cravados) e
+    RECUPERANDO do banco o que já foi feito hoje — assim um restart/deploy NÃO
+    duplica bom dia, boa noite nem iscas."""
+    est = {}
+    try:
+        est = auth.promo_dia_get(dia)
+    except Exception as e:
+        print("!! promo_dia_get:", e)
+    marcos = set()
+    if est.get("bomdia"):
+        marcos.add("bomdia")
+    if est.get("boanoite"):
+        marcos.add("boanoite")
+    # Sem histórico persistido E já dentro da janela de iscas (= restart no meio do
+    # dia): trava a próxima isca pra daqui a 1 gap, pra não disparar na hora do restart.
+    ultima = float(est.get("ultima_isca", 0) or 0)
+    if not ultima and not int(est.get("iscas", 0) or 0):
+        _ag = _agora()
+        if (_ag.hour * 60 + _ag.minute) >= ISCA_JANELA[0]:
+            ultima = _time.time()
     _estado.update({
-        "dia": dia, "slots": set(), "social": set(),
-        "postados": set(), "marcos": set(),
+        "dia": dia, "slots": set(), "social": set(), "postados": set(),
+        "marcos": marcos,
         "bomdia_min": 8 * 60 + random.randint(0, 59),       # 08:00–08:59
         "boanoite_min": 22 * 60 + random.randint(0, 59),    # 22:00–22:59
-        "isca_alvos": sorted([random.randint(11 * 60, 14 * 60),    # 1ª isca 11h–14h
-                              random.randint(17 * 60, 20 * 60)]),  # 2ª isca 17h–20h
-        "iscas": set(),
-        "entradas": 0,
+        "iscas_feitas": int(est.get("iscas", 0) or 0),
+        "ultima_isca": ultima,
+        "entradas": int(est.get("entradas", 0) or 0),
     })
+
+
+def _salvar_estado():
+    """Persiste o estado do dia no banco (pra sobreviver a restart)."""
+    try:
+        auth.promo_dia_salvar(
+            _estado["dia"],
+            1 if "bomdia" in _estado["marcos"] else 0,
+            1 if "boanoite" in _estado["marcos"] else 0,
+            _estado["iscas_feitas"], _estado["entradas"], _estado["ultima_isca"])
+    except Exception as e:
+        print("!! _salvar_estado:", e)
 
 
 def _pegar(cands):
@@ -302,7 +334,7 @@ def postar_isca():
     banca_txt = "500" if banca == 500 else "1.000"
     msg = (
         f"🎯 <b>ENTRADA PRO — {_pct_txt(pct)}% DE RETORNO</b>\n\n"
-        f"⚽ {notifier._esc(str(sb.get('event','')))}\n\n"
+        f"{notifier._sport_emoji(sb)} {notifier._esc(str(sb.get('event','')))}\n\n"
         f"Quem é PRO pegou essa agora — com as casas e as odds pra travar o lucro. 🔒\n\n"
         f"💰 Com <b>R$ {banca_txt}</b> nessa jogada, o lucro travado é <b>R$ {_fmt(lucro)}</b> "
         f"— ganhe quem ganhar, sem risco.\n"
@@ -380,31 +412,33 @@ def _loop():
                         ultimo = agora
                         intervalo_seg = _sortear_intervalo()   # e aguarda 80-100 min
                     marcos.add("bomdia")
+                    _salvar_estado()
                 # dia ABERTO: só age entre o bom dia e o boa noite
                 if "bomdia" in marcos and "boanoite" not in marcos:
                     # 🌙 BOA NOITE — sorteado 22:00–23:00 -> resumo e fecha o dia
                     if minuto >= _estado["boanoite_min"]:
                         marcos.add("boanoite")
                         _postar_boa_noite(dia)
+                        _salvar_estado()
                     else:
                         postou_isca = False
-                        # 🔒 ISCAS PRO (8-12%, 2x/dia) no horário do slot. Tolerância
-                        # de 3h: se passou muito (restart), pula o slot sem postar.
-                        for i, alvo in enumerate(_estado["isca_alvos"]):
-                            if i in _estado["iscas"] or minuto < alvo:
-                                continue
-                            if minuto >= alvo + 180:
-                                _estado["iscas"].add(i)      # perdeu a janela
-                                continue
+                        ini, fim = ISCA_JANELA
+                        # 🔒 ISCA PRO — máx 2/dia, entre 11h e 20h, 3h30 de gap. Contador
+                        # PERSISTENTE (restart/deploy não zera -> nunca dispara demais).
+                        if (_estado["iscas_feitas"] < ISCA_MAX_DIA
+                                and ini <= minuto < fim
+                                and agora - _estado["ultima_isca"] >= ISCA_GAP_SEG):
                             if postar_isca():
-                                _estado["iscas"].add(i)
+                                _estado["iscas_feitas"] += 1
+                                _estado["ultima_isca"] = agora
                                 postou_isca = True
-                            break                  # no máx. 1 tentativa de isca por tick
+                                _salvar_estado()
                         # 🎯 ENTRADA NORMAL 2-4% (~80-100 min, teto MAX_ENTRADAS_DIA/dia)
                         if (not postou_isca and _estado["entradas"] < MAX_ENTRADAS_DIA
                                 and agora - ultimo >= intervalo_seg):
                             if postar_faixa(*FAIXA_NORMAL, "2-4%"):
                                 _estado["entradas"] += 1
+                                _salvar_estado()
                             ultimo = agora
                             intervalo_seg = _sortear_intervalo()
         except Exception as e:

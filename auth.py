@@ -264,6 +264,15 @@ def init():
             user_id BIGINT NOT NULL,
             sb_id TEXT NOT NULL,
             PRIMARY KEY(user_id, sb_id))""")
+        # Estado do DIA do robô de grupo (persiste bom dia/boa noite/iscas/entradas
+        # entre RESTARTS — senão um deploy reseta e duplica isca/bom dia).
+        c.execute("""CREATE TABLE IF NOT EXISTS promo_dia(
+            dia TEXT PRIMARY KEY,
+            bomdia INTEGER DEFAULT 0,
+            boanoite INTEGER DEFAULT 0,
+            iscas INTEGER DEFAULT 0,
+            entradas INTEGER DEFAULT 0,
+            ultima_isca REAL DEFAULT 0)""")
     # Migrações leves para bancos antigos: cada ALTER na SUA transação (no
     # Postgres, um erro aborta a transação inteira). Erro = coluna já existe.
     for tabela, coluna in [("checkouts", "pi TEXT"),
@@ -469,6 +478,24 @@ def pagina_publicada(slug):
     with _db() as c:
         row = c.execute(_q("SELECT publicado FROM paginas_seo WHERE slug=?"), (slug,)).fetchone()
     return True if row is None else bool(row["publicado"])
+
+
+def promo_dia_get(dia):
+    """Estado persistente do dia do robô de grupo (sobrevive a restart/deploy)."""
+    with _db() as c:
+        row = c.execute(_q("SELECT * FROM promo_dia WHERE dia=?"), (dia,)).fetchone()
+    if row:
+        return dict(row)
+    return {"bomdia": 0, "boanoite": 0, "iscas": 0, "entradas": 0, "ultima_isca": 0}
+
+
+def promo_dia_salvar(dia, bomdia, boanoite, iscas, entradas, ultima_isca):
+    with _db() as c:
+        c.execute(_q("""INSERT INTO promo_dia(dia,bomdia,boanoite,iscas,entradas,ultima_isca)
+            VALUES(?,?,?,?,?,?)
+            ON CONFLICT(dia) DO UPDATE SET bomdia=excluded.bomdia, boanoite=excluded.boanoite,
+                iscas=excluded.iscas, entradas=excluded.entradas, ultima_isca=excluded.ultima_isca"""),
+            (dia, int(bomdia), int(boanoite), int(iscas), int(entradas), float(ultima_isca or 0)))
 
 
 def _dia_br():
