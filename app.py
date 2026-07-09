@@ -769,7 +769,8 @@ def me(request: Request):
     if not user:
         return JSONResponse({"erro": "não autenticado"}, status_code=401)
     dias = auth.dias_restantes(user)
-    return {"nome": user["nome"], "email": user["email"], "plano": _plano_efetivo(user),
+    return {"id": user["id"], "nome": user["nome"], "email": user["email"],
+            "plano": _plano_efetivo(user),
             "dias": dias, "aviso_renovar": _aviso_renovar(dias),
             "whatsapp": user.get("whatsapp") or "",
             "admin": _admin_email(user)}

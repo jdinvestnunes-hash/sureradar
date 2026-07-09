@@ -1,11 +1,16 @@
 // SureRadar — dashboard
 
-const FILTERS_KEY = "sureradar_filtros_v6";
-const BANK_KEY = "sureradar_banca_v1";
+// Chaves do localStorage são SEPARADAS POR CONTA (evita 2 contas no mesmo
+// navegador compartilharem banca/filtros). O USER_TAG é preenchido em initUser().
+const FILTERS_BASE = "sureradar_filtros_v6";
+const BANK_BASE = "sureradar_banca_v1";
+let USER_TAG = "anon";
+const filtersKey = () => FILTERS_BASE + "_" + USER_TAG;
+const bankKey = () => BANK_BASE + "_" + USER_TAG;
 
 let META = null, REFRESH_SEC = 600, LAST_TS = 0;
-let filtros = load(FILTERS_KEY, {});
-let banca = load(BANK_KEY, []);
+let filtros = {};      // carregados por conta em initUser()
+let banca = [];
 let SUREBETS = [];
 let LOCKED = [];    // entradas reais de alto lucro (>1%) borradas para o FREE
 let PLANO = "free"; // plano do usuário logado (free | pro)
@@ -45,12 +50,12 @@ const $ = (s) => document.querySelector(s);
 const el = (t, c, h) => { const e = document.createElement(t); if (c) e.className = c; if (h !== undefined) e.innerHTML = h; return e; };
 const brl = (v) => "R$ " + Number(v).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 function load(k, def) { try { return JSON.parse(localStorage.getItem(k)) ?? def; } catch { return def; } }
-function saveFiltros() { localStorage.setItem(FILTERS_KEY, JSON.stringify(filtros)); }
+function saveFiltros() { localStorage.setItem(filtersKey(), JSON.stringify(filtros)); }
 // Banca: salva no navegador (cache) E no SERVIDOR (banco de dados) — assim as
 // entradas sobrevivem a troca de PC/celular e limpeza do navegador.
 let _bancaSyncTimer = null;
 function saveBanca() {
-  localStorage.setItem(BANK_KEY, JSON.stringify(banca));
+  localStorage.setItem(bankKey(), JSON.stringify(banca));
   renderBankBadge();
   clearTimeout(_bancaSyncTimer);            // debounce: agrupa edições rápidas
   _bancaSyncTimer = setTimeout(() => {
@@ -69,16 +74,15 @@ async function syncBancaDoServidor() {
     const doServidor = j.entradas || [];
     if (doServidor.length) {
       banca = doServidor;
-      localStorage.setItem(BANK_KEY, JSON.stringify(banca));
+      localStorage.setItem(bankKey(), JSON.stringify(banca));
     } else if (banca.length) {
-      // migração: primeiras entradas (do localStorage) sobem pro banco
+      // migração: entradas do MESMO usuário (localStorage já é por conta) sobem pro banco
       fetch("/api/banca", { method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ entradas: banca }) }).catch(() => {});
     }
     renderBankBadge();
   } catch { /* offline: segue com o localStorage */ }
 }
-syncBancaDoServidor();
 function sportUI(id) { return SPORTS_UI[id] || { label: id, ico: ICONS.globe }; }
 function dataDe(br) { return br && br.includes(" ") ? br.split(" ")[0] : ""; }        // "dd/mm/yyyy"
 function ddmm(d) { const p = d.split("/"); return p.length >= 2 ? p[0] + "/" + p[1] : d; }
@@ -577,6 +581,11 @@ async function initUser() {
     const r = await fetch("/api/me");
     if (r.status === 401) { location.href = "/login"; return false; }
     me = await r.json();
+    // separa banca/filtros POR CONTA e carrega os dessa conta
+    USER_TAG = String(me.id || me.email || "anon").replace(/[^A-Za-z0-9_.@-]/g, "");
+    filtros = load(filtersKey(), {});
+    banca = load(bankKey(), []);
+    await syncBancaDoServidor();
   } catch { return true; }           // sem rede: deixa o painel abrir
   const chip = $("#user-chip");
   if (chip && me && me.nome) {
