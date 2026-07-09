@@ -250,6 +250,20 @@ def init():
             data_prevista TEXT,
             publicado INTEGER NOT NULL DEFAULT 0,
             publicado_em TEXT)""")
+        # Alertas personalizados no Telegram (1 config por usuário).
+        c.execute("""CREATE TABLE IF NOT EXISTS alertas_tg(
+            user_id BIGINT PRIMARY KEY,
+            chat_id TEXT,
+            token TEXT,
+            casas TEXT,
+            min_pct REAL DEFAULT 5,
+            ativo INTEGER NOT NULL DEFAULT 1,
+            criado TEXT)""")
+        # Dedup: não manda a mesma surebet 2x pro mesmo usuário.
+        c.execute("""CREATE TABLE IF NOT EXISTS alerta_enviados(
+            user_id BIGINT NOT NULL,
+            sb_id TEXT NOT NULL,
+            PRIMARY KEY(user_id, sb_id))""")
     # Migrações leves para bancos antigos: cada ALTER na SUA transação (no
     # Postgres, um erro aborta a transação inteira). Erro = coluna já existe.
     for tabela, coluna in [("checkouts", "pi TEXT"),
@@ -686,6 +700,94 @@ def metricas_por_campanha():
         d["vendas"] = int(r["vendas"])
         d["receita"] = round(float(r["receita"]), 2)
     return out
+
+
+# ---------- Alertas personalizados no Telegram ----------
+def alerta_get(user_id):
+    with _db() as c:
+        row = c.execute(_q("SELECT * FROM alertas_tg WHERE user_id=?"), (user_id,)).fetchone()
+    if not row:
+        return None
+    d = dict(row)
+    d["conectado"] = bool(d.get("chat_id"))
+    d["ativo"] = bool(d.get("ativo"))
+    d["casas"] = [x for x in (d.get("casas") or "").split(",") if x]
+    return d
+
+
+def alerta_salvar(user_id, casas, min_pct, ativo):
+    """Cria/atualiza as preferências (mantém chat_id/token se já existir)."""
+    casas_str = ",".join([str(x).strip() for x in (casas or []) if str(x).strip()])[:2000]
+    try:
+        min_pct = max(0.0, float(min_pct))
+    except (TypeError, ValueError):
+        min_pct = 5.0
+    with _db() as c:
+        c.execute(_q("""INSERT INTO alertas_tg(user_id,casas,min_pct,ativo,criado)
+            VALUES(?,?,?,?,?)
+            ON CONFLICT(user_id) DO UPDATE SET casas=excluded.casas,
+                min_pct=excluded.min_pct, ativo=excluded.ativo"""),
+            (user_id, casas_str, min_pct, 1 if ativo else 0, _dia_br()))
+
+
+def alerta_token(user_id):
+    """Gera (e guarda) um token de conexão; devolve o token pro deep-link do bot."""
+    tok = secrets.token_urlsafe(12)
+    with _db() as c:
+        c.execute(_q("""INSERT INTO alertas_tg(user_id,token,criado) VALUES(?,?,?)
+            ON CONFLICT(user_id) DO UPDATE SET token=excluded.token"""),
+            (user_id, tok, _dia_br()))
+    return tok
+
+
+def alerta_conectar(token, chat_id):
+    """O bot chama isto no /start <token>: liga o chat_id do Telegram à conta."""
+    if not token:
+        return None
+    with _db() as c:
+        row = c.execute(_q("SELECT user_id FROM alertas_tg WHERE token=?"), (token,)).fetchone()
+        if not row:
+            return None
+        c.execute(_q("UPDATE alertas_tg SET chat_id=?, token=NULL WHERE user_id=?"),
+                  (str(chat_id), row["user_id"]))
+    return row["user_id"]
+
+
+def alerta_desconectar(user_id):
+    with _db() as c:
+        c.execute(_q("UPDATE alertas_tg SET chat_id=NULL, token=NULL WHERE user_id=?"), (user_id,))
+
+
+def alerta_ativos():
+    """Configs prontas pra receber alerta: conectadas (chat_id) e ativas."""
+    with _db() as c:
+        rows = c.execute("SELECT * FROM alertas_tg WHERE chat_id IS NOT NULL AND ativo=1").fetchall()
+    out = []
+    for r in rows:
+        d = dict(r)
+        d["casas"] = [x for x in (d.get("casas") or "").split(",") if x]
+        out.append(d)
+    return out
+
+
+def alerta_ja_enviou(user_id, sb_id):
+    with _db() as c:
+        row = c.execute(_q("SELECT 1 FROM alerta_enviados WHERE user_id=? AND sb_id=?"),
+                        (user_id, sb_id)).fetchone()
+    return bool(row)
+
+
+def alerta_marcar(user_id, sb_id):
+    try:
+        with _db() as c:
+            if PG:
+                c.execute(_q("INSERT INTO alerta_enviados(user_id,sb_id) VALUES(?,?) "
+                             "ON CONFLICT DO NOTHING"), (user_id, sb_id))
+            else:
+                c.execute("INSERT OR IGNORE INTO alerta_enviados(user_id,sb_id) VALUES(?,?)",
+                          (user_id, sb_id))
+    except Exception as e:
+        print("!! alerta_marcar:", e)
 
 
 def voltar_free(user_id: int):

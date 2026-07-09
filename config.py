@@ -194,6 +194,11 @@ TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "").strip()
 # Pegue o seu chat_id mandando qualquer mensagem pro bot e vendo em /api/admin/telegram-chats.
 ADMIN_TELEGRAM_CHAT_ID = os.getenv("ADMIN_TELEGRAM_CHAT_ID", "").strip()
 
+# Alertas personalizados no Telegram (surebet que bate com os filtros do usuário
+# cai na DM dele). BETA: liberado só para estes e-mails (separados por vírgula).
+# Ex.: ALERTA_BETA_EMAILS=leosaper12@gmail.com
+ALERTA_BETA_EMAILS = os.getenv("ALERTA_BETA_EMAILS", "").strip()
+
 # Grupo FREE do Telegram: recebe as surebets até este lucro (%), no máximo N por
 # ciclo (evita flood). As de maior lucro ficam pro PRO (funil).
 TELEGRAM_LUCRO_MAX = float(os.getenv("TELEGRAM_LUCRO_MAX", "1.0"))

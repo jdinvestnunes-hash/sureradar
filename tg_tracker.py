@@ -15,11 +15,33 @@ import requests
 
 import auth
 import config
+import notifier
 
 _API = "https://api.telegram.org/bot{}/{}"
 _stop = threading.Event()
 _thread = None
 _offset = 0
+
+
+def _tratar_start(msg):
+    """/start <token> numa DM -> conecta o Telegram do usuário aos alertas."""
+    txt = msg.get("text") or ""
+    partes = txt.split(maxsplit=1)
+    token = partes[1].strip() if len(partes) > 1 else ""
+    chat_id = (msg.get("chat") or {}).get("id")
+    if not chat_id:
+        return
+    uid = auth.alerta_conectar(token, chat_id) if token else None
+    if uid:
+        notifier.enviar_para(chat_id,
+            "✅ <b>Telegram conectado!</b>\n\nAs surebets que batem com os seus filtros "
+            "(casas + lucro mínimo) vão chegar aqui na sua DM. 🔔\n\n"
+            "Pra ajustar ou pausar, é no site → seu perfil → Alertas.")
+        print(f">> alerta: usuário {uid} conectou o Telegram (chat {chat_id})")
+    else:
+        notifier.enviar_para(chat_id,
+            "👋 Oi! Pra ativar os alertas, gere o link de conexão no site "
+            "(seu perfil → Alertas) e clique nele.")
 
 
 def _rodar():
@@ -38,6 +60,11 @@ def _rodar():
             data = r.json()
             for up in data.get("result", []):
                 _offset = max(_offset, up["update_id"])
+                # conexão de alerta: "/start <token>" numa DM com o bot
+                msg = up.get("message")
+                if msg and isinstance(msg.get("text"), str) and msg["text"].startswith("/start"):
+                    _tratar_start(msg)
+                    continue
                 cm = up.get("chat_member")
                 if not cm:
                     continue

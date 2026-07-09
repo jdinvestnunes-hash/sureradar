@@ -46,18 +46,42 @@ def enviar_texto(texto, preview=False):
     })
 
 
+def enviar_para(chat_id, texto, preview=False):
+    """Envia uma mensagem HTML pra um chat específico (ex.: DM de um usuário)."""
+    if not (config.TELEGRAM_BOT_TOKEN and chat_id):
+        return False
+    return _post("sendMessage", {
+        "chat_id": chat_id,
+        "text": texto,
+        "parse_mode": "HTML",
+        "disable_web_page_preview": not preview,
+    })
+
+
 def enviar_admin(texto):
     """Mensagem PRIVADA pro admin (config.ADMIN_TELEGRAM_CHAT_ID) — ex.: aviso de
     venda. No-op silencioso se o chat do admin não estiver configurado."""
-    chat = getattr(config, "ADMIN_TELEGRAM_CHAT_ID", "")
-    if not (config.TELEGRAM_BOT_TOKEN and chat):
-        return False
-    return _post("sendMessage", {
-        "chat_id": chat,
-        "text": texto,
-        "parse_mode": "HTML",
-        "disable_web_page_preview": True,
-    })
+    return enviar_para(getattr(config, "ADMIN_TELEGRAM_CHAT_ID", ""), texto)
+
+
+_BOT_USER = None
+
+
+def bot_username():
+    """Nome de usuário do bot (@...) — pro deep-link t.me/<bot>?start=. Cacheia."""
+    global _BOT_USER
+    if _BOT_USER is not None:
+        return _BOT_USER
+    _BOT_USER = ""
+    try:
+        if config.TELEGRAM_BOT_TOKEN:
+            r = requests.get(API.format(token=config.TELEGRAM_BOT_TOKEN, metodo="getMe"), timeout=10)
+            j = r.json()
+            if j.get("ok"):
+                _BOT_USER = j["result"].get("username", "") or ""
+    except Exception as e:
+        print("!! getMe (bot_username):", e)
+    return _BOT_USER
 
 
 def testar():

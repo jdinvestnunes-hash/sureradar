@@ -40,6 +40,7 @@ import threading
 
 import unicodedata
 
+import alertas
 import auth
 import config
 import emailer
@@ -114,11 +115,16 @@ async def lifespan(app):
         tg_tracker.iniciar()          # conta membros por link de campanha (Telegram)
     except Exception as e:
         print(f"!! Telegram tracker não iniciou: {e}")
+    try:
+        alertas.iniciar()             # alertas personalizados de surebet na DM (PRO)
+    except Exception as e:
+        print(f"!! Alertas Telegram não iniciaram: {e}")
     yield
     pipeline.parar_agendador()
     promo.parar()
     lifecycle.parar()
     tg_tracker.parar()
+    alertas.parar()
 
 
 app = FastAPI(title="Surebet SaaS", version="0.1.0", lifespan=lifespan)
@@ -773,7 +779,57 @@ def me(request: Request):
             "plano": _plano_efetivo(user),
             "dias": dias, "aviso_renovar": _aviso_renovar(dias),
             "whatsapp": user.get("whatsapp") or "",
-            "admin": _admin_email(user)}
+            "admin": _admin_email(user),
+            "alertas": _alerta_liberado(user)}
+
+
+def _alerta_liberado(user):
+    """BETA: alertas no Telegram liberados só para os e-mails de config.ALERTA_BETA_EMAILS."""
+    if not user:
+        return False
+    emails = [e.strip().lower() for e in (config.ALERTA_BETA_EMAILS or "").split(",") if e.strip()]
+    return user.get("email", "").strip().lower() in emails
+
+
+@app.get("/api/alerta")
+def alerta_config(request: Request):
+    user = _usuario(request)
+    if not user:
+        return JSONResponse({"erro": "não autenticado"}, status_code=401)
+    if not _alerta_liberado(user):
+        return {"liberado": False}
+    cfg = auth.alerta_get(user["id"]) or {}
+    connect_url = ""
+    if not cfg.get("conectado"):
+        bot = notifier.bot_username()
+        if bot:
+            connect_url = f"https://t.me/{bot}?start={auth.alerta_token(user['id'])}"
+    return {"liberado": True, "conectado": bool(cfg.get("conectado")),
+            "ativo": bool(cfg.get("ativo", True)), "casas": cfg.get("casas", []),
+            "min_pct": cfg.get("min_pct", 5), "connect_url": connect_url}
+
+
+@app.post("/api/alerta")
+def alerta_salvar_api(request: Request, payload: dict = Body(...)):
+    user = _usuario(request)
+    if not user:
+        return JSONResponse({"erro": "não autenticado"}, status_code=401)
+    if not _alerta_liberado(user):
+        return JSONResponse({"erro": "indisponível"}, status_code=403)
+    auth.alerta_salvar(user["id"], payload.get("casas") or [],
+                       payload.get("min_pct", 5), bool(payload.get("ativo", True)))
+    return {"ok": True}
+
+
+@app.post("/api/alerta/desconectar")
+def alerta_desconectar_api(request: Request):
+    user = _usuario(request)
+    if not user:
+        return JSONResponse({"erro": "não autenticado"}, status_code=401)
+    if not _alerta_liberado(user):
+        return JSONResponse({"erro": "indisponível"}, status_code=403)
+    auth.alerta_desconectar(user["id"])
+    return {"ok": True}
 
 
 @app.get("/api/perfil")
