@@ -368,35 +368,44 @@ def _loop():
                 agora = _time.time()
                 minuto = a.hour * 60 + a.minute
                 marcos = _estado["marcos"]
-                # ☀️ BOM DIA — horário SORTEADO 08:00–09:00 (1x/dia) -> liga o fluxo
-                if minuto >= _estado["bomdia_min"] and "bomdia" not in marcos:
-                    marcos.add("bomdia")
-                    notifier.enviar_texto(_bom_dia_msg(a))
-                    ultimo = 0.0
-                    intervalo_seg = 0          # 1ª entrada sai logo após o bom dia
-                # 🌙 BOA NOITE — horário SORTEADO 22:00–23:00 (1x/dia) -> resumo e fecha
-                elif "bomdia" in marcos and "boanoite" not in marcos \
-                        and minuto >= _estado["boanoite_min"]:
-                    marcos.add("boanoite")
-                    _postar_boa_noite(dia)
-                # janela ativa: SÓ entre o bom dia e o boa noite (fora disso, silêncio)
-                elif "bomdia" in marcos and "boanoite" not in marcos:
-                    postou_isca = False
-                    # 🔒 ISCAS PRO (8-12%, 2x/dia) — disparam no horário do slot
-                    for i, alvo in enumerate(_estado["isca_alvos"]):
-                        if i in _estado["iscas"] or minuto < alvo:
-                            continue
-                        if postar_isca():
-                            _estado["iscas"].add(i)
-                            postou_isca = True
-                        break                  # no máx. 1 tentativa de isca por tick
-                    # 🎯 ENTRADA NORMAL 2-4% (~80-100 min, teto MAX_ENTRADAS_DIA/dia)
-                    if (not postou_isca and _estado["entradas"] < MAX_ENTRADAS_DIA
-                            and agora - ultimo >= intervalo_seg):
-                        if postar_faixa(*FAIXA_NORMAL, "2-4%"):
-                            _estado["entradas"] += 1
+                # ☀️ BOM DIA — sorteado 08:00–09:00. SÓ posta DE MANHÃ. Se o robô
+                # reiniciar no meio do dia, ABRE o dia sem postar (nada de "bom
+                # dia" às 8 da noite por causa de um deploy).
+                if "bomdia" not in marcos and minuto >= _estado["bomdia_min"]:
+                    if minuto < 10 * 60:            # ainda é de manhã -> posta
+                        notifier.enviar_texto(_bom_dia_msg(a))
+                        ultimo = 0.0
+                        intervalo_seg = 0
+                    else:                          # restart tarde -> não posta
                         ultimo = agora
-                        intervalo_seg = _sortear_intervalo()
+                    marcos.add("bomdia")
+                # dia ABERTO: só age entre o bom dia e o boa noite
+                if "bomdia" in marcos and "boanoite" not in marcos:
+                    # 🌙 BOA NOITE — sorteado 22:00–23:00 -> resumo e fecha o dia
+                    if minuto >= _estado["boanoite_min"]:
+                        marcos.add("boanoite")
+                        _postar_boa_noite(dia)
+                    else:
+                        postou_isca = False
+                        # 🔒 ISCAS PRO (8-12%, 2x/dia) no horário do slot. Tolerância
+                        # de 3h: se passou muito (restart), pula o slot sem postar.
+                        for i, alvo in enumerate(_estado["isca_alvos"]):
+                            if i in _estado["iscas"] or minuto < alvo:
+                                continue
+                            if minuto >= alvo + 180:
+                                _estado["iscas"].add(i)      # perdeu a janela
+                                continue
+                            if postar_isca():
+                                _estado["iscas"].add(i)
+                                postou_isca = True
+                            break                  # no máx. 1 tentativa de isca por tick
+                        # 🎯 ENTRADA NORMAL 2-4% (~80-100 min, teto MAX_ENTRADAS_DIA/dia)
+                        if (not postou_isca and _estado["entradas"] < MAX_ENTRADAS_DIA
+                                and agora - ultimo >= intervalo_seg):
+                            if postar_faixa(*FAIXA_NORMAL, "2-4%"):
+                                _estado["entradas"] += 1
+                            ultimo = agora
+                            intervalo_seg = _sortear_intervalo()
         except Exception as e:
             print("!! promo loop erro:", e)
         _parar.wait(30)

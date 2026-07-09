@@ -77,12 +77,30 @@ def _brl(v):
     return "R$ " + f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
+_SPORT_EMOJI = {
+    "Football": "⚽", "Soccer": "⚽", "Futebol": "⚽",
+    "Tennis": "🎾", "Tênis": "🎾", "TableTennis": "🏓", "Tênis de Mesa": "🏓",
+    "Basketball": "🏀", "Basquete": "🏀", "Volleyball": "🏐", "Vôlei": "🏐",
+    "Hockey": "🏒", "Baseball": "⚾", "Handball": "🤾", "Handebol": "🤾",
+    "Esports": "🎮", "MMA": "🥊", "Boxing": "🥊", "Futsal": "⚽",
+    "AmericanFootball": "🏈", "Cricket": "🏏", "Rugby": "🏉",
+}
+
+
+def _sport_emoji(sb):
+    for chave in (sb.get("sport"), sb.get("sport_label")):
+        e = _SPORT_EMOJI.get(str(chave or "").strip())
+        if e:
+            return e
+    return "🏆"
+
+
 def formatar_surebet(sb):
     """Monta a mensagem HTML de uma surebet (dict no formato-contrato)."""
     banca = sb.get("banca", 1000)
     linhas = [
         f"🎯 <b>SUREBET {sb['profit_pct']:.2f}%</b>",
-        f"⚽ <b>{_esc(sb['event'])}</b>",
+        f"{_sport_emoji(sb)} <b>{_esc(sb['event'])}</b>",
         f"🏆 {_esc(sb.get('sport_label', sb['sport']))}  •  {_esc(sb.get('market_label', sb['market']))}",
     ]
     if sb.get("commence_br"):
