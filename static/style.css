@@ -319,15 +319,18 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 17p
     color: var(--text); font-weight: 700; font-size: 14px; cursor: pointer; font-family: inherit;
   }
 
-  /* topbar responsiva: abas numa 2ª linha rolável; menu do usuário compacto */
+  /* topbar responsiva: abas quebram em 2 linhas CENTRALIZADAS (todas à mostra) */
   .topbar { flex-wrap: wrap; gap: 10px 12px; padding: 10px 14px; }
-  .tabs { order: 3; width: 100%; margin-left: 0; overflow-x: auto; }
-  .tab { flex: 0 0 auto; }
+  .tabs { order: 3; width: 100%; margin-left: 0; flex-wrap: wrap; justify-content: center; row-gap: 6px; }
+  .tab { flex: 0 0 auto; font-size: 13px; padding: 7px 11px; gap: 5px; }
   .timer { display: none; }
   #status-text { display: none; }
   .status { padding: 7px 9px; }
   .user-name, .user-plan, .user-perfil { display: none; }
   .user-chip { padding: 4px; gap: 6px; }
+
+  /* chips de esporte centralizados */
+  .chips { margin: 0 auto 14px; justify-content: center; }
 
   .row { grid-template-columns: 64px 1fr; }
   .row-actions { grid-column: 1 / -1; flex-direction: row; justify-content: space-between; }
