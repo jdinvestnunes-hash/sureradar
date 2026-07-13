@@ -546,9 +546,17 @@ def checkout_stripe(request: Request, payload: dict = Body(...)):
         return JSONResponse({"erro": "plano inválido"}, status_code=400)
     if not config.STRIPE_SECRET_KEY:
         return JSONResponse({"erro": "Stripe não configurado"}, status_code=503)
-    # ASSINATURA recorrente: cobra automático (mês p/ mensal, ano p/ anual) até
-    # a pessoa cancelar. Pix continua pagamento único (renovação manual).
-    intervalo = "year" if p["dias"] >= 365 else "month"
+    # ASSINATURA recorrente: cobra automático até cancelar. Mensal=1 mês, Trimestral=
+    # 3 meses, Semestral=6 meses, Anual=1 ano. Pix continua pagamento único.
+    dias = p["dias"]
+    if dias >= 365:
+        intervalo, count = "year", 1
+    elif dias >= 180:
+        intervalo, count = "month", 6
+    elif dias >= 90:
+        intervalo, count = "month", 3
+    else:
+        intervalo, count = "month", 1
     data = {
         "mode": "subscription",
         "success_url": config.SITE_URL + "/perfil?pago=1",
@@ -559,6 +567,7 @@ def checkout_stripe(request: Request, payload: dict = Body(...)):
         "line_items[0][price_data][currency]": "brl",
         "line_items[0][price_data][unit_amount]": str(int(round(p["valor"] * 100))),
         "line_items[0][price_data][recurring][interval]": intervalo,
+        "line_items[0][price_data][recurring][interval_count]": str(count),
         "line_items[0][price_data][product_data][name]": "SureRadar " + p["nome"],
         "subscription_data[metadata][user_id]": str(user["id"]),
         "subscription_data[metadata][plano]": plano,

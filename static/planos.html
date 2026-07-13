@@ -58,6 +58,11 @@
     .pay-row{display:flex;gap:8px}
     .pay-row .btn{padding:13px 10px;font-size:14px}
     .btn-pix{background:rgba(56,212,245,.12);color:var(--cyan);border:1px solid rgba(56,212,245,.45)}
+    /* seletor de período (Mensal/Trimestral e Semestral/Anual) */
+    .seg{display:flex;gap:4px;background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:4px;margin-bottom:16px}
+    .seg-opt{flex:1;border:none;background:none;color:var(--dim);font-weight:700;font-size:12.5px;padding:8px 6px;border-radius:999px;cursor:pointer;font-family:var(--font-b);transition:.15s}
+    .seg-opt.on{background:var(--grad);color:#052015}
+    .seg-opt:not(.on):hover{color:var(--text)}
 
     .modal-bg{position:fixed;inset:0;background:rgba(3,5,10,.72);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;z-index:50;padding:20px}
     .modal-bg.show{display:flex}
@@ -98,7 +103,7 @@
   <div class="head">
     <div class="eyebrow">Seja PRO</div>
     <h1>Destrave as entradas de <span class="grad">maior lucro</span></h1>
-    <p class="lead">No grátis você vê surebets de <b>0 a 1%</b>. No PRO você libera <b>todas — de 1% a 15%+</b>, que se pagam com 1 ou 2 entradas.</p>
+    <p class="lead">No grátis você vê surebets de <b>0 a 1%</b>. No PRO você libera <b>todas — de 1% a 20%+</b>, que se pagam com 1 ou 2 entradas.</p>
   </div>
 
   <div class="plans">
@@ -111,48 +116,55 @@
         <li><span class="ck">✓</span> Entradas de <b>até 1% de lucro</b></li>
         <li><span class="ck">✓</span> Todas as casas do Brasil</li>
         <li><span class="ck">✓</span> Calculadora + gestão de banca</li>
-        <li class="off"><span class="ck">✗</span> Entradas de 1% a 15%+</li>
+        <li class="off"><span class="ck">✗</span> Entradas de 1% a 20%+</li>
         <li class="off"><span class="ck">✗</span> Alertas no Telegram</li>
       </ul>
       <button class="btn btn-atual" disabled>Plano atual</button>
       <div class="payback">&nbsp;</div>
     </div>
 
-    <!-- ANUAL -->
-    <div class="plan pop">
-      <div class="badge">⭐ MAIS VANTAJOSO · 57% OFF</div>
-      <div class="pname">Pro Anual</div>
-      <div class="price">R$ 497<small>/ano</small></div>
-      <div class="pnote">sai por <b>R$ 41/mês</b> · <span class="save">economize R$ 667</span></div>
+    <!-- LONGO: Semestral / Anual (padrão Anual) -->
+    <div class="plan pop" data-card="long" data-plano="anual">
+      <div class="badge" data-badge>⭐ MAIS VANTAJOSO · 57% OFF</div>
+      <div class="seg">
+        <button class="seg-opt" data-plan="semestral">Semestral</button>
+        <button class="seg-opt on" data-plan="anual">Anual</button>
+      </div>
+      <div class="price" data-price>R$ 497<small>/ano</small></div>
+      <div class="pnote" data-note>sai por <b>R$ 41/mês</b> · <span class="save">economize R$ 667</span></div>
       <ul>
-        <li><span class="ck">✓</span> <b>TODAS as entradas — 1% a 15%+</b></li>
+        <li><span class="ck">✓</span> <b>TODAS as entradas — 1% a 20%+</b></li>
         <li><span class="ck">✓</span> Sem limite de entradas por dia</li>
-        <li><span class="ck">✓</span> Alertas prioritários no Telegram</li>
+        <li><span class="ck">✓</span> Alertas no Telegram</li>
         <li><span class="ck">✓</span> Todas as casas e mercados</li>
         <li><span class="ck">✓</span> Suporte exclusivo</li>
       </ul>
       <div class="pay-row">
-        <button class="btn btn-primary" data-pay="anual:cartao">💳 Cartão</button>
-        <button class="btn btn-pix" data-pay="anual:pix">⚡ Pix</button>
+        <button class="btn btn-primary" data-pay="cartao">💳 Cartão</button>
+        <button class="btn btn-pix" data-pay="pix">⚡ Pix</button>
       </div>
       <div class="payback">💰 1 entrada de 5% já paga meses</div>
     </div>
 
-    <!-- MENSAL -->
-    <div class="plan">
-      <div class="pname">Pro Mensal</div>
-      <div class="price">R$ 97<small>/mês</small></div>
-      <div class="pnote">cancele quando quiser</div>
+    <!-- CURTO: Mensal / Trimestral (padrão Mensal) -->
+    <div class="plan" data-card="short" data-plano="mensal">
+      <div class="badge" data-badge style="display:none"></div>
+      <div class="seg">
+        <button class="seg-opt on" data-plan="mensal">Mensal</button>
+        <button class="seg-opt" data-plan="trimestral">Trimestral</button>
+      </div>
+      <div class="price" data-price>R$ 97<small>/mês</small></div>
+      <div class="pnote" data-note>cancele quando quiser</div>
       <ul>
-        <li><span class="ck">✓</span> <b>TODAS as entradas — 1% a 15%+</b></li>
+        <li><span class="ck">✓</span> <b>TODAS as entradas — 1% a 20%+</b></li>
         <li><span class="ck">✓</span> Sem limite de entradas por dia</li>
-        <li><span class="ck">✓</span> Alertas prioritários no Telegram</li>
+        <li><span class="ck">✓</span> Alertas no Telegram</li>
         <li><span class="ck">✓</span> Todas as casas e mercados</li>
         <li><span class="ck">✓</span> Suporte exclusivo</li>
       </ul>
       <div class="pay-row">
-        <button class="btn btn-ghost" data-pay="mensal:cartao">💳 Cartão</button>
-        <button class="btn btn-pix" data-pay="mensal:pix">⚡ Pix</button>
+        <button class="btn btn-ghost" data-pay="cartao">💳 Cartão</button>
+        <button class="btn btn-pix" data-pay="pix">⚡ Pix</button>
       </div>
       <div class="payback">💰 2 entradas de 5% pagam o mês</div>
     </div>
@@ -245,9 +257,30 @@ $id('pix-go').onclick = ()=>{
   pagar(pixCtx.plano, 'pix', pixCtx.btn, {cpf, celular: cel});
 };
 
+// ---- Seletor de período (Mensal/Trimestral · Semestral/Anual) ----
+const PLANOS = {
+  mensal:     { price:'R$ 97<small>/mês</small>',        note:'cancele quando quiser', badge:'' },
+  trimestral: { price:'R$ 237<small>/trimestre</small>', note:'sai por <b>R$ 79/mês</b> · <span class="save">18% OFF</span>', badge:'💚 18% OFF' },
+  semestral:  { price:'R$ 387<small>/semestre</small>',  note:'sai por <b>R$ 64,50/mês</b> · <span class="save">33% OFF</span>', badge:'💚 33% OFF' },
+  anual:      { price:'R$ 497<small>/ano</small>',        note:'sai por <b>R$ 41/mês</b> · <span class="save">economize R$ 667</span>', badge:'⭐ MAIS VANTAJOSO · 57% OFF' },
+};
+function setPlano(card, key){
+  const p = PLANOS[key]; if(!p) return;
+  card.dataset.plano = key;
+  card.querySelector('[data-price]').innerHTML = p.price;
+  card.querySelector('[data-note]').innerHTML = p.note;
+  const badge = card.querySelector('[data-badge]');
+  if (p.badge){ badge.innerHTML = p.badge; badge.style.display=''; } else { badge.style.display='none'; }
+  card.querySelectorAll('.seg-opt').forEach(o=> o.classList.toggle('on', o.dataset.plan===key));
+}
+document.querySelectorAll('.seg-opt').forEach(opt=>{
+  opt.addEventListener('click', ()=> setPlano(opt.closest('.plan'), opt.dataset.plan));
+});
+
 document.querySelectorAll('[data-pay]').forEach(b=>{
   b.addEventListener('click', ()=>{
-    const [plano, metodo] = b.dataset.pay.split(':');
+    const metodo = b.dataset.pay;                    // 'cartao' | 'pix'
+    const plano = b.closest('.plan').dataset.plano;  // plano selecionado no seletor do card
     if (metodo === 'pix') abrirPix(plano, b);
     else pagar(plano, metodo, b);
   });

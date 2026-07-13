@@ -213,8 +213,10 @@ SITE_URL = os.getenv("SITE_URL", "https://sureradar.site").strip()
 # Pagamento único que libera N dias de PRO (renovação manual, com aviso). Não é
 # assinatura recorrente por enquanto — casa com o modelo de dias_restantes.
 PLANOS = {
-    "mensal": {"nome": "Pro Mensal", "dias": 30, "valor": 97.0},
-    "anual":  {"nome": "Pro Anual",  "dias": 365, "valor": 497.0},
+    "mensal":     {"nome": "Pro Mensal",     "dias": 30,  "valor": 97.0},
+    "trimestral": {"nome": "Pro Trimestral", "dias": 90,  "valor": 237.0},
+    "semestral":  {"nome": "Pro Semestral",  "dias": 180, "valor": 387.0},
+    "anual":      {"nome": "Pro Anual",      "dias": 365, "valor": 497.0},
 }
 
 STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "").strip()
