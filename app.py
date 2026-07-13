@@ -1111,6 +1111,30 @@ def admin_fb_gastos(request: Request, preset: str = "hoje", level: str = "adset"
     }
 
 
+@app.get("/api/admin/pendentes")
+def admin_pendentes(request: Request):
+    """Quem gerou checkout (Pix + cartão) e NÃO pagou — pra recuperar a venda."""
+    import time as _t
+    user = _usuario(request)
+    erro = _guard_admin(request, user)
+    if erro:
+        return erro
+    agora = _t.time()
+    linhas, tot = [], 0.0
+    for c in auth.checkouts_pendentes():
+        val = float(c.get("valor", 0) or 0)
+        tot += val
+        linhas.append({
+            "email": c.get("email"), "nome": c.get("nome"),
+            "whatsapp": c.get("whatsapp") or "",
+            "plano": c.get("plano"), "valor": val,
+            "metodo": (c.get("metodo") or c.get("provider") or "").lower(),
+            "horas_atras": round((agora - float(c.get("criado", agora))) / 3600, 1),
+            "ja_pro": (c.get("user_plano") == "pro"),
+        })
+    return {"total_valor": round(tot, 2), "qtd": len(linhas), "pendentes": linhas}
+
+
 @app.get("/api/campanha-link")
 def campanha_link_pub(c: int = 0):
     """Público: a landing /grupo pega o link de convite da campanha pra usar nos botões."""

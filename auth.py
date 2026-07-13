@@ -708,6 +708,19 @@ def listar_usuarios():
     return [dict(r) for r in rows]
 
 
+def checkouts_pendentes():
+    """Quem GEROU checkout (Pix ou cartão) e NÃO pagou — pra recuperar. Traz também
+    o plano ATUAL do usuário (pra ver quem já virou PRO por outro caminho)."""
+    with _db() as c:
+        rows = c.execute(
+            """SELECT ck.id, ck.provider, ck.metodo, ck.plano, ck.valor, ck.criado,
+                      u.email, u.nome, u.whatsapp, u.plano AS user_plano
+               FROM checkouts ck JOIN users u ON u.id = ck.user_id
+               WHERE ck.status = 'pendente'
+               ORDER BY ck.criado DESC""").fetchall()
+    return [dict(r) for r in rows]
+
+
 def metricas_por_campanha():
     """Por campanha (id em users.campanha): cadastros, vendas pagas e receita.
     Só cobre quem chegou ao SITE com a tag da campanha e se cadastrou (last-click)."""
