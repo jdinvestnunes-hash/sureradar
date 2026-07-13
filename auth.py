@@ -388,12 +388,14 @@ def usuarios_para_recuperacao():
 
 
 def recup_status(user_id):
-    """(conjunto de tipos 'recup*' já enviados, timestamp do último) — pra espaçar."""
+    """(conjunto de tipos 'recup*' já enviados, timestamp do último) — pra espaçar.
+    Sem LIKE (o '%' do LIKE conflita com o %s do driver Postgres); filtra em Python."""
     with _db() as c:
-        rows = c.execute(_q("SELECT tipo, criado FROM email_enviados "
-                            "WHERE user_id=? AND tipo LIKE 'recup%'"), (user_id,)).fetchall()
-    tipos = {r["tipo"] for r in rows}
-    ultimo = max((float(r["criado"]) for r in rows), default=0.0)
+        rows = c.execute(_q("SELECT tipo, criado FROM email_enviados WHERE user_id=?"),
+                         (user_id,)).fetchall()
+    recs = [r for r in rows if str(r["tipo"]).startswith("recup")]
+    tipos = {r["tipo"] for r in recs}
+    ultimo = max((float(r["criado"]) for r in recs), default=0.0)
     return tipos, ultimo
 
 
