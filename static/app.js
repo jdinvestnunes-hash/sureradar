@@ -785,6 +785,32 @@ async function initUser() {
   }
   // aba de Alertas: aparece pra todo mundo logado (FREE vê a tela de upgrade)
   if (me) { const ta = document.getElementById("tab-alertas"); if (ta) ta.style.display = ""; }
+
+  // banner do plano (só aparece no mobile) — deixa claro se é grátis e o que o PRO libera
+  const pb = document.getElementById("plano-banner");
+  if (pb && me) {
+    if (me.plano === "pro") {
+      pb.innerHTML =
+        `<div style="background:linear-gradient(160deg,rgba(46,230,168,.12),var(--surface,#0e1421));border:1px solid rgba(46,230,168,.4);border-radius:14px;padding:14px 16px">
+           <div style="font-weight:800;font-size:15px;color:var(--green,#2ee6a8)">💎 Plano PRO ativo</div>
+           <div style="font-size:13px;color:var(--text-dim,#9aa7bd);margin-top:4px">Você vê todas as entradas de <b style="color:var(--text,#f2f6fc)">1% a 20%+</b> e tem os <b style="color:var(--text,#f2f6fc)">alertas no Telegram</b> liberados${me.dias != null ? ` · ${me.dias} dias` : ""}.</div>
+         </div>`;
+    } else {
+      pb.innerHTML =
+        `<div style="background:var(--surface,#0e1421);border:1px solid var(--border,#1b2740);border-radius:14px;padding:16px">
+           <div style="font-weight:800;font-size:15px">🔓 Você está no plano <span style="color:var(--gold,#ffc94d)">Grátis</span></div>
+           <div style="font-size:13px;color:var(--text-dim,#9aa7bd);margin-top:3px">Você vê só entradas de até <b style="color:var(--text,#f2f6fc)">1%</b> de lucro.</div>
+           <div style="height:1px;background:var(--border,#1b2740);margin:12px 0"></div>
+           <div style="font-size:13.5px;font-weight:700;margin-bottom:8px">💎 No PRO você libera:</div>
+           <div style="font-size:13.5px;color:var(--text-dim,#9aa7bd);line-height:1.95">
+             ✅ Entradas de <b style="color:var(--text,#f2f6fc)">1% a 20%+</b><br>
+             ✅ <b style="color:var(--text,#f2f6fc)">Alertas no Telegram</b><br>
+             ✅ Todas as casas e mercados
+           </div>
+           <button onclick="location.href='/planos'" style="width:100%;margin-top:14px;background:var(--grad,linear-gradient(112deg,#2ee6a8,#38d4f5));color:#052015;font-weight:800;font-size:15px;padding:13px;border:none;border-radius:11px;cursor:pointer;font-family:inherit">🚀 Fazer upgrade pro PRO</button>
+         </div>`;
+    }
+  }
   return true;
 }
 
