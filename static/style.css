@@ -332,6 +332,16 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 17p
   /* chips de esporte centralizados */
   .chips { margin: 0 auto 14px; justify-content: center; }
 
+  /* Minha Banca: evento em cima (linha inteira) e os controles embaixo — não estoura */
+  .bank-view { padding: 16px 14px; }
+  .metrics { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .metric { padding: 13px 14px; }
+  .metric-val { font-size: 20px; }
+  .bank-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; }
+  .bank-ev { flex: 1 1 100%; }
+  .bank-col { text-align: left; }
+  .bank-status { margin-left: auto; }
+
   .row { grid-template-columns: 64px 1fr; }
   .row-actions { grid-column: 1 / -1; flex-direction: row; justify-content: space-between; }
 }
