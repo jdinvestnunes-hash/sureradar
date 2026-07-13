@@ -373,6 +373,30 @@ def registrar_email(user_id, tipo):
         return False
 
 
+def usuarios_para_recuperacao():
+    """Quem GEROU checkout (Pix/cartão) e NÃO é PRO agora (nem descadastrou). Traz o
+    1º checkout (momento da intenção). PRO ativo = plano='pro' E expira no futuro."""
+    with _db() as c:
+        rows = c.execute(_q(
+            """SELECT u.id, u.nome, u.email, MIN(ck.criado) AS primeiro_checkout
+               FROM users u JOIN checkouts ck ON ck.user_id = u.id
+               WHERE COALESCE(u.email_optout,0) = 0
+                 AND COALESCE(u.email_verificado,1) = 1
+                 AND NOT (u.plano = 'pro' AND COALESCE(u.plano_expira,0) > ?)
+               GROUP BY u.id, u.nome, u.email"""), (time.time(),)).fetchall()
+    return [dict(r) for r in rows]
+
+
+def recup_status(user_id):
+    """(conjunto de tipos 'recup*' já enviados, timestamp do último) — pra espaçar."""
+    with _db() as c:
+        rows = c.execute(_q("SELECT tipo, criado FROM email_enviados "
+                            "WHERE user_id=? AND tipo LIKE 'recup%'"), (user_id,)).fetchall()
+    tipos = {r["tipo"] for r in rows}
+    ultimo = max((float(r["criado"]) for r in rows), default=0.0)
+    return tipos, ultimo
+
+
 def usuarios_free_verificados():
     """Grátis + e-mail confirmado + NÃO descadastrado (alvo dos nudges pró)."""
     with _db() as c:

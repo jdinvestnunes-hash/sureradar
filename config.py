@@ -229,6 +229,8 @@ ABACATEPAY_WEBHOOK_SECRET = os.getenv("ABACATEPAY_WEBHOOK_SECRET", "").strip()
 RESEND_API_KEY = os.getenv("RESEND_API_KEY", "").strip()
 # Fluxo de nutrição por e-mail (boas-vindas + nudges pró p/ quem não comprou).
 LIFECYCLE_ATIVO = os.getenv("LIFECYCLE_ATIVO", "1") not in ("0", "false", "False", "no")
+# Régua de recuperação por e-mail (quem gerou checkout Pix/cartão e não pagou).
+RECUP_ATIVO = os.getenv("RECUP_ATIVO", "1") not in ("0", "false", "False", "no")
 
 # Segredo do /api/ingest: só o robô (que sabe o token) pode publicar surebets.
 # VAZIO = endpoint aberto (compatível com o robô atual). Setar p/ exigir o token.

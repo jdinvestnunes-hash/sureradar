@@ -141,6 +141,80 @@ def enviar_nudge(to: str, nome: str, tipo: str, unsub_url: str = "") -> bool:
     return enviar(to, assunto, texto=texto, headers=headers)
 
 
+# ---------------------------------------------------------------------------
+# RECUPERAÇÃO: quem gerou checkout (Pix/cartão) e NÃO pagou. 7 e-mails na régua,
+# depois 2/mês até comprar. Para na hora que vira PRO. Plain text (deliverability).
+# ---------------------------------------------------------------------------
+_RECUP = {
+    "recup_1": ("faltou só o pagamento 👀",
+        "Oi {n}, tudo bem?\n\n"
+        "Vi que você começou a assinar o PRO do SureRadar mas o pagamento não foi finalizado.\n\n"
+        "Faltou só isso! Em 1 clique você destrava TODAS as entradas (de 1% a 20%+) e os alertas no Telegram.\n\n"
+        "Terminar agora: {url}/planos\n\n"
+        "Qualquer dúvida, é só responder este e-mail.\nAbraço,\nEquipe SureRadar"),
+    "recup_2": ("as entradas que você não está vendo",
+        "Oi {n},\n\n"
+        "Enquanto você está no grátis, as entradas de maior lucro — 5%, 8%, 12%+ — saem todo dia e ficam TRAVADAS na sua conta.\n\n"
+        "Uma única dessas já paga a mensalidade, e o resto é lucro no seu bolso.\n\n"
+        "Destravar tudo: {url}/planos\n\nAbraço,\nEquipe SureRadar"),
+    "recup_3": ("não é sorte, é matemática",
+        "Oi {n},\n\n"
+        "Surebet não é palpite. Você cobre TODOS os resultados de um jogo, em casas diferentes, e trava o lucro — ganhe quem ganhar. É conta, não sorte.\n\n"
+        "O PRO te entrega essas entradas prontas, com as casas e os valores. Você só aposta.\n\n"
+        "Ver os planos: {url}/planos\n\nAbraço,\nEquipe SureRadar"),
+    "recup_4": ("1 ou 2 entradas e o PRO se paga",
+        "Oi {n},\n\n"
+        "Faz a conta: com R$ 1.000 numa entrada de 10%, o lucro é R$ 100 — já paga o PRO e ainda sobra.\n\n"
+        "Ou seja, 1 ou 2 entradas e a assinatura se pagou. O resto do mês é lucro.\n\n"
+        "Assinar: {url}/planos\n\nAbraço,\nEquipe SureRadar"),
+    "recup_5": ("risco zero por 7 dias",
+        "Oi {n},\n\n"
+        "Se está com o pé atrás, relaxa: o PRO tem garantia de 7 dias. Entra, usa, pega as entradas — se não fizer sentido, devolvemos 100%, sem perguntas.\n\n"
+        "Você não tem nada a perder pra testar.\n\n"
+        "Começar: {url}/planos\n\nAbraço,\nEquipe SureRadar"),
+    "recup_6": ("cartão ou Pix, você escolhe",
+        "Oi {n},\n\n"
+        "Dá pra assinar o PRO do jeito que preferir:\n"
+        "- Cartão: renova automático, cancela quando quiser.\n"
+        "- Pix: pagamento avulso, você renova quando quiser.\n\n"
+        "Leva 1 minuto: {url}/planos\n\nAbraço,\nEquipe SureRadar"),
+    "recup_7": ("última chamada 🏁",
+        "Oi {n},\n\n"
+        "Esse é o último e-mail dessa série — não quero encher sua caixa.\n\n"
+        "Fica o convite: as entradas de alto lucro continuam saindo todo dia no PRO, e a garantia de 7 dias segue de pé. Quando quiser destravar, é só chamar.\n\n"
+        "{url}/planos\n\nAbraço,\nEquipe SureRadar"),
+}
+
+# Pool do fluxo MENSAL (2/mês) — roda em rodízio até a pessoa comprar.
+_RECUP_MENSAIS = [
+    ("as entradas continuam saindo 📈",
+        "Oi {n},\n\nPassando pra lembrar: todo dia saem surebets de alto lucro no PRO — e elas seguem travadas na sua conta grátis.\n\nQuando quiser destravar: {url}/planos\n\nAbraço,\nEquipe SureRadar"),
+    ("quanto deu pra ganhar esse mês",
+        "Oi {n},\n\nQuem é PRO fechou mais um mês de greens no automático. No grátis dá pra ver só as entradas de até 1%.\n\n1 ou 2 entradas e a assinatura se paga. Bora?\n{url}/planos\n\nAbraço,\nEquipe SureRadar"),
+    ("surebet em 2 minutos",
+        "Oi {n},\n\nRecapitulando por que funciona: você aposta nos dois lados, em casas diferentes, e trava o lucro — dê no que der. Matemática, não sorte.\n\nO PRO entrega tudo pronto: {url}/planos\n\nAbraço,\nEquipe SureRadar"),
+    ("o PRO se paga sozinho",
+        "Oi {n},\n\nLembrete rápido: uma entrada de 10% com R$ 1.000 já rende R$ 100 — mais que a mensalidade do PRO.\n\nDestravar as entradas: {url}/planos\n\nAbraço,\nEquipe SureRadar"),
+]
+
+
+def enviar_recup(to: str, nome: str, tipo: str, unsub_url: str = "", idx: int = 0) -> bool:
+    """Envia um e-mail da régua de recuperação. tipo = recup_1..recup_7 ou recup_m_*."""
+    if tipo in _RECUP:
+        assunto, corpo = _RECUP[tipo]
+    elif tipo.startswith("recup_m_") and _RECUP_MENSAIS:
+        assunto, corpo = _RECUP_MENSAIS[idx % len(_RECUP_MENSAIS)]
+    else:
+        return False
+    texto = corpo.format(n=_primeiro(nome), url=config.SITE_URL)
+    headers = None
+    if unsub_url:
+        texto += f"\n\n---\nNão quer mais esses e-mails? Descadastre aqui: {unsub_url}"
+        headers = {"List-Unsubscribe": f"<{unsub_url}>",
+                   "List-Unsubscribe-Post": "List-Unsubscribe=One-Click"}
+    return enviar(to, assunto, texto=texto, headers=headers)
+
+
 def _layout(titulo: str, corpo_html: str) -> str:
     """Casca visual da marca (dark, verde/ciano) para os e-mails."""
     return f"""\

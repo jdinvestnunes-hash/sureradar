@@ -50,6 +50,7 @@ import meta_ads
 import notifier
 import pipeline
 import promo
+import recuperacao
 import tg_tracker
 
 BASE_DIR = Path(__file__).parent
@@ -112,6 +113,10 @@ async def lifespan(app):
     except Exception as e:
         print(f"!! Lifecycle de e-mail não iniciou: {e}")
     try:
+        recuperacao.iniciar()         # régua de recuperação (gerou checkout e não pagou)
+    except Exception as e:
+        print(f"!! Recuperação de e-mail não iniciou: {e}")
+    try:
         tg_tracker.iniciar()          # conta membros por link de campanha (Telegram)
     except Exception as e:
         print(f"!! Telegram tracker não iniciou: {e}")
@@ -123,6 +128,7 @@ async def lifespan(app):
     pipeline.parar_agendador()
     promo.parar()
     lifecycle.parar()
+    recuperacao.parar()
     tg_tracker.parar()
     alertas.parar()
 
