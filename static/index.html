@@ -13,7 +13,7 @@
     gtag('js', new Date());
     gtag('config', 'AW-17915571478');
   </script>
-  <link rel="stylesheet" href="/static/style.css?v=4" />
+  <link rel="stylesheet" href="/static/style.css?v=5" />
   <link rel="stylesheet"
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
         media="print" onload="this.media='all'" />
@@ -65,6 +65,8 @@
 
   <!-- VIEW: OPORTUNIDADES -->
   <div class="layout" id="view-ops">
+    <button id="btn-filtros" class="btn-filtros"
+      onclick="document.querySelector('#view-ops .sidebar').classList.toggle('open'); this.classList.toggle('aberto')">⚙ Filtros</button>
     <aside class="sidebar">
       <div class="filter-block">
         <div class="filter-title">Lucro da entrada</div>

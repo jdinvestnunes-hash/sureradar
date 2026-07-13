@@ -300,9 +300,35 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 17p
 .up-list { list-style: none; padding: 0; margin: 20px 0; text-align: left; display: flex; flex-direction: column; gap: 10px; }
 .up-list li { font-size: 14px; font-weight: 500; }
 
+/* Botão de filtros — só aparece no mobile (no desktop os filtros ficam sempre à mostra) */
+.btn-filtros { display: none; }
+.btn-filtros::after { content: " ▾"; opacity: .8; }
+.btn-filtros.aberto::after { content: " ▴"; }
+
 @media (max-width: 860px) {
   .layout { grid-template-columns: 1fr; }
-  .sidebar { border-right: none; border-bottom: 1px solid var(--border-soft); }
+  .content { padding: 14px 14px; }
+
+  /* filtros (casas etc.) RECOLHIDOS por padrão -> entradas aparecem primeiro */
+  .sidebar { border-right: none; border-bottom: 1px solid var(--border-soft); display: none; }
+  .sidebar.open { display: flex; }
+  .btn-filtros {
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    margin: 12px 14px 4px; padding: 12px; box-sizing: border-box;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    color: var(--text); font-weight: 700; font-size: 14px; cursor: pointer; font-family: inherit;
+  }
+
+  /* topbar responsiva: abas numa 2ª linha rolável; menu do usuário compacto */
+  .topbar { flex-wrap: wrap; gap: 10px 12px; padding: 10px 14px; }
+  .tabs { order: 3; width: 100%; margin-left: 0; overflow-x: auto; }
+  .tab { flex: 0 0 auto; }
+  .timer { display: none; }
+  #status-text { display: none; }
+  .status { padding: 7px 9px; }
+  .user-name, .user-plan, .user-perfil { display: none; }
+  .user-chip { padding: 4px; gap: 6px; }
+
   .row { grid-template-columns: 64px 1fr; }
   .row-actions { grid-column: 1 / -1; flex-direction: row; justify-content: space-between; }
 }
