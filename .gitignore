@@ -15,3 +15,8 @@ venv/
 pw_profile/
 scraper_pw log
 link_cache.json
+
+# logs de runtime do robo/vigia
+scraper.log
+scraper.err.log
+vigia.log
