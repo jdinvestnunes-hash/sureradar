@@ -1142,6 +1142,28 @@ def admin_fb_gastos(request: Request, preset: str = "hoje", level: str = "campai
     }
 
 
+@app.get("/api/admin/meta-test")
+def admin_meta_test(request: Request):
+    """Diagnóstico da conexão Meta: diz se o token funciona e mostra o erro exato
+    (token vencido? conta restrita? conta errada?) sem deixar o admin no escuro."""
+    user = _usuario(request)
+    erro = _guard_admin(request, user)
+    if erro:
+        return erro
+    aid = (config.META_AD_ACCOUNT_ID or "").strip()
+    if not meta_ads.configurado():
+        return {"ok": False, "configurado": False, "conta": aid,
+                "erro": "Falta META_ACCESS_TOKEN e/ou META_AD_ACCOUNT_ID no Railway."}
+    try:
+        linhas = meta_ads.gastos(preset="tudo", level="campaign")
+        total = round(sum(x.get("gasto", 0) for x in linhas), 2)
+        return {"ok": True, "configurado": True, "conta": aid,
+                "campanhas": len(linhas), "gasto_total": total,
+                "amostra": [x.get("nome", "") for x in linhas[:5]]}
+    except Exception as e:
+        return {"ok": False, "configurado": True, "conta": aid, "erro": str(e)}
+
+
 @app.get("/api/admin/pendentes")
 def admin_pendentes(request: Request):
     """Quem gerou checkout (Pix + cartão) e NÃO pagou — pra recuperar a venda."""

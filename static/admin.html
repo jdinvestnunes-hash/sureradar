@@ -197,8 +197,12 @@
             <button class="fb-per" data-per="30dias">30 dias</button>
             <button class="fb-per" data-per="tudo">Máximo</button>
           </div>
-          <button class="refresh" onclick="loadFbGastos()">↻ Atualizar</button>
+          <div style="display:flex;gap:8px">
+            <button class="refresh" onclick="metaTest()">🔌 Testar conexão</button>
+            <button class="refresh" onclick="loadFbGastos()">↻ Atualizar</button>
+          </div>
         </div>
+        <div id="fb-diag" style="display:none;margin-bottom:14px"></div>
 
         <div id="fb-kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px"></div>
 
@@ -422,6 +426,33 @@ function fbStatus(code){       // effective_status do Face -> pílula "Veiculaç
   const [txt,cor] = m[code] || [code||"", "#8a94a6"];
   if(!txt) return "";
   return `<span class="fb-pill" style="background:${cor}22;color:${cor}"><span class="fb-dot" style="background:${cor}"></span>${txt}</span>`;
+}
+async function metaTest(){
+  const box=$("#fb-diag"); box.style.display="block";
+  box.innerHTML='<div class="panel" style="border-color:var(--line2)">🔌 Testando conexão com o Meta…</div>';
+  const d=await fetch("/api/admin/meta-test").then(r=>r.json()).catch(()=>({ok:false,erro:"sem resposta"}));
+  if(d.ok){
+    const amostra=(d.amostra||[]).filter(Boolean).map(escH).join(" · ")||"—";
+    box.innerHTML=`<div class="panel" style="border-color:var(--green)">
+      ✅ <b>Conectado!</b> Conta <code>${escH(d.conta||"")}</code> · <b>${d.campanhas}</b> campanha(s) · gasto total <b>${brl(d.gasto_total||0)}</b>
+      ${d.campanhas?`<div style="font-size:12px;color:var(--text-dim);margin-top:6px">Ex.: ${amostra}</div>`
+        :`<div style="font-size:12.5px;color:var(--gold,#ffc94d);margin-top:6px">⚠️ Token OK, mas <b>0 campanhas</b> nesta conta. Talvez suas campanhas reais estejam na <b>outra conta</b> — troque o <code>META_AD_ACCOUNT_ID</code> no Railway (ex.: a CA02).</div>`}
+    </div>`;
+  } else if(d.configurado===false){
+    box.innerHTML=`<div class="panel" style="border-color:var(--gold,#ffc94d)">⚙️ <b>Ainda não configurado.</b> ${escH(d.erro||"")}</div>`;
+  } else {
+    const e=(d.erro||"").toLowerCase();
+    let dica="";
+    if(e.includes("expired")||e.includes("session")||e.includes("oauth")||e.includes("token"))
+      dica="Parece <b>token vencido</b>. Gere um novo <b>token de Usuário do Sistema</b> (não expira) e troque no Railway.";
+    else if(e.includes("block")||e.includes("restrict")||e.includes("disable")||e.includes("permission"))
+      dica="Parece <b>conta/App restrito ou sem permissão</b>. Confira se o usuário do sistema tem <b>ads_read</b> e acesso à conta, e veja em <i>Qualidade da conta</i> se ela está restrita.";
+    box.innerHTML=`<div class="panel" style="border-color:#ff6b6b">
+      ❌ <b>Não conectou.</b> Conta <code>${escH(d.conta||"—")}</code>
+      <div style="font-size:12.5px;color:var(--text-dim);margin-top:6px">Erro do Meta: <span style="color:#ff6b6b">${escH(d.erro||"")}</span></div>
+      ${dica?`<div style="font-size:12.5px;margin-top:6px">💡 ${dica}</div>`:""}
+    </div>`;
+  }
 }
 async function loadFbGastos(){
   const setup=$("#fb-setup"), wrap=$("#fb-wrap"), kpis=$("#fb-kpis"), tab=$("#fb-tabela");
