@@ -18,6 +18,7 @@ PRESETS = {
     "7dias": "last_7d",
     "30dias": "last_30d",
     "mes": "this_month",
+    "tudo": "maximum",
 }
 
 

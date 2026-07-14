@@ -102,8 +102,7 @@
       <a onclick="mostrarView('dash');setTimeout(()=>document.getElementById('sec-users').scrollIntoView({behavior:'smooth'}),60)"><span class="ic">👥</span> Assinantes</a>
       <a onclick="mostrarView('dash');setTimeout(()=>document.getElementById('sec-pag').scrollIntoView({behavior:'smooth'}),60)"><span class="ic">💳</span> Pagamentos</a>
       <a id="nav-tickets" onclick="mostrarView('tickets')"><span class="ic">🎫</span> Tickets <span id="nav-tk-badge" class="tab-badge" style="display:none"></span></a>
-      <a id="nav-camp" onclick="mostrarView('campanhas')"><span class="ic">📣</span> Campanhas</a>
-      <a id="nav-gastos" onclick="mostrarView('gastos')"><span class="ic">💰</span> Gastos (FB)</a>
+      <a id="nav-gastos" onclick="mostrarView('gastos')"><span class="ic">📣</span> Campanhas</a>
       <a id="nav-conteudo" onclick="mostrarView('conteudo')"><span class="ic">📅</span> Conteúdo (SEO)</a>
       <a href="/app"><span class="ic">↗</span> Ir ao painel</a>
     </nav>
@@ -164,25 +163,22 @@
       </div>
     </div>
 
-    <!-- VIEW: campanhas -->
-    <div id="view-campanhas" style="display:none">
-      <div class="panel">
-        <h3>📣 Campanhas <small>membros REAIS por link</small></h3>
-        <p style="color:var(--text-dim);font-size:13px;margin:6px 0 14px">Crie 1 campanha por criativo/anúncio. O sistema gera um link de convite do Telegram e conta quantos <b style="color:var(--text)">membros entraram por ele</b>. Use a "landing" no anúncio do Facebook.</p>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px">
-          <input id="camp-nome" class="search" style="flex:2;min-width:170px;margin:0" placeholder="Nome (ex.: FB Criativo 1)" />
-          <input id="camp-link" class="search" style="flex:2;min-width:170px;margin:0" placeholder="(opcional) colar link de convite existente" />
-          <button class="btn b-pro" id="camp-criar">+ Criar</button>
-        </div>
-        <div id="campanhas"></div>
-      </div>
-    </div>
-
-    <!-- VIEW: gastos (Facebook) -->
+    <!-- VIEW: campanhas (unificado: criar + gasto + membros + cadastros + receita) -->
     <div id="view-gastos" style="display:none">
       <div id="fb-setup" style="display:none" class="panel">
-        ⚙️ <b>Integração do Facebook não configurada.</b><br>
-        <span style="color:var(--text-dim);font-size:13.5px;line-height:1.7">Pra puxar o gasto automático, adicione no Railway: <code>META_ACCESS_TOKEN</code> (token com <code>ads_read</code>) e <code>META_AD_ACCOUNT_ID</code> (ID da conta de anúncios).</span>
+        ⚙️ <b>Gasto do Facebook não conectado.</b>
+        <span style="color:var(--text-dim);font-size:13.5px;line-height:1.7"> Pra puxar o gasto automático, adicione no Railway <code>META_ACCESS_TOKEN</code> e <code>META_AD_ACCOUNT_ID</code>. (As campanhas, membros, cadastros e receita funcionam mesmo sem isso.)</span>
+      </div>
+
+      <!-- criar campanha -->
+      <div class="panel">
+        <h3>📣 Suas campanhas</h3>
+        <p style="color:var(--text-dim);font-size:12.5px;margin:6px 0 12px">Crie 1 campanha por criativo/anúncio. Use o <b style="color:var(--text)">link do site</b> no anúncio (não o link cru do Telegram) pra rastrear tudo. O nome deve ser o mesmo do conjunto no Facebook.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <input id="camp-nome" class="search" style="flex:2;min-width:170px;margin:0" placeholder="Nome (ex.: FB Criativo 1)" />
+          <input id="camp-link" class="search" style="flex:2;min-width:170px;margin:0" placeholder="(opcional) link de convite existente" />
+          <button class="btn b-pro" id="camp-criar">+ Criar</button>
+        </div>
       </div>
 
       <div id="fb-wrap">
@@ -192,17 +188,16 @@
             <button class="mini fb-per" data-per="ontem">Ontem</button>
             <button class="mini fb-per" data-per="7dias">7 dias</button>
             <button class="mini fb-per" data-per="30dias">30 dias</button>
+            <button class="mini fb-per" data-per="tudo">Tudo</button>
           </div>
           <button class="refresh" onclick="loadFbGastos()">↻ Atualizar</button>
         </div>
 
-        <!-- KPIs -->
-        <div id="fb-kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px;margin-bottom:16px"></div>
+        <div id="fb-kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px"></div>
 
-        <!-- Tabela por campanha -->
         <div class="panel">
-          <h3>Por campanha <small id="fb-sub">gasto × membros reais</small></h3>
-          <p style="color:var(--text-dim);font-size:12.5px;margin:2px 0 14px">Casa pelo <b style="color:var(--text)">nome</b>: deixe a campanha (aba Campanhas) com o mesmo nome do conjunto no Facebook pra ver o custo por membro real.</p>
+          <h3>Desempenho por campanha <small id="fb-sub"></small></h3>
+          <p style="color:var(--text-dim);font-size:12.5px;margin:2px 0 14px">Gasto, quem entrou no grupo, cadastros e receita — por campanha, no período escolhido.</p>
           <div id="fb-tabela"></div>
         </div>
       </div>
@@ -347,44 +342,21 @@ function dataBR(ts){return new Date(ts*1000).toLocaleDateString("pt-BR");}
 function mostrarView(v){
   $("#view-dash").style.display = v==="dash" ? "" : "none";
   $("#view-tickets").style.display = v==="tickets" ? "" : "none";
-  const vcamp=$("#view-campanhas"); if(vcamp) vcamp.style.display = v==="campanhas" ? "" : "none";
   const vcont=$("#view-conteudo"); if(vcont) vcont.style.display = v==="conteudo" ? "" : "none";
   const vgas=$("#view-gastos"); if(vgas) vgas.style.display = v==="gastos" ? "" : "none";
   document.querySelectorAll(".nav a").forEach(a=>a.classList.remove("on"));
-  const nav = v==="tickets"?$("#nav-tickets") : v==="campanhas"?$("#nav-camp") : v==="gastos"?$("#nav-gastos") : v==="conteudo"?$("#nav-conteudo") : $("#nav-dash");
+  const nav = v==="tickets"?$("#nav-tickets") : v==="gastos"?$("#nav-gastos") : v==="conteudo"?$("#nav-conteudo") : $("#nav-dash");
   if(nav) nav.classList.add("on");
   $("#head-sub").textContent = v==="tickets" ? "Suporte — tickets dos usuários."
-    : v==="campanhas" ? "Campanhas — membros reais por link de convite."
-    : v==="gastos" ? "Gastos no Facebook — investimento × membros reais."
+    : v==="gastos" ? "Campanhas — gasto, membros, cadastros e receita por período."
     : v==="conteudo" ? "Conteúdo — calendário de SEO e publicação."
     : "Visão do negócio — receita, assinantes e crescimento.";
   if(v==="tickets") loadTickets();
-  if(v==="campanhas") loadCampanhas();
   if(v==="gastos") loadFbGastos();
   if(v==="conteudo") loadConteudo();
 }
 
-// ---- Campanhas ----
-function diaBR(iso){ // "2026-07-07" -> "07/07"
-  const p=(iso||"").split("-"); return p.length===3 ? p[2]+"/"+p[1] : (iso||"");
-}
-async function loadCampanhas(){
-  const r=await fetch("/api/admin/campanhas"); if(!r.ok) return;
-  const cs=(await r.json()).campanhas||[];
-  $("#campanhas").innerHTML = cs.length ? cs.map(c=>`
-    <div style="border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:12px;background:var(--bg)">
-      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-        <b style="font-size:15px">${escH(c.nome)}</b>
-        <span style="font-weight:800;color:var(--green);font-size:20px">${c.membros}<span style="font-size:12px;color:var(--mute);font-weight:600"> membros</span></span>
-      </div>
-      <div style="margin-top:8px;font-size:12.5px;color:var(--dim)">📢 Use no anúncio: <a href="${c.landing}" target="_blank" style="color:var(--cyan)">${escH(c.landing)}</a></div>
-      <div style="margin-top:4px;font-size:11.5px;color:var(--mute);word-break:break-all">Link Telegram: ${escH(c.invite_link||"—")}</div>
-      ${(c.por_dia&&c.por_dia.length)?`<div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px">
-        ${c.por_dia.map(d=>`<span style="background:rgba(46,230,168,.1);border:1px solid rgba(46,230,168,.3);border-radius:8px;padding:4px 9px;font-size:12px;color:var(--dim)"><b style="color:var(--green)">+${d.qtd}</b> ${diaBR(d.dia)}</span>`).join("")}
-      </div>`:`<div style="margin-top:10px;font-size:11.5px;color:var(--mute)">Sem entradas por dia ainda (só conta a partir de agora).</div>`}
-      <button class="btn b-pre" data-delcamp="${c.id}" style="margin-top:10px">Excluir</button>
-    </div>`).join("") : '<div class="empty">Nenhuma campanha ainda. Crie a primeira acima.</div>';
-}
+// ---- Campanhas (criar / excluir) ----
 document.addEventListener("click",(e)=>{
   if(e.target.id==="camp-criar"){
     const nome=$("#camp-nome").value.trim(), link=$("#camp-link").value.trim();
@@ -394,13 +366,13 @@ document.addEventListener("click",(e)=>{
       .then(r=>r.json().then(j=>({ok:r.ok,j}))).then(({ok,j})=>{
         e.target.disabled=false;
         if(!ok){toast("❌ "+(j.erro||"erro"));return;}
-        toast("✅ Campanha criada");$("#camp-nome").value="";$("#camp-link").value="";loadCampanhas();
+        toast("✅ Campanha criada");$("#camp-nome").value="";$("#camp-link").value="";loadFbGastos();
       }).catch(()=>{e.target.disabled=false;toast("❌ erro de conexão");});
     return;
   }
   if(e.target.dataset.delcamp){
     if(confirm("Excluir esta campanha? (o link do Telegram continua existindo)"))
-      fetch("/api/admin/campanhas/excluir",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:parseInt(e.target.dataset.delcamp)})}).then(()=>loadCampanhas());
+      fetch("/api/admin/campanhas/excluir",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:parseInt(e.target.dataset.delcamp)})}).then(()=>loadFbGastos());
     return;
   }
 });
@@ -419,51 +391,64 @@ async function loadFbGastos(){
   tab.innerHTML='<div class="empty">Carregando…</div>'; kpis.innerHTML="";
   const r=await fetch("/api/admin/fb-gastos?level=adset&preset="+FB_PER);
   const d=await r.json().catch(()=>({}));
-  if(d.configurado===false){ setup.style.display="block"; wrap.style.display="none"; return; }
-  setup.style.display="none"; wrap.style.display="";
-  if(d.erro){ kpis.innerHTML=""; tab.innerHTML=`<div class="empty">⚠️ ${escH(d.erro)}</div>`; return; }
+  wrap.style.display="";   // as campanhas aparecem sempre (mesmo sem Facebook)
+  if(d.fb_conectado===false){
+    setup.style.display="block";
+    setup.innerHTML = '⚙️ <b>Gasto do Facebook não conectado.</b> <span style="color:var(--text-dim);font-size:13.5px;line-height:1.7">Pra puxar o gasto automático, adicione no Railway <code>META_ACCESS_TOKEN</code> e <code>META_AD_ACCOUNT_ID</code>. (As campanhas, membros, cadastros e receita abaixo funcionam mesmo assim.)</span>';
+  } else if(d.fb_erro){
+    setup.style.display="block";
+    setup.innerHTML = '⚠️ <b>Facebook conectado, mas deu erro ao puxar o gasto:</b><br><span style="color:var(--text-dim);font-size:13px">'+escH(d.fb_erro)+'</span>';
+  } else {
+    setup.style.display="none";
+  }
+  if(d.configurado===false){ tab.innerHTML='<div class="empty">Sem acesso.</div>'; return; }
   const k=d.kpis||{}, gs=d.gastos||[];
   const cpm = k.custo_por_membro!=null ? brl(k.custo_por_membro) : "—";
   const roiCor = (k.roi||0) >= 0 ? "var(--green)" : "#ff6b6b";
+  const perLabel = {hoje:"hoje",ontem:"ontem","7dias":"últimos 7 dias","30dias":"últimos 30 dias",tudo:"desde sempre"}[FB_PER]||FB_PER;
   kpis.innerHTML =
-    fbKpi("Gasto no período", brl(k.gasto||0), FB_PER==="hoje"?"hoje":FB_PER) +
-    fbKpi("Membros reais", (k.membros||0), "entraram no grupo", "var(--green)") +
-    fbKpi("Custo por membro", cpm, "gasto ÷ membros reais", "var(--cyan,#38d4f5)") +
-    fbKpi("Leads (Facebook)", (k.leads_fb||0), `${k.cliques||0} cliques · o Face conta`, "var(--gold,#ffc94d)") +
-    fbKpi("Receita", brl(k.receita||0), `${k.vendas||0} venda(s) · ${k.cadastros||0} cadastros`, "var(--green)") +
-    fbKpi("Lucro (ROI)", brl(k.roi||0), "receita − gasto", roiCor);
-  if(!gs.length){ tab.innerHTML='<div class="empty">Sem gasto nesse período.</div>'; return; }
+    fbKpi("Gasto", brl(k.gasto||0), perLabel) +
+    fbKpi("Entraram", (k.membros||0), "no grupo", "var(--green)") +
+    fbKpi("Custo/membro", cpm, "gasto ÷ entraram", "var(--cyan,#38d4f5)") +
+    fbKpi("Cadastros", (k.cadastros||0), "no site", "var(--cyan,#38d4f5)") +
+    fbKpi("Receita", brl(k.receita||0), `${k.vendas||0} venda(s)`, "var(--green)") +
+    fbKpi("Lucro", brl(k.roi||0), "receita − gasto", roiCor);
+  if(!gs.length){ tab.innerHTML='<div class="empty">Nenhuma campanha ainda. Crie a primeira acima 👆</div>'; return; }
   const linhas = gs.map(g=>{
-    const temMatch=g.matched;
-    const membros = temMatch ? (g.membros||0) : null;
-    const cpmR = g.custo_por_membro!=null ? brl(g.custo_por_membro) : (temMatch?"—":"");
-    const totTxt = (temMatch && g.membros_total!=null && g.membros_total!==membros)
-      ? `<span style="color:var(--text-dim);font-size:11px"> (${g.membros_total} no total)</span>` : "";
-    const memCel = temMatch
-      ? `<b style="color:var(--green)">${membros}</b>${totTxt}`
-      : `<span style="color:var(--text-dim);font-size:11.5px">sem match de nome</span>`;
-    const nConj = (g.conjuntos && g.conjuntos>1) ? ` <span style="color:var(--text-dim);font-size:11px;font-weight:500">· ${g.conjuntos} conjuntos</span>` : "";
-    const cad = temMatch ? (g.cadastros||0) : "—";
-    const rec = temMatch ? brl(g.receita||0) : "—";
-    const roi = temMatch ? (g.roi||0) : null;
-    const roiTxt = roi!=null ? brl(roi) : "—";
-    const roiCor = roi==null ? "var(--text-dim)" : (roi>=0 ? "var(--green)" : "#ff6b6b");
+    if(!g.matched){   // gasto do FB sem campanha correspondente aqui
+      return `<tr style="border-top:1px solid var(--line);opacity:.7">
+        <td style="padding:11px 10px">${escH(g.nome||"—")} <span style="color:var(--text-dim);font-size:11px">· conjunto do FB sem campanha aqui</span></td>
+        <td style="padding:11px 10px;text-align:right">${brl(g.gasto)}</td>
+        <td style="padding:11px 10px;text-align:center;color:var(--text-dim)">—</td>
+        <td style="padding:11px 10px;text-align:center;color:var(--text-dim)">—</td>
+        <td style="padding:11px 10px;text-align:right;color:var(--text-dim)">—</td>
+        <td style="padding:11px 10px;text-align:right;color:var(--text-dim)">—</td>
+      </tr>`;
+    }
+    const membros=g.membros||0, roi=g.roi||0;
+    const totTxt = (g.membros_total!=null && g.membros_total!==membros) ? ` <span style="color:var(--text-dim);font-size:10.5px">(${g.membros_total} total)</span>` : "";
+    const cpmTxt = g.custo_por_membro!=null ? `<div style="font-size:10.5px;color:var(--cyan,#38d4f5)">${brl(g.custo_por_membro)}/membro</div>` : "";
+    const nConj = (g.conjuntos>1) ? ` <span style="color:var(--text-dim);font-size:10.5px">·${g.conjuntos} conj.</span>`
+                : (g.conjuntos===0 ? ` <span style="color:var(--text-dim);font-size:10.5px">·sem gasto FB</span>` : "");
+    const linkTxt = (g.link_site||"").replace(/^https?:\/\//,"");
     return `<tr style="border-top:1px solid var(--line)">
-      <td style="padding:11px 10px;font-weight:600">${escH(g.nome||"—")}${nConj}</td>
+      <td style="padding:11px 10px">
+        <div style="font-weight:700">${escH(g.nome)}${nConj}</div>
+        <div style="font-size:11px;margin-top:3px"><a href="${g.link_site}" target="_blank" style="color:var(--cyan,#38d4f5)">📢 ${escH(linkTxt)}</a></div>
+        <button class="btn b-pre" data-delcamp="${g.campanha_id}" style="margin-top:6px;padding:3px 9px;font-size:11px">Excluir</button>
+      </td>
       <td style="padding:11px 10px;text-align:right">${brl(g.gasto)}</td>
-      <td style="padding:11px 10px;text-align:center;color:var(--gold,#ffc94d)">${g.leads_fb||0}</td>
-      <td style="padding:11px 10px;text-align:center">${memCel}</td>
-      <td style="padding:11px 10px;text-align:center;color:var(--cyan,#38d4f5)">${cad}</td>
-      <td style="padding:11px 10px;text-align:right">${rec}</td>
-      <td style="padding:11px 10px;text-align:right;font-weight:800;color:${roiCor}">${roiTxt}</td>
+      <td style="padding:11px 10px;text-align:center"><b style="color:var(--green)">${membros}</b>${totTxt}${cpmTxt}</td>
+      <td style="padding:11px 10px;text-align:center;color:var(--cyan,#38d4f5)">${g.cadastros||0}</td>
+      <td style="padding:11px 10px;text-align:right">${brl(g.receita||0)}</td>
+      <td style="padding:11px 10px;text-align:right;font-weight:800;color:${roi>=0?'var(--green)':'#ff6b6b'}">${brl(roi)}</td>
     </tr>`;
   }).join("");
   tab.innerHTML =
-    `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13.5px;min-width:640px">
+    `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13.5px;min-width:600px">
       <thead><tr style="color:var(--text-dim);font-size:11.5px;text-transform:uppercase;letter-spacing:.04em">
-        <th style="padding:0 10px 8px;text-align:left">Campanha (conjunto FB)</th>
+        <th style="padding:0 10px 8px;text-align:left">Campanha</th>
         <th style="padding:0 10px 8px;text-align:right">Gasto</th>
-        <th style="padding:0 10px 8px;text-align:center">Leads FB</th>
         <th style="padding:0 10px 8px;text-align:center">Entraram</th>
         <th style="padding:0 10px 8px;text-align:center">Cadastros</th>
         <th style="padding:0 10px 8px;text-align:right">Receita</th>

@@ -747,6 +747,38 @@ def checkouts_pendentes():
     return [dict(r) for r in rows]
 
 
+def metricas_por_campanha_periodo(desde, ate):
+    """Cadastros e vendas/receita por campanha no intervalo [desde, ate) (epoch).
+    desde=None -> tudo (sem filtro de data)."""
+    out = {}
+    with _db() as c:
+        if desde is None:
+            cad = c.execute("SELECT campanha, COUNT(*) AS n FROM users "
+                            "WHERE campanha IS NOT NULL GROUP BY campanha").fetchall()
+            rev = c.execute(_q("""SELECT u.campanha AS campanha, COUNT(*) AS vendas,
+                                        COALESCE(SUM(ck.valor),0) AS receita
+                                 FROM checkouts ck JOIN users u ON u.id = ck.user_id
+                                 WHERE ck.status = ? AND u.campanha IS NOT NULL
+                                 GROUP BY u.campanha"""), ("pago",)).fetchall()
+        else:
+            cad = c.execute(_q("SELECT campanha, COUNT(*) AS n FROM users "
+                               "WHERE campanha IS NOT NULL AND criado >= ? AND criado < ? "
+                               "GROUP BY campanha"), (desde, ate)).fetchall()
+            rev = c.execute(_q("""SELECT u.campanha AS campanha, COUNT(*) AS vendas,
+                                        COALESCE(SUM(ck.valor),0) AS receita
+                                 FROM checkouts ck JOIN users u ON u.id = ck.user_id
+                                 WHERE ck.status = ? AND ck.criado >= ? AND ck.criado < ?
+                                   AND u.campanha IS NOT NULL
+                                 GROUP BY u.campanha"""), ("pago", desde, ate)).fetchall()
+    for r in cad:
+        out[str(r["campanha"])] = {"cadastros": int(r["n"]), "vendas": 0, "receita": 0.0}
+    for r in rev:
+        d = out.setdefault(str(r["campanha"]), {"cadastros": 0, "vendas": 0, "receita": 0.0})
+        d["vendas"] = int(r["vendas"])
+        d["receita"] = round(float(r["receita"]), 2)
+    return out
+
+
 def metricas_por_campanha():
     """Por campanha (id em users.campanha): cadastros, vendas pagas e receita.
     Só cobre quem chegou ao SITE com a tag da campanha e se cadastrou (last-click)."""

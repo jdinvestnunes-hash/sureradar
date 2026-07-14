@@ -1015,9 +1015,12 @@ def _norm_nome(s):
 _BR_TZ = timezone(timedelta(hours=-3))
 
 
-def _dias_do_periodo(preset):
-    """Conjunto de datas (YYYY-MM-DD, fuso BR) que o período cobre — pra somar os
-    membros REAIS no mesmo intervalo do gasto do Facebook."""
+def _periodo(preset):
+    """(datas do período p/ membros, desde_ts, ate_ts p/ cadastros/receita).
+    'tudo' -> datas=None (sem filtro de dia) e range bem amplo."""
+    import time as _t
+    if preset == "tudo":
+        return None, 0.0, _t.time() + 86400.0
     hoje = datetime.now(_BR_TZ).date()
     if preset == "ontem":
         dias = [hoje - timedelta(days=1)]
@@ -1027,11 +1030,18 @@ def _dias_do_periodo(preset):
         dias = [hoje - timedelta(days=i) for i in range(30)]
     else:
         dias = [hoje]
-    return {d.isoformat() for d in dias}
+    dias_set = {d.isoformat() for d in dias}
+    menor, maior = min(dias), max(dias)
+    desde = datetime(menor.year, menor.month, menor.day, tzinfo=_BR_TZ).timestamp()
+    ate = (datetime(maior.year, maior.month, maior.day, tzinfo=_BR_TZ)
+           + timedelta(days=1)).timestamp()
+    return dias_set, desde, ate
 
 
 def _membros_no_periodo(camp, dias_set):
-    """Quantos membros entraram por essa campanha nas datas do período."""
+    """Membros que entraram nessa campanha no período (dias_set None = total)."""
+    if dias_set is None:
+        return int(camp.get("membros", 0) or 0)
     return sum(int(d.get("qtd", 0)) for d in (camp.get("por_dia") or [])
                if d.get("dia") in dias_set)
 
@@ -1043,75 +1053,73 @@ def admin_fb_gastos(request: Request, preset: str = "hoje", level: str = "adset"
     erro = _guard_admin(request, user)
     if erro:
         return erro
-    if not meta_ads.configurado():
-        return {"configurado": False}
-    try:
-        gastos = meta_ads.gastos(preset=preset, level=level)
-    except Exception as e:
-        return JSONResponse({"configurado": True, "erro": str(e)}, status_code=502)
+    # As campanhas/membros/cadastros/receita funcionam SEM o Facebook. O gasto do
+    # FB é um "extra": se estiver conectado a gente enriquece; se não, mostra R$0.
+    fb_on = meta_ads.configurado()
+    gastos, fb_erro = [], None
+    if fb_on:
+        try:
+            gastos = meta_ads.gastos(preset=preset, level=level)
+        except Exception as e:
+            fb_erro = str(e)
     por_nome = {_norm_nome(c["nome"]): c for c in auth.listar_campanhas()}
-    dias_set = _dias_do_periodo(preset)
-    met = auth.metricas_por_campanha()   # cadastros/vendas/receita por campanha (id)
-    # Agrupa os conjuntos do FB pela campanha interna (soma as cópias); o que não
-    # casa com nenhuma campanha aqui fica solto (sem membros).
-    grupos, soltas = {}, []
+    dias_set, desde, ate = _periodo(preset)
+    met = auth.metricas_por_campanha_periodo(desde, ate)   # cadastros/vendas/receita NO PERÍODO
+    campanhas = auth.listar_campanhas()
+    # Soma o gasto do FB por campanha interna (match por nome, junta as cópias).
+    fb, soltas = {}, []
     for g in gastos:
         c = por_nome.get(_norm_nome(g["nome"]))
         if c:
-            grp = grupos.get(c["id"])
-            if grp is None:
-                m = met.get(str(c["id"]), {})
-                grp = grupos[c["id"]] = {
-                    "nome": c["nome"], "gasto": 0.0, "leads_fb": 0, "cliques": 0,
-                    "impressoes": 0, "conjuntos": 0, "matched": True, "campanha_id": c["id"],
-                    "membros": _membros_no_periodo(c, dias_set),
-                    "membros_total": int(c["membros"]),
-                    "cadastros": int(m.get("cadastros", 0)),
-                    "vendas": int(m.get("vendas", 0)),
-                    "receita": float(m.get("receita", 0.0)),
-                }
-            grp["gasto"] += g["gasto"]
-            grp["leads_fb"] += g.get("leads_fb", 0)
-            grp["cliques"] += g.get("cliques", 0)
-            grp["impressoes"] += g.get("impressoes", 0)
-            grp["conjuntos"] += 1
+            f = fb.setdefault(c["id"], {"gasto": 0.0, "leads_fb": 0, "cliques": 0, "conjuntos": 0})
+            f["gasto"] += g["gasto"]
+            f["leads_fb"] += g.get("leads_fb", 0)
+            f["cliques"] += g.get("cliques", 0)
+            f["conjuntos"] += 1
         else:
-            soltas.append({**g, "matched": False, "membros": None,
-                           "membros_total": None, "custo_por_membro": None, "conjuntos": 1})
+            soltas.append({"nome": g["nome"], "gasto": round(g["gasto"], 2),
+                           "leads_fb": g.get("leads_fb", 0), "cliques": g.get("cliques", 0),
+                           "conjuntos": 1, "matched": False, "campanha_id": None,
+                           "link_site": None, "membros": None, "membros_total": None,
+                           "cadastros": None, "vendas": None, "receita": None,
+                           "custo_por_membro": None, "roi": None})
+    # Uma linha POR CAMPANHA (todas aparecem, com link), enriquecida com o FB.
     linhas = []
-    tot_membros = membros_conhecidos = tot_cadastros = tot_vendas = 0
-    gasto_casado = tot_receita = 0.0
-    for grp in grupos.values():
-        grp["gasto"] = round(grp["gasto"], 2)
-        m = grp["membros"] or 0
-        grp["custo_por_membro"] = round(grp["gasto"] / m, 2) if m > 0 else None
-        grp["roi"] = round(grp["receita"] - grp["gasto"], 2)   # lucro (receita − gasto)
-        tot_membros += m
-        tot_cadastros += grp["cadastros"]
-        tot_vendas += grp["vendas"]
-        tot_receita += grp["receita"]
-        if m > 0:
-            membros_conhecidos += m
-            gasto_casado += grp["gasto"]
-        linhas.append(grp)
-    linhas.extend(soltas)
-    tot_gasto = round(sum(r["gasto"] for r in linhas), 2)
-    tot_leads = sum(r.get("leads_fb", 0) for r in linhas)
-    tot_cliques = sum(r.get("cliques", 0) for r in linhas)
-    linhas.sort(key=lambda x: x["gasto"], reverse=True)
+    tot_gasto = tot_receita = gasto_casado = 0.0
+    tot_membros = tot_cadastros = tot_vendas = tot_leads = membros_conhecidos = 0
+    for c in campanhas:
+        f = fb.get(c["id"], {"gasto": 0.0, "leads_fb": 0, "cliques": 0, "conjuntos": 0})
+        m = met.get(str(c["id"]), {})
+        gasto = round(f["gasto"], 2)
+        membros = _membros_no_periodo(c, dias_set)
+        receita = round(float(m.get("receita", 0.0)), 2)
+        cadastros = int(m.get("cadastros", 0))
+        linhas.append({
+            "campanha_id": c["id"], "nome": c["nome"], "matched": True,
+            "link_site": config.SITE_URL + "/grupo?c=" + str(c["id"]),
+            "gasto": gasto, "leads_fb": f["leads_fb"], "cliques": f["cliques"],
+            "conjuntos": f["conjuntos"], "membros": membros, "membros_total": int(c["membros"]),
+            "cadastros": cadastros, "vendas": int(m.get("vendas", 0)), "receita": receita,
+            "custo_por_membro": round(gasto / membros, 2) if membros > 0 else None,
+            "roi": round(receita - gasto, 2),
+        })
+        tot_gasto += gasto; tot_receita += receita; tot_membros += membros
+        tot_cadastros += cadastros; tot_vendas += int(m.get("vendas", 0)); tot_leads += f["leads_fb"]
+        if membros > 0:
+            gasto_casado += gasto; membros_conhecidos += membros
+    linhas.sort(key=lambda x: (x["gasto"], x["membros"] or 0), reverse=True)
+    for s in soltas:                       # gasto do FB sem campanha correspondente aqui
+        tot_gasto += s["gasto"]; tot_leads += s["leads_fb"]
+        linhas.append(s)
     custo_medio = round(gasto_casado / membros_conhecidos, 2) if membros_conhecidos else None
     return {
-        "configurado": True, "preset": preset, "level": level,
+        "configurado": True, "fb_conectado": fb_on, "fb_erro": fb_erro,
+        "preset": preset, "level": level,
         "kpis": {
-            "gasto": tot_gasto,
-            "membros": int(tot_membros),
-            "leads_fb": int(tot_leads),
-            "cliques": int(tot_cliques),
-            "custo_por_membro": custo_medio,
-            "cadastros": int(tot_cadastros),
-            "vendas": int(tot_vendas),
-            "receita": round(tot_receita, 2),
-            "roi": round(tot_receita - tot_gasto, 2),
+            "gasto": round(tot_gasto, 2), "membros": int(tot_membros),
+            "leads_fb": int(tot_leads), "cadastros": int(tot_cadastros),
+            "vendas": int(tot_vendas), "receita": round(tot_receita, 2),
+            "custo_por_membro": custo_medio, "roi": round(tot_receita - tot_gasto, 2),
         },
         "gastos": linhas,
     }
