@@ -96,6 +96,34 @@ def gastos(preset="hoje", level="adset"):
     return out
 
 
+def status_campanhas():
+    """{id_campanha: {"status": effective_status, "objetivo": objective}} pra
+    mostrar a coluna 'Veiculação' (Ativa/Pausada/Em análise) igual o gerenciador.
+    Best-effort: se der erro, devolve {} e o painel só não mostra o status."""
+    if not configurado():
+        return {}
+    url = f"{_BASE}/{config.META_API_VER}/{_ad_account()}/campaigns"
+    params = {
+        "fields": "id,name,effective_status,objective",
+        "limit": 300,
+        "access_token": config.META_ACCESS_TOKEN,
+    }
+    try:
+        r = requests.get(url, params=params, timeout=15)
+        data = r.json() if r.content else {}
+    except (requests.RequestException, ValueError):
+        return {}
+    if r.status_code != 200 or "error" in data:
+        return {}
+    out = {}
+    for row in data.get("data", []):
+        out[row.get("id", "")] = {
+            "status": row.get("effective_status", ""),
+            "objetivo": row.get("objective", ""),
+        }
+    return out
+
+
 def testar():
     """Diagnóstico rápido pra tela de admin."""
     if not configurado():

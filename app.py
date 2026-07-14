@@ -1047,79 +1047,96 @@ def _membros_no_periodo(camp, dias_set):
 
 
 @app.get("/api/admin/fb-gastos")
-def admin_fb_gastos(request: Request, preset: str = "hoje", level: str = "adset"):
-    """Dashboard de gastos do Facebook: gasto + leads(FB) x membros REAIS + custo/membro."""
+def admin_fb_gastos(request: Request, preset: str = "hoje", level: str = "campaign"):
+    """Dashboard estilo Gerenciador de Anúncios: puxa AS CAMPANHAS DO META
+    automaticamente (auto-sync via token) e mostra Gasto, Resultados(leads),
+    Impressões, Cliques, Veiculação + cruza com nosso rastreio (membros/cadastros/
+    receita) por nome. level: 'campaign' (padrão) ou 'adset'."""
     user = _usuario(request)
     erro = _guard_admin(request, user)
     if erro:
         return erro
-    # As campanhas/membros/cadastros/receita funcionam SEM o Facebook. O gasto do
-    # FB é um "extra": se estiver conectado a gente enriquece; se não, mostra R$0.
+    level = "adset" if level == "adset" else "campaign"
     fb_on = meta_ads.configurado()
-    gastos, fb_erro = [], None
+    gastos, fb_erro, status = [], None, {}
     if fb_on:
         try:
             gastos = meta_ads.gastos(preset=preset, level=level)
+            if level == "campaign":
+                status = meta_ads.status_campanhas()
         except Exception as e:
             fb_erro = str(e)
-    por_nome = {_norm_nome(c["nome"]): c for c in auth.listar_campanhas()}
+    internas = auth.listar_campanhas()
+    por_nome = {_norm_nome(c["nome"]): c for c in internas}
     dias_set, desde, ate = _periodo(preset)
     met = auth.metricas_por_campanha_periodo(desde, ate)   # cadastros/vendas/receita NO PERÍODO
-    campanhas = auth.listar_campanhas()
-    # Soma o gasto do FB por campanha interna (match por nome, junta as cópias).
-    fb, soltas = {}, []
-    for g in gastos:
-        c = por_nome.get(_norm_nome(g["nome"]))
-        if c:
-            f = fb.setdefault(c["id"], {"gasto": 0.0, "leads_fb": 0, "cliques": 0, "conjuntos": 0})
-            f["gasto"] += g["gasto"]
-            f["leads_fb"] += g.get("leads_fb", 0)
-            f["cliques"] += g.get("cliques", 0)
-            f["conjuntos"] += 1
-        else:
-            soltas.append({"nome": g["nome"], "gasto": round(g["gasto"], 2),
-                           "leads_fb": g.get("leads_fb", 0), "cliques": g.get("cliques", 0),
-                           "conjuntos": 1, "matched": False, "campanha_id": None,
-                           "link_site": None, "membros": None, "membros_total": None,
-                           "cadastros": None, "vendas": None, "receita": None,
-                           "custo_por_membro": None, "roi": None})
-    # Uma linha POR CAMPANHA (todas aparecem, com link), enriquecida com o FB.
-    linhas = []
-    tot_gasto = tot_receita = gasto_casado = 0.0
-    tot_membros = tot_cadastros = tot_vendas = tot_leads = membros_conhecidos = 0
-    for c in campanhas:
-        f = fb.get(c["id"], {"gasto": 0.0, "leads_fb": 0, "cliques": 0, "conjuntos": 0})
+
+    usados = set()   # ids internos já casados com uma campanha do Meta
+
+    def _enriquecer(nome):
+        """Cruza uma campanha do Meta com nosso rastreio interno (por nome)."""
+        c = por_nome.get(_norm_nome(nome))
+        if not c:
+            return None
+        usados.add(c["id"])
         m = met.get(str(c["id"]), {})
-        gasto = round(f["gasto"], 2)
-        membros = _membros_no_periodo(c, dias_set)
-        receita = round(float(m.get("receita", 0.0)), 2)
-        cadastros = int(m.get("cadastros", 0))
-        linhas.append({
-            "campanha_id": c["id"], "nome": c["nome"], "matched": True,
+        return {
+            "campanha_id": c["id"],
             "link_site": config.SITE_URL + "/grupo?c=" + str(c["id"]),
-            "gasto": gasto, "leads_fb": f["leads_fb"], "cliques": f["cliques"],
-            "conjuntos": f["conjuntos"], "membros": membros, "membros_total": int(c["membros"]),
-            "cadastros": cadastros, "vendas": int(m.get("vendas", 0)), "receita": receita,
-            "custo_por_membro": round(gasto / membros, 2) if membros > 0 else None,
-            "roi": round(receita - gasto, 2),
+            "membros": _membros_no_periodo(c, dias_set), "membros_total": int(c["membros"]),
+            "cadastros": int(m.get("cadastros", 0)), "vendas": int(m.get("vendas", 0)),
+            "receita": round(float(m.get("receita", 0.0)), 2),
+        }
+
+    linhas = []
+    # 1) TODAS as campanhas que vieram do Meta (auto-sync) — mesmo sem rastreio nosso
+    for g in gastos:
+        st = status.get(g.get("id", ""), {})
+        row = {
+            "origem": "meta", "nome": g.get("nome", "—"), "gasto": round(g.get("gasto", 0.0), 2),
+            "impressoes": int(g.get("impressoes", 0)), "cliques": int(g.get("cliques", 0)),
+            "leads_fb": int(g.get("leads_fb", 0)),
+            "status": st.get("status", ""), "objetivo": st.get("objetivo", ""),
+            "campanha_id": None, "link_site": None, "membros": None, "membros_total": None,
+            "cadastros": None, "vendas": None, "receita": None,
+        }
+        extra = _enriquecer(g.get("nome", ""))
+        if extra:
+            row.update(extra)
+        linhas.append(row)
+    # 2) Nossas campanhas manuais que NÃO têm gasto no Meta (não somem do painel)
+    for c in internas:
+        if c["id"] in usados:
+            continue
+        m = met.get(str(c["id"]), {})
+        linhas.append({
+            "origem": "interna", "nome": c["nome"], "gasto": 0.0,
+            "impressoes": 0, "cliques": 0, "leads_fb": 0, "status": "", "objetivo": "",
+            "campanha_id": c["id"], "link_site": config.SITE_URL + "/grupo?c=" + str(c["id"]),
+            "membros": _membros_no_periodo(c, dias_set), "membros_total": int(c["membros"]),
+            "cadastros": int(m.get("cadastros", 0)), "vendas": int(m.get("vendas", 0)),
+            "receita": round(float(m.get("receita", 0.0)), 2),
         })
-        tot_gasto += gasto; tot_receita += receita; tot_membros += membros
-        tot_cadastros += cadastros; tot_vendas += int(m.get("vendas", 0)); tot_leads += f["leads_fb"]
-        if membros > 0:
-            gasto_casado += gasto; membros_conhecidos += membros
-    linhas.sort(key=lambda x: (x["gasto"], x["membros"] or 0), reverse=True)
-    for s in soltas:                       # gasto do FB sem campanha correspondente aqui
-        tot_gasto += s["gasto"]; tot_leads += s["leads_fb"]
-        linhas.append(s)
-    custo_medio = round(gasto_casado / membros_conhecidos, 2) if membros_conhecidos else None
+    # totais (linha de rodapé estilo Gerenciador)
+    t = {"gasto": 0.0, "impressoes": 0, "cliques": 0, "leads_fb": 0,
+         "membros": 0, "cadastros": 0, "vendas": 0, "receita": 0.0}
+    for r in linhas:
+        t["gasto"] += r["gasto"]; t["impressoes"] += r["impressoes"]; t["cliques"] += r["cliques"]
+        t["leads_fb"] += r["leads_fb"]; t["membros"] += r["membros"] or 0
+        t["cadastros"] += r["cadastros"] or 0; t["vendas"] += r["vendas"] or 0
+        t["receita"] += r["receita"] or 0.0
+    linhas.sort(key=lambda x: (x["gasto"], x["receita"] or 0), reverse=True)
     return {
         "configurado": True, "fb_conectado": fb_on, "fb_erro": fb_erro,
-        "preset": preset, "level": level,
+        "preset": preset, "level": level, "n": len(linhas),
         "kpis": {
-            "gasto": round(tot_gasto, 2), "membros": int(tot_membros),
-            "leads_fb": int(tot_leads), "cadastros": int(tot_cadastros),
-            "vendas": int(tot_vendas), "receita": round(tot_receita, 2),
-            "custo_por_membro": custo_medio, "roi": round(tot_receita - tot_gasto, 2),
+            "gasto": round(t["gasto"], 2), "membros": int(t["membros"]),
+            "leads_fb": int(t["leads_fb"]), "impressoes": int(t["impressoes"]),
+            "cliques": int(t["cliques"]), "cadastros": int(t["cadastros"]),
+            "vendas": int(t["vendas"]), "receita": round(t["receita"], 2),
+            "custo_por_membro": round(t["gasto"] / t["membros"], 2) if t["membros"] else None,
+            "roi": round(t["receita"] - t["gasto"], 2),
+            "roas": round(t["receita"] / t["gasto"], 2) if t["gasto"] > 0 else None,
         },
         "gastos": linhas,
     }
