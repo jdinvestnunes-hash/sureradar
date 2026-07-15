@@ -552,34 +552,31 @@ def checkout_stripe(request: Request, payload: dict = Body(...)):
         return JSONResponse({"erro": "plano inválido"}, status_code=400)
     if not config.STRIPE_SECRET_KEY:
         return JSONResponse({"erro": "Stripe não configurado"}, status_code=503)
-    # ASSINATURA recorrente: cobra automático até cancelar. Mensal=1 mês, Trimestral=
-    # 3 meses, Semestral=6 meses, Anual=1 ano. Pix continua pagamento único.
-    dias = p["dias"]
-    if dias >= 365:
-        intervalo, count = "year", 1
-    elif dias >= 180:
-        intervalo, count = "month", 6
-    elif dias >= 90:
-        intervalo, count = "month", 3
-    else:
-        intervalo, count = "month", 1
+    # PAGAMENTO ÚNICO com parcelamento no cartão (Stripe Brasil). Mensal = à vista;
+    # Trimestral/Semestral/Anual PODEM PARCELAR (a Stripe mostra as parcelas conforme
+    # o valor e o cartão, até 12x). O acesso dura p["dias"] e expira (a régua de
+    # e-mail chama pra recomprar). Pix segue pagamento único à parte.
+    parcelar = plano != "mensal"
     data = {
-        "mode": "subscription",
+        "mode": "payment",
         "success_url": config.SITE_URL + "/perfil?pago=1",
         "cancel_url": config.SITE_URL + "/planos",
         "customer_email": user["email"],
         "client_reference_id": str(user["id"]),
+        "payment_method_types[0]": "card",
         "line_items[0][quantity]": "1",
         "line_items[0][price_data][currency]": "brl",
         "line_items[0][price_data][unit_amount]": str(int(round(p["valor"] * 100))),
-        "line_items[0][price_data][recurring][interval]": intervalo,
-        "line_items[0][price_data][recurring][interval_count]": str(count),
         "line_items[0][price_data][product_data][name]": "SureRadar " + p["nome"],
-        "subscription_data[metadata][user_id]": str(user["id"]),
-        "subscription_data[metadata][plano]": plano,
         "metadata[user_id]": str(user["id"]),
         "metadata[plano]": plano,
+        "payment_intent_data[metadata][user_id]": str(user["id"]),
+        "payment_intent_data[metadata][plano]": plano,
     }
+    if parcelar:
+        # parcelamento: só aparece p/ cartão BR e precisa estar ATIVADO no painel Stripe
+        # (Configurações → Métodos de pagamento → Cartões → Parcelamento).
+        data["payment_method_options[card][installments][enabled]"] = "true"
     try:
         r = requests.post("https://api.stripe.com/v1/checkout/sessions", data=data,
                           auth=(config.STRIPE_SECRET_KEY, ""), timeout=20)
