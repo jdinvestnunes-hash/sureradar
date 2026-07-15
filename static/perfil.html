@@ -232,10 +232,35 @@ async function load(){
       ? `<p style="color:var(--dim);font-size:13.5px;margin-bottom:16px">💳 Assinatura no cartão <b>ativa</b> — renova automático${d.expira?` em ${data_br(d.expira)}`:""}. Cancele quando quiser.</p>
          <button class="btn btn-ghost" id="btn-gerenciar" style="width:100%;margin-bottom:10px">Gerenciar / cancelar assinatura</button>`
       : "";
+    // upgrade: mostra os planos MAIORES que o atual (os dias sempre SOMAM). Detecta o
+    // plano atual pelo pagamento mais recente; se não achar, assume mensal (mostra todos).
+    const ORDER = {mensal:1, trimestral:2, semestral:3, anual:4};
+    const UP = {
+      trimestral: {nome:"Trimestral", preco:"R$ 237", extra:"3 meses"},
+      semestral:  {nome:"Semestral",  preco:"R$ 387", extra:"6 meses · 33% OFF"},
+      anual:      {nome:"Anual",       preco:"R$ 497", extra:"1 ano · só R$ 41/mês"},
+    };
+    const _ts = v => (v==null?0:(typeof v==="number"?v:(Date.parse(v)||0)));
+    let atual = "mensal";
+    (d.pagamentos||[]).slice().sort((a,b)=>_ts(b.criado)-_ts(a.criado)).some(pg=>{
+      if (ORDER[pg.plano]) { atual = pg.plano; return true; } return false;
+    });
+    const opts = ["trimestral","semestral","anual"].filter(k => ORDER[k] > (ORDER[atual]||1));
+    const upgrade = opts.length ? `
+      <div style="margin-top:18px;background:linear-gradient(135deg,rgba(46,230,168,.10),rgba(56,212,245,.08));border:1px solid rgba(46,230,168,.4);border-radius:14px;padding:16px 18px">
+        <div style="font-weight:800;font-size:15px">🚀 Fazer upgrade do seu plano</div>
+        <p style="color:#ffdb8a;font-size:13px;margin:8px 0 14px">✨ Seus <b>${d.dias} dias</b> atuais são <b>somados</b> ao novo plano — você não perde nada.</p>
+        ${opts.map(k=>`<button class="btn btn-${k==='anual'?'primary':'ghost'} up-plan" data-plano="${k}" style="width:100%;margin-bottom:9px">${UP[k].nome} — ${UP[k].preco} <span style="opacity:.7;font-weight:600">· ${UP[k].extra}</span></button>`).join("")}
+        <p style="font-size:11.5px;color:var(--mute);margin-top:4px;text-align:center">💳 parcele no cartão · ⚡ ou Pix</p>
+      </div>` : "";
     sc.innerHTML = `<div class="ct">Assinatura</div>
       <p style="color:var(--dim);font-size:14px;margin-bottom:16px">Seu Pro está ativo. Você tem acesso a todas as entradas, de 1% a 15%+.</p>
       ${assin}
-      <button class="btn btn-ghost" onclick="location.href='/app'">Ir para o painel →</button>`;
+      <button class="btn btn-ghost" onclick="location.href='/app'">Ir para o painel →</button>
+      ${upgrade}`;
+    sc.querySelectorAll(".up-plan").forEach(b=>{
+      b.onclick = ()=>location.href="/planos?upgrade=1&plano="+b.dataset.plano;
+    });
     const bg = $("#btn-gerenciar");
     if (bg) bg.onclick = async ()=>{
       bg.textContent = "⏳ Abrindo..."; bg.disabled = true;

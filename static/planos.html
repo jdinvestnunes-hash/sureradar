@@ -105,6 +105,7 @@
     <h1>Destrave as entradas de <span class="grad">maior lucro</span></h1>
     <p class="lead">No grátis você vê surebets de <b>0 a 1%</b>. No PRO você libera <b>todas — de 1% a 20%+</b>, que se pagam com 1 ou 2 entradas.</p>
   </div>
+  <div id="upgrade-banner" style="display:none;max-width:640px;margin:0 auto 22px;background:linear-gradient(135deg,rgba(46,230,168,.12),rgba(56,212,245,.08));border:1px solid rgba(46,230,168,.45);border-radius:14px;padding:14px 18px;text-align:center;font-size:14px">🚀 <b>Upgrade do seu plano</b> — escolha o novo plano abaixo. <b style="color:#2ee6a8">Seus dias atuais são somados</b>, você não perde nada.</div>
 
   <div class="plans">
     <!-- GRÁTIS -->
@@ -285,6 +286,24 @@ function setPlano(card, key){
 document.querySelectorAll('.seg-opt').forEach(opt=>{
   opt.addEventListener('click', ()=> setPlano(opt.closest('.plan'), opt.dataset.plan));
 });
+
+// ---- Upgrade (vem do /perfil com ?plano=X&upgrade=1): pré-seleciona e avisa ----
+(function(){
+  const params = new URLSearchParams(location.search);
+  const pl = params.get('plano');
+  if (pl){
+    const opt = document.querySelector('.seg-opt[data-plan="'+pl+'"]');
+    if (opt){
+      const card = opt.closest('.plan');
+      setPlano(card, pl);
+      setTimeout(()=>card.scrollIntoView({behavior:'smooth', block:'center'}), 200);
+    }
+  }
+  if (params.get('upgrade')==='1'){
+    const b = document.getElementById('upgrade-banner');
+    if (b) b.style.display='block';
+  }
+})();
 
 document.querySelectorAll('[data-pay]').forEach(b=>{
   b.addEventListener('click', ()=>{
