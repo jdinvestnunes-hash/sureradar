@@ -732,6 +732,75 @@ def checkout_pix(request: Request, payload: dict = Body(...)):
     return {"url": url}
 
 
+def _max_parcelas(dias):
+    """Máximo de parcelas no cartão por plano (AbacatePay exige mín. R$10/parcela)."""
+    if dias >= 365:
+        return 12
+    if dias >= 180:
+        return 6
+    if dias >= 90:
+        return 3
+    return 1
+
+
+@app.post("/api/checkout/cartao")
+def checkout_cartao(request: Request, payload: dict = Body(...)):
+    """Checkout no CARTÃO com PARCELAMENTO (AbacatePay). Pagamento único; o cliente
+    escolhe as parcelas (mín. R$10 cada) — Mensal 1x, Trimestral 3x, Semestral 6x,
+    Anual 12x. A mesma tela também oferece Pix. Libera o PRO pelo mesmo webhook."""
+    user = _usuario(request)
+    if not user:
+        return JSONResponse({"erro": "não autenticado"}, status_code=401)
+    plano, p = _plano_valido(payload)
+    if not p:
+        return JSONResponse({"erro": "plano inválido"}, status_code=400)
+    if not config.ABACATEPAY_API_KEY:
+        return JSONResponse({"erro": "AbacatePay não configurado"}, status_code=503)
+    cpf = "".join(ch for ch in str(payload.get("cpf", "")) if ch.isdigit())
+    celular = "".join(ch for ch in str(payload.get("celular", "")) if ch.isdigit())
+    if not celular:
+        celular = "".join(ch for ch in str(user.get("whatsapp") or "") if ch.isdigit())
+    if len(cpf) != 11:
+        return JSONResponse({"erro": "CPF inválido — informe os 11 dígitos."}, status_code=400)
+    if len(celular) not in (10, 11):
+        return JSONResponse({"erro": "Celular inválido — informe com DDD."}, status_code=400)
+    cpf_fmt = f"{cpf[:3]}.{cpf[3:6]}.{cpf[6:9]}-{cpf[9:]}"
+    cel_fmt = (f"({celular[:2]}) {celular[2:7]}-{celular[7:]}" if len(celular) == 11
+               else f"({celular[:2]}) {celular[2:6]}-{celular[6:]}")
+    body = {
+        "frequency": "ONE_TIME",
+        "methods": ["PIX", "CARD"],
+        "products": [{
+            "externalId": "pro-" + plano,
+            "name": "SureRadar " + p["nome"],
+            "description": "Acesso " + p["nome"] + " (" + str(p["dias"]) + " dias)",
+            "quantity": 1,
+            "price": int(round(p["valor"] * 100)),
+        }],
+        "returnUrl": config.SITE_URL + "/planos",
+        "completionUrl": config.SITE_URL + "/perfil?pago=1",
+        "customer": {
+            "name": user["nome"], "email": user["email"],
+            "cellphone": cel_fmt, "taxId": cpf_fmt,
+        },
+        "card": {"maxInstallments": _max_parcelas(p["dias"])},
+    }
+    try:
+        r = requests.post("https://api.abacatepay.com/v1/billing/create", json=body,
+                          headers={"Authorization": "Bearer " + config.ABACATEPAY_API_KEY},
+                          timeout=20)
+    except requests.RequestException as e:
+        return JSONResponse({"erro": "falha de rede", "detalhe": str(e)[:120]}, status_code=502)
+    if not r.ok:
+        return JSONResponse({"erro": "AbacatePay recusou", "detalhe": r.text[:300]}, status_code=502)
+    d = (r.json() or {}).get("data") or {}
+    bid, url = d.get("id"), d.get("url")
+    if not bid or not url:
+        return JSONResponse({"erro": "resposta inesperada do AbacatePay"}, status_code=502)
+    auth.checkout_registrar("abacatepay", bid, user["id"], plano, p["dias"], p["valor"], "cartao")
+    return {"url": url}
+
+
 @app.post("/api/webhook/abacatepay")
 async def webhook_abacate(request: Request):
     if (not config.ABACATEPAY_WEBHOOK_SECRET or
