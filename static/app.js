@@ -49,6 +49,15 @@ const TEASERS = [
 const $ = (s) => document.querySelector(s);
 const el = (t, c, h) => { const e = document.createElement(t); if (c) e.className = c; if (h !== undefined) e.innerHTML = h; return e; };
 const brl = (v) => "R$ " + Number(v).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+// Tipo de mercado por UNIDADE (games/sets/pontos) — o que mais confunde no tênis/vôlei.
+// Dois handicaps parecidos (games x sets) têm odds próximas; o cliente aposta o errado.
+function tipoMercado(txt) {
+  const t = (txt || "").toLowerCase();
+  if (/\bgames?\b/.test(t)) return { lbl: "GAMES", cor: "#2ee6a8" };
+  if (/\bsets?\b/.test(t)) return { lbl: "SETS", cor: "#ffb020" };
+  if (/\bpontos?\b|\bpoints?\b/.test(t)) return { lbl: "PONTOS", cor: "#a98bff" };
+  return null;
+}
 function load(k, def) { try { return JSON.parse(localStorage.getItem(k)) ?? def; } catch { return def; } }
 function saveFiltros() { localStorage.setItem(filtersKey(), JSON.stringify(filtros)); }
 // Banca: salva no navegador (cache) E no SERVIDOR (banco de dados) — assim as
@@ -273,7 +282,10 @@ function opEl(sb, teaser) {
     const box = el("div", "op-box");
     const main = el("div", "op-box-main");
     // rótulo legível (ex.: "AC d'Escaldes — classificação"); código técnico fica pequeno embaixo
-    main.appendChild(el("div", "op-box-label", l.desc || l.outcome));
+    // + selo do TIPO (GAMES/SETS/PONTOS) bem visível, pra não apostar o mercado errado
+    const tp = tipoMercado(l.desc || l.outcome);
+    const badge = tp ? `<span style="display:inline-block;font-size:10px;font-weight:800;letter-spacing:.04em;padding:1px 6px;border-radius:6px;margin-right:6px;color:#04121a;background:${tp.cor};vertical-align:middle">${tp.lbl}</span>` : "";
+    main.appendChild(el("div", "op-box-label", badge + (l.desc || l.outcome)));
     if (l.desc && l.outcome && l.desc !== l.outcome) {
       const codeEl = el("div", null, l.outcome);
       codeEl.style.cssText = "font-size:11px;color:var(--muted,#647388);margin-top:2px";
@@ -291,6 +303,16 @@ function opEl(sb, teaser) {
     odds.appendChild(box);
   });
   body.appendChild(odds);
+  // Tênis/vôlei: GAMES e SETS são handicaps DIFERENTES com odds parecidas — apostar
+  // o errado quebra a proteção. Avisa pra conferir exatamente qual mercado casar.
+  const unidades = [...new Set(sb.legs.map((l) => (tipoMercado(l.desc || l.outcome) || {}).lbl).filter((u) => u === "GAMES" || u === "SETS"))];
+  if (unidades.length && !teaser) {
+    const alvo = unidades.length === 1 ? unidades[0] : "GAMES × SETS";
+    const warn = el("div", null,
+      `⚠️ Confira na casa: aposte o handicap de <b>${alvo}</b> exatamente como está marcado. No tênis existe GAMES e SETS com odds parecidas — apostar o tipo errado quebra a proteção da surebet.`);
+    warn.style.cssText = "font-size:11.5px;color:#ffb020;background:rgba(255,176,32,.09);border:1px solid rgba(255,176,32,.25);border-radius:8px;padding:7px 10px;margin-top:10px;line-height:1.45";
+    body.appendChild(warn);
+  }
   op.appendChild(body);
 
   const bar = el("div", "op-bar");
