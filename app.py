@@ -918,6 +918,12 @@ async def webhook_abacate(request: Request):
                 _confirmar_compra_email(res["user_id"])
                 _avisar_venda_admin(res)
                 break
+    elif tipo in ("checkout.refunded", "checkout.disputed", "billing.refunded",
+                  "transparent.refunded", "transparent.disputed", "payment.refunded"):
+        # estorno / chargeback do cartão -> tira o PRO da pessoa
+        for bid in cands:
+            if auth.checkout_revogar("abacatepay", bid):
+                break
     return {"ok": True}
 
 

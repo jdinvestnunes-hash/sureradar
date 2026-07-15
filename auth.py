@@ -985,6 +985,22 @@ def checkout_revogar_por_pi(pi):
     return dict(row)
 
 
+def checkout_revogar(provider, external_id):
+    """Estorno/chargeback de checkout avulso (cartão/Pix AbacatePay): acha o checkout
+    PAGO com esse provider+external_id e TIRA o PRO (volta pra free). Idempotente."""
+    if not external_id:
+        return None
+    with _db() as c:
+        row = c.execute(_q("SELECT * FROM checkouts WHERE provider=? AND external_id=? AND status='pago'"),
+                        (provider, external_id)).fetchone()
+        if not row:
+            return None
+        c.execute(_q("UPDATE checkouts SET status='estornado' WHERE id=?"), (row["id"],))
+    voltar_free(row["user_id"])
+    print(f">> ESTORNO/chargeback ({provider}): PRO revogado do user {row['user_id']}")
+    return dict(row)
+
+
 # ---------------------------------------------------------------------------
 # Métricas de negócio (para o dashboard admin)
 # ---------------------------------------------------------------------------
