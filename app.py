@@ -780,6 +780,30 @@ def _abacate_produto_id(plano, p):
     return pid
 
 
+_abacate_cust_cache = {}   # user_id -> customerId (memória; recria no redeploy)
+
+
+def _abacate_customer_id(user):
+    """Cria/reusa um customer na AbacatePay v2 pra PRÉ-PREENCHER email+nome no
+    checkout. Best-effort: se falhar, devolve None e o checkout segue sem pré-preencher."""
+    uid = user["id"]
+    if uid in _abacate_cust_cache:
+        return _abacate_cust_cache[uid]
+    body = {"email": user["email"], "name": user.get("nome") or "",
+            "metadata": {"userId": str(uid)}}
+    try:
+        r = requests.post(_ABACATE_V2 + "/customers/create", json=body,
+                          headers={"Authorization": "Bearer " + _abacate_v2_key()}, timeout=15)
+        if r.ok:
+            cid = ((r.json() or {}).get("data") or {}).get("id")
+            if cid:
+                _abacate_cust_cache[uid] = cid
+                return cid
+    except requests.RequestException:
+        pass
+    return None
+
+
 @app.post("/api/checkout/cartao")
 def checkout_cartao(request: Request, payload: dict = Body(...)):
     """Checkout no CARTÃO com PARCELAMENTO (AbacatePay API v2). Pagamento único; o
@@ -806,6 +830,9 @@ def checkout_cartao(request: Request, payload: dict = Body(...)):
         "externalId": "sr-" + str(user["id"]) + "-" + plano,
         "card": {"maxInstallments": _max_parcelas(p["dias"])},
     }
+    cid = _abacate_customer_id(user)      # pré-preenche email+nome na tela (best-effort)
+    if cid:
+        body["customerId"] = cid
     try:
         r = requests.post(_ABACATE_V2 + "/checkouts/create", json=body,
                           headers={"Authorization": "Bearer " + _abacate_v2_key()},
