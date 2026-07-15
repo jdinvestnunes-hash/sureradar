@@ -881,6 +881,23 @@ def checkout_cartao(request: Request, payload: dict = Body(...)):
     return {"url": url}
 
 
+@app.get("/api/debug/abacate")
+def _dbg_abacate():
+    """TEMPORÁRIO — diagnóstico do customer/checkout v2 (remover depois)."""
+    out = {"v2_key_set": bool(config.ABACATEPAY_V2_API_KEY),
+           "fallback_v1": not bool(config.ABACATEPAY_V2_API_KEY)}
+    hdr = {"Authorization": "Bearer " + _abacate_v2_key()}
+    try:
+        r = requests.post(_ABACATE_V2 + "/customers/create",
+                          json={"email": "debug@sureradar.site", "name": "Debug SR"},
+                          headers=hdr, timeout=10)
+        out["customer_status"] = r.status_code
+        out["customer_body"] = r.text[:700]
+    except Exception as e:
+        out["customer_err"] = str(e)[:200]
+    return out
+
+
 @app.post("/api/webhook/abacatepay")
 async def webhook_abacate(request: Request):
     if (not config.ABACATEPAY_WEBHOOK_SECRET or
