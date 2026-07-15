@@ -124,6 +124,11 @@ async def lifespan(app):
         alertas.iniciar()             # alertas personalizados de surebet na DM (PRO)
     except Exception as e:
         print(f"!! Alertas Telegram não iniciaram: {e}")
+    try:                              # cria/cacheia produtos p/ o cartão parcelado ser rápido
+        import threading as _th        # em thread p/ NÃO travar o boot (healthcheck do Railway)
+        _th.Thread(target=_abacate_prewarm_produtos, name="abacate-prewarm", daemon=True).start()
+    except Exception as e:
+        print(f"!! Prewarm produtos AbacatePay: {e}")
     yield
     pipeline.parar_agendador()
     promo.parar()
@@ -759,7 +764,7 @@ def _abacate_produto_id(plano, p):
     ext = "pro-" + plano
     hdr = {"Authorization": "Bearer " + _abacate_v2_key()}
     try:
-        r = requests.get(_ABACATE_V2 + "/products/list", headers=hdr, timeout=15)
+        r = requests.get(_ABACATE_V2 + "/products/list", headers=hdr, timeout=8)
         if r.ok:
             for prod in ((r.json() or {}).get("data") or []):
                 if prod.get("externalId") == ext and prod.get("id"):
@@ -770,7 +775,7 @@ def _abacate_produto_id(plano, p):
     body = {"externalId": ext, "name": "SureRadar " + p["nome"],
             "description": "Acesso " + p["nome"] + " (" + str(p["dias"]) + " dias)",
             "price": int(round(p["valor"] * 100)), "currency": "BRL"}
-    r = requests.post(_ABACATE_V2 + "/products/create", json=body, headers=hdr, timeout=20)
+    r = requests.post(_ABACATE_V2 + "/products/create", json=body, headers=hdr, timeout=12)
     if not r.ok:
         raise RuntimeError("produto: " + r.text[:160])
     pid = ((r.json() or {}).get("data") or {}).get("id")
@@ -778,6 +783,32 @@ def _abacate_produto_id(plano, p):
         raise RuntimeError("produto criado sem id")
     _abacate_prod_cache[plano] = pid
     return pid
+
+
+def _abacate_prewarm_produtos():
+    """No boot: garante os produtos dos 4 planos já criados/cacheados, pra o clique
+    em 'Cartão' NÃO gastar tempo criando produto. Best-effort (1 listagem + faltantes)."""
+    if not _abacate_v2_key():
+        return
+    hdr = {"Authorization": "Bearer " + _abacate_v2_key()}
+    existentes = {}
+    try:
+        r = requests.get(_ABACATE_V2 + "/products/list", headers=hdr, timeout=8)
+        if r.ok:
+            for prod in ((r.json() or {}).get("data") or []):
+                if prod.get("externalId") and prod.get("id"):
+                    existentes[prod["externalId"]] = prod["id"]
+    except requests.RequestException:
+        pass
+    for plano, p in config.PLANOS.items():
+        ext = "pro-" + plano
+        if ext in existentes:
+            _abacate_prod_cache[plano] = existentes[ext]
+        elif plano not in _abacate_prod_cache:
+            try:
+                _abacate_produto_id(plano, p)
+            except Exception as e:
+                print(f"!! prewarm produto {plano}:", e)
 
 
 _abacate_cust_cache = {}   # user_id -> customerId (memória; recria no redeploy)
@@ -793,14 +824,15 @@ def _abacate_customer_id(user):
             "metadata": {"userId": str(uid)}}
     try:
         r = requests.post(_ABACATE_V2 + "/customers/create", json=body,
-                          headers={"Authorization": "Bearer " + _abacate_v2_key()}, timeout=15)
+                          headers={"Authorization": "Bearer " + _abacate_v2_key()}, timeout=8)
         if r.ok:
             cid = ((r.json() or {}).get("data") or {}).get("id")
             if cid:
                 _abacate_cust_cache[uid] = cid
                 return cid
-    except requests.RequestException:
-        pass
+        print(">> abacate customer nao ok:", r.status_code, r.text[:120])
+    except requests.RequestException as e:
+        print(">> abacate customer erro:", str(e)[:80])
     return None
 
 
@@ -836,7 +868,7 @@ def checkout_cartao(request: Request, payload: dict = Body(...)):
     try:
         r = requests.post(_ABACATE_V2 + "/checkouts/create", json=body,
                           headers={"Authorization": "Bearer " + _abacate_v2_key()},
-                          timeout=20)
+                          timeout=12)
     except requests.RequestException as e:
         return JSONResponse({"erro": "falha de rede", "detalhe": str(e)[:120]}, status_code=502)
     if not r.ok:
