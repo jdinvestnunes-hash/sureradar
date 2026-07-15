@@ -131,7 +131,7 @@
         <button class="seg-opt on" data-plan="anual">Anual</button>
       </div>
       <div class="price" data-price>R$ 497<small>/ano</small></div>
-      <div class="pnote" data-note>sai por <b>R$ 41/mês</b> · <span class="save">economize R$ 667</span></div>
+      <div class="pnote" data-note>sai por <b>R$ 41/mês</b> · <span class="save">economize R$ 667</span> · 💳 <b>até 12x no cartão</b></div>
       <ul>
         <li><span class="ck">✓</span> <b>TODAS as entradas — 1% a 20%+</b></li>
         <li><span class="ck">✓</span> Sem limite de entradas por dia</li>
@@ -269,9 +269,9 @@ $id('pix-go').onclick = ()=>{
 // ---- Seletor de período (Mensal/Trimestral · Semestral/Anual) ----
 const PLANOS = {
   mensal:     { price:'R$ 97<small>/mês</small>',        note:'pagamento à vista', badge:'' },
-  trimestral: { price:'R$ 237<small>/trimestre</small>', note:'sai por <b>R$ 79/mês</b> · <span class="save">18% OFF</span>', badge:'💚 18% OFF' },
-  semestral:  { price:'R$ 387<small>/semestre</small>',  note:'sai por <b>R$ 64,50/mês</b> · <span class="save">33% OFF</span>', badge:'💚 33% OFF' },
-  anual:      { price:'R$ 497<small>/ano</small>',        note:'sai por <b>R$ 41/mês</b> · <span class="save">economize R$ 667</span>', badge:'⭐ MAIS VANTAJOSO · 57% OFF' },
+  trimestral: { price:'R$ 237<small>/trimestre</small>', note:'sai por <b>R$ 79/mês</b> · <span class="save">18% OFF</span> · 💳 parcele no cartão', badge:'💚 18% OFF' },
+  semestral:  { price:'R$ 387<small>/semestre</small>',  note:'sai por <b>R$ 64,50/mês</b> · <span class="save">33% OFF</span> · 💳 parcele no cartão', badge:'💚 33% OFF' },
+  anual:      { price:'R$ 497<small>/ano</small>',        note:'sai por <b>R$ 41/mês</b> · <span class="save">economize R$ 667</span> · 💳 <b>até 12x no cartão</b>', badge:'⭐ MAIS VANTAJOSO · 57% OFF' },
 };
 function setPlano(card, key){
   const p = PLANOS[key]; if(!p) return;
