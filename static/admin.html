@@ -278,7 +278,7 @@ function barChart(el,labels,values,color,money){
 
 function renderMetricas(m){
   $("#kpis").innerHTML=[
-    ["💰 Receita total",brl(m.receita_total),`${brl(m.receita_30d)} nos últimos 30d`,"var(--gold)"],
+    ["💰 Receita total",brl(m.receita_total),`${brl(m.receita_30d)} nos últimos 30d${m.reembolsos?` · −${brl(m.reembolsos)} reemb.`:""}`,"var(--gold)"],
     ["🔁 MRR (recorrente)",brl(m.mrr),`ARR ${brl0(m.arr)}/ano`,"var(--green)"],
     ["⭐ Assinantes PRO",m.pro_ativos,`de ${m.total_usuarios} usuários`,"var(--cyan)"],
     ["📈 LTV por cliente",brl(m.ltv),`${m.pagantes} pagantes`,"var(--violet)"],
@@ -288,7 +288,7 @@ function renderMetricas(m){
     ["Conversão",m.conversao+"%"],["Ticket médio",brl(m.ticket_medio)],
     ["ARPU",brl(m.arpu)],["Usuários free",m.free],
     ["Novos (7d)","+"+m.novos_7d],["Novos (30d)","+"+m.novos_30d],
-    ["Receita 7d",brl(m.receita_7d)],["Total usuários",m.total_usuarios],
+    ["Receita 7d",brl(m.receita_7d)],["↩️ Reembolsos",brl(m.reembolsos||0)],
   ].map(([l,v])=>`<div class="mini"><div class="lbl">${l}</div><div class="val">${v}</div></div>`).join("");
 
   barChart($("#chart-rev"),m.serie_dias,m.serie_receita,"#ffc94d",true);
@@ -298,7 +298,7 @@ function renderMetricas(m){
 
   $("#pagamentos").innerHTML = m.pagamentos_recentes.length
     ? `<table><thead><tr><th>Cliente</th><th>Plano</th><th>Método</th><th style="text-align:right">Valor</th></tr></thead><tbody>${
-        m.pagamentos_recentes.map(p=>`<tr><td class="b">${p.email}</td><td>${p.plano}</td><td>${p.metodo||"—"}</td><td style="text-align:right" class="money">${brl(p.valor)}</td></tr>`).join("")}</tbody></table>`
+        m.pagamentos_recentes.map(p=>{const neg=p.valor<0;return `<tr><td class="b">${p.email}</td><td>${p.plano}</td><td>${neg?'<span style="color:#ff6b6b">↩️ reembolso</span>':(p.metodo||"—")}</td><td class="money" style="text-align:right${neg?';color:#ff6b6b':''}">${brl(p.valor)}</td></tr>`}).join("")}</tbody></table>`
     : '<div class="empty">Nenhum pagamento ainda.</div>';
 
   $("#vencendo").innerHTML = m.vencendo.length
