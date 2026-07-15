@@ -769,7 +769,7 @@ def checkout_cartao(request: Request, payload: dict = Body(...)):
                else f"({celular[:2]}) {celular[2:6]}-{celular[6:]}")
     body = {
         "frequency": "ONE_TIME",
-        "methods": ["PIX", "CARD"],
+        "methods": ["CARD"],          # só cartão aqui (o Pix tem botão próprio)
         "products": [{
             "externalId": "pro-" + plano,
             "name": "SureRadar " + p["nome"],
