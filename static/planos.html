@@ -224,6 +224,8 @@ const $id = s => document.getElementById(s);
 let pixCtx = null;
 let ME_WHATS = "";   // WhatsApp salvo no cadastro (prefill do celular no Pix)
 fetch("/api/me").then(r => r.ok ? r.json() : null).then(d => { if (d) ME_WHATS = (d.whatsapp || "").replace(/\D/g, ""); }).catch(() => {});
+// pré-cria o customer da AbacatePay (email preenchido + cartão mais rápido no clique)
+fetch("/api/checkout/prep").catch(() => {});
 function abrirPix(plano, btn, metodo){
   metodo = metodo || 'pix';
   pixCtx = {plano, btn, metodo}; $id('pix-err').textContent='';
