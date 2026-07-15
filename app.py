@@ -743,51 +743,72 @@ def _max_parcelas(dias):
     return 1
 
 
+_ABACATE_V2 = "https://api.abacatepay.com/v2"
+_abacate_prod_cache = {}   # plano -> prod_id (memória; some no redeploy, recria sozinho)
+
+
+def _abacate_v2_key():
+    return config.ABACATEPAY_V2_API_KEY or config.ABACATEPAY_API_KEY
+
+
+def _abacate_produto_id(plano, p):
+    """Garante que o produto do plano existe na AbacatePay (v2) e devolve o prod_id.
+    Idempotente por externalId 'pro-<plano>': acha o existente ou cria um novo."""
+    if plano in _abacate_prod_cache:
+        return _abacate_prod_cache[plano]
+    ext = "pro-" + plano
+    hdr = {"Authorization": "Bearer " + _abacate_v2_key()}
+    try:
+        r = requests.get(_ABACATE_V2 + "/products/list", headers=hdr, timeout=15)
+        if r.ok:
+            for prod in ((r.json() or {}).get("data") or []):
+                if prod.get("externalId") == ext and prod.get("id"):
+                    _abacate_prod_cache[plano] = prod["id"]
+                    return prod["id"]
+    except requests.RequestException:
+        pass
+    body = {"externalId": ext, "name": "SureRadar " + p["nome"],
+            "description": "Acesso " + p["nome"] + " (" + str(p["dias"]) + " dias)",
+            "price": int(round(p["valor"] * 100)), "currency": "BRL"}
+    r = requests.post(_ABACATE_V2 + "/products/create", json=body, headers=hdr, timeout=20)
+    if not r.ok:
+        raise RuntimeError("produto: " + r.text[:160])
+    pid = ((r.json() or {}).get("data") or {}).get("id")
+    if not pid:
+        raise RuntimeError("produto criado sem id")
+    _abacate_prod_cache[plano] = pid
+    return pid
+
+
 @app.post("/api/checkout/cartao")
 def checkout_cartao(request: Request, payload: dict = Body(...)):
-    """Checkout no CARTÃO com PARCELAMENTO (AbacatePay). Pagamento único; o cliente
-    escolhe as parcelas (mín. R$10 cada) — Mensal 1x, Trimestral 3x, Semestral 6x,
-    Anual 12x. A mesma tela também oferece Pix. Libera o PRO pelo mesmo webhook."""
+    """Checkout no CARTÃO com PARCELAMENTO (AbacatePay API v2). Pagamento único; o
+    cliente escolhe as parcelas na própria tela da AbacatePay (Mensal 1x / Trimestral
+    3x / Semestral 6x / Anual 12x). A página v2 já coleta CPF + dados do cartão, então
+    aqui NÃO pedimos CPF. Libera o PRO no webhook checkout.completed."""
     user = _usuario(request)
     if not user:
         return JSONResponse({"erro": "não autenticado"}, status_code=401)
     plano, p = _plano_valido(payload)
     if not p:
         return JSONResponse({"erro": "plano inválido"}, status_code=400)
-    if not config.ABACATEPAY_API_KEY:
+    if not _abacate_v2_key():
         return JSONResponse({"erro": "AbacatePay não configurado"}, status_code=503)
-    cpf = "".join(ch for ch in str(payload.get("cpf", "")) if ch.isdigit())
-    celular = "".join(ch for ch in str(payload.get("celular", "")) if ch.isdigit())
-    if not celular:
-        celular = "".join(ch for ch in str(user.get("whatsapp") or "") if ch.isdigit())
-    if len(cpf) != 11:
-        return JSONResponse({"erro": "CPF inválido — informe os 11 dígitos."}, status_code=400)
-    if len(celular) not in (10, 11):
-        return JSONResponse({"erro": "Celular inválido — informe com DDD."}, status_code=400)
-    cpf_fmt = f"{cpf[:3]}.{cpf[3:6]}.{cpf[6:9]}-{cpf[9:]}"
-    cel_fmt = (f"({celular[:2]}) {celular[2:7]}-{celular[7:]}" if len(celular) == 11
-               else f"({celular[:2]}) {celular[2:6]}-{celular[6:]}")
+    try:
+        prod_id = _abacate_produto_id(plano, p)
+    except Exception as e:
+        return JSONResponse({"erro": "AbacatePay (produto)", "detalhe": str(e)[:200]}, status_code=502)
     body = {
-        "frequency": "ONE_TIME",
-        "methods": ["CARD"],          # só cartão aqui (o Pix tem botão próprio)
-        "products": [{
-            "externalId": "pro-" + plano,
-            "name": "SureRadar " + p["nome"],
-            "description": "Acesso " + p["nome"] + " (" + str(p["dias"]) + " dias)",
-            "quantity": 1,
-            "price": int(round(p["valor"] * 100)),
-        }],
+        "items": [{"id": prod_id, "quantity": 1}],
+        "methods": ["CARD"],
         "returnUrl": config.SITE_URL + "/planos",
         "completionUrl": config.SITE_URL + "/perfil?pago=1",
-        "customer": {
-            "name": user["nome"], "email": user["email"],
-            "cellphone": cel_fmt, "taxId": cpf_fmt,
-        },
+        "externalId": "sr-" + str(user["id"]) + "-" + plano,
         "card": {"maxInstallments": _max_parcelas(p["dias"])},
     }
     try:
-        r = requests.post("https://api.abacatepay.com/v1/billing/create", json=body,
-                          headers={"Authorization": "Bearer " + config.ABACATEPAY_API_KEY},
+        r = requests.post(_ABACATE_V2 + "/checkouts/create", json=body,
+                          headers={"Authorization": "Bearer " + _abacate_v2_key()},
                           timeout=20)
     except requests.RequestException as e:
         return JSONResponse({"erro": "falha de rede", "detalhe": str(e)[:120]}, status_code=502)
@@ -810,17 +831,24 @@ async def webhook_abacate(request: Request):
         ev = await request.json()
     except Exception:
         return JSONResponse({"erro": "payload inválido"}, status_code=400)
-    # billing.paid é o evento do Pix (v1); os demais são tolerância p/ variações.
-    if ev.get("event") in ("billing.paid", "billing.completed", "payment.paid",
-                            "checkout.completed", "transparent.completed"):
-        d = ev.get("data") or {}
-        billing = d.get("billing") or d.get("pixQrCode") or d
-        bid = (billing or {}).get("id") or d.get("id")
-        if bid:
+    # v1 Pix = billing.paid; v2 cartão (parcelamento) = checkout.completed.
+    # A estrutura do data varia entre v1/v2, então tentamos vários caminhos de id.
+    tipo = ev.get("event")
+    d = ev.get("data") or {}
+    cands = []
+    for obj in (d, d.get("billing"), d.get("checkout"), d.get("pixQrCode"), d.get("payment")):
+        if isinstance(obj, dict) and obj.get("id"):
+            cands.append(obj["id"])
+    # log sem PII (só chaves + ids) — ajuda a confirmar o payload no 1º pagamento real
+    print(">> webhook abacate:", tipo, "| data keys:", list(d.keys()), "| ids:", cands)
+    if tipo in ("billing.paid", "billing.completed", "payment.paid",
+                "checkout.completed", "transparent.completed"):
+        for bid in cands:
             res = auth.checkout_pagar("abacatepay", bid)
             if res:
                 _confirmar_compra_email(res["user_id"])
                 _avisar_venda_admin(res)
+                break
     return {"ok": True}
 
 

@@ -223,6 +223,9 @@ STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "").strip()
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "").strip()
 
 ABACATEPAY_API_KEY = os.getenv("ABACATEPAY_API_KEY", "").strip()
+# Chave da API v2 (Checkout — necessária p/ PARCELAMENTO no cartão). Se vazia, cai
+# na chave v1 acima (algumas contas usam a mesma). Gere no painel da AbacatePay.
+ABACATEPAY_V2_API_KEY = os.getenv("ABACATEPAY_V2_API_KEY", "").strip()
 ABACATEPAY_WEBHOOK_SECRET = os.getenv("ABACATEPAY_WEBHOOK_SECRET", "").strip()
 
 # E-mail transacional (Resend) — recuperar senha, etc.

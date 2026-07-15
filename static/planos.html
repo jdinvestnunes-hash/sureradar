@@ -288,7 +288,8 @@ document.querySelectorAll('[data-pay]').forEach(b=>{
   b.addEventListener('click', ()=>{
     const metodo = b.dataset.pay;                    // 'cartao' | 'pix'
     const plano = b.closest('.plan').dataset.plano;  // plano selecionado no seletor do card
-    abrirPix(plano, b, metodo);                      // ambos passam pela AbacatePay (pede CPF)
+    if (metodo === 'pix') abrirPix(plano, b, 'pix'); // Pix (v1) pede CPF no modal
+    else pagar(plano, metodo, b);                    // Cartão (v2) coleta CPF na tela da AbacatePay
   });
 });
 </script>
