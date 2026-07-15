@@ -883,18 +883,29 @@ def checkout_cartao(request: Request, payload: dict = Body(...)):
 
 @app.get("/api/debug/abacate")
 def _dbg_abacate():
-    """TEMPORÁRIO — diagnóstico do customer/checkout v2 (remover depois)."""
-    out = {"v2_key_set": bool(config.ABACATEPAY_V2_API_KEY),
-           "fallback_v1": not bool(config.ABACATEPAY_V2_API_KEY)}
+    """TEMPORÁRIO — cria customer + checkout com customerId e devolve a URL/resposta."""
+    out = {"v2_key_set": bool(config.ABACATEPAY_V2_API_KEY)}
     hdr = {"Authorization": "Bearer " + _abacate_v2_key()}
+    cid = None
     try:
         r = requests.post(_ABACATE_V2 + "/customers/create",
                           json={"email": "debug@sureradar.site", "name": "Debug SR"},
                           headers=hdr, timeout=10)
         out["customer_status"] = r.status_code
-        out["customer_body"] = r.text[:700]
+        cid = ((r.json() or {}).get("data") or {}).get("id")
+        out["customer_id"] = cid
     except Exception as e:
         out["customer_err"] = str(e)[:200]
+    try:
+        prod = _abacate_produto_id("mensal", config.PLANOS["mensal"])
+        body = {"items": [{"id": prod, "quantity": 1}], "methods": ["CARD"],
+                "customerId": cid, "card": {"maxInstallments": 1},
+                "completionUrl": config.SITE_URL + "/perfil?pago=1"}
+        r = requests.post(_ABACATE_V2 + "/checkouts/create", json=body, headers=hdr, timeout=12)
+        out["checkout_status"] = r.status_code
+        out["checkout_body"] = r.text[:900]
+    except Exception as e:
+        out["checkout_err"] = str(e)[:200]
     return out
 
 
