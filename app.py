@@ -964,7 +964,16 @@ def me(request: Request):
             "dias": dias, "aviso_renovar": _aviso_renovar(dias),
             "whatsapp": user.get("whatsapp") or "",
             "admin": _admin_email(user),
-            "alertas": _alerta_liberado(user)}
+            "alertas": _alerta_liberado(user),
+            "valor_beta": _valor_liberado(user)}
+
+
+def _valor_liberado(user):
+    """Aba 'Odds de Valor' (valuebets, BETA): só pros e-mails em VALUEBET_BETA_EMAILS."""
+    if not user:
+        return False
+    emails = [e.strip().lower() for e in (config.VALUEBET_BETA_EMAILS or "").split(",") if e.strip()]
+    return user.get("email", "").strip().lower() in emails
 
 
 def _alerta_liberado(user):
@@ -1039,11 +1048,11 @@ def perfil_dados(request: Request):
 def _emails_excluidos(user=None):
     """E-mails que NÃO entram em broadcast nem no painel de pendentes: admin, dono e
     o do próprio admin logado (contas de teste)."""
-    ex = set()
-    for src in (getattr(config, "ADMIN_EMAILS", ""), getattr(config, "OWNER_EMAILS", "")):
-        for e in (src or "").split(","):
-            if e.strip():
-                ex.add(e.strip().lower())
+    ex = set(getattr(config, "EMAILS_EXCLUIR", set()) or set())     # env EMAILS_EXCLUIR
+    ex |= set(getattr(config, "ADMIN_EMAILS", set()) or set())
+    for e in (getattr(config, "OWNER_EMAILS", "") or "").split(","):
+        if e.strip():
+            ex.add(e.strip().lower())
     if user and user.get("email"):
         ex.add(user["email"].strip().lower())
     return ex

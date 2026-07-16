@@ -29,6 +29,15 @@ ADMIN_EMAILS = {
     if e.strip()
 }
 
+# E-mails de TESTE do dono — EXCLUÍDOS de broadcasts (aviso de parcelamento etc.) e
+# do painel "geraram e não pagaram". Env EMAILS_EXCLUIR (vírgula). Não cravar e-mails
+# aqui: o repositório é público. Ex.: EMAILS_EXCLUIR="a@x.com,b@y.com".
+EMAILS_EXCLUIR = {
+    e.strip().lower()
+    for e in os.getenv("EMAILS_EXCLUIR", "").split(",")
+    if e.strip()
+}
+
 # Senha do painel admin (2º fator, além do e-mail). Defina ADMIN_PASSWORD no
 # Railway. Se ficar vazia, o painel admin fica BLOQUEADO (segurança).
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "").strip()
@@ -198,6 +207,10 @@ ADMIN_TELEGRAM_CHAT_ID = os.getenv("ADMIN_TELEGRAM_CHAT_ID", "").strip()
 # cai na DM dele). BETA: liberado só para estes e-mails (separados por vírgula).
 # Ex.: ALERTA_BETA_EMAILS=leosaper12@gmail.com
 ALERTA_BETA_EMAILS = os.getenv("ALERTA_BETA_EMAILS", "").strip()
+
+# Aba "Odds de Valor" (valuebets) em BETA: só aparece pros e-mails desta lista, pra
+# testar o visual antes de liberar geral. Env VALUEBET_BETA_EMAILS (vírgula).
+VALUEBET_BETA_EMAILS = os.getenv("VALUEBET_BETA_EMAILS", "").strip()
 
 # Grupo FREE do Telegram: recebe as surebets até este lucro (%), no máximo N por
 # ciclo (evita flood). As de maior lucro ficam pro PRO (funil).

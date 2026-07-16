@@ -589,9 +589,69 @@ function switchView(v) {
   if (vl) vl.classList.toggle("hidden", v !== "learn");
   const va = document.getElementById("view-alertas");
   if (va) va.classList.toggle("hidden", v !== "alertas");
+  const vv = document.getElementById("view-valor");
+  if (vv) vv.classList.toggle("hidden", v !== "valor");
   if (v === "bank") renderBanca();
   if (v === "learn") renderLearn();
   if (v === "alertas") renderAlertas();
+  if (v === "valor") renderValor();
+}
+
+// ---- Odds de Valor (valuebets) — BETA, dados de exemplo p/ ver o visual ----
+const VALOR_SAMPLE = [
+  { ico:"⚽", esporte:"Futebol", hora:"hoje 21:00", event:"Flamengo x Palmeiras", mercado:"Mais de 2.5 gols", casa:"Betano", odd:2.10, valor:13, justa:1.85, stake:2 },
+  { ico:"🎾", esporte:"Tênis", hora:"hoje 16:30", event:"Alcaraz x Sinner", mercado:"Alcaraz vence", casa:"Superbet", odd:1.95, valor:9, justa:1.79, stake:1.5 },
+  { ico:"🏀", esporte:"Basquete", hora:"amanhã 02:00", event:"Lakers x Celtics", mercado:"Mais de 214.5 pts", casa:"Novibet", odd:1.90, valor:7, justa:1.78, stake:1.5 },
+  { ico:"⚽", esporte:"Futebol", hora:"dom 17:00", event:"Real Madrid x Barcelona", mercado:"Ambas marcam", casa:"Bet365", odd:1.80, valor:11, justa:1.62, stake:2 },
+  { ico:"⚽", esporte:"Futebol", hora:"dom 13:30", event:"Man City x Arsenal", mercado:"Mais de 9.5 escanteios", casa:"Betnacional", odd:2.05, valor:8, justa:1.90, stake:1.5 },
+  { ico:"🎾", esporte:"Tênis", hora:"seg 10:00", event:"Djokovic x Medvedev", mercado:"Djokovic -3.5 games", casa:"Pixbet", odd:2.20, valor:10, justa:2.00, stake:2 },
+];
+const VALOR_FREE = 2;   // quantas aparecem liberadas; o resto vem borrado
+
+function valorCard(v, locked) {
+  const blur = locked ? "filter:blur(6px);user-select:none;pointer-events:none" : "";
+  return `<div style="position:relative;background:var(--surface2,#121a2b);border:1px solid ${locked?'var(--border,#1b2740)':'rgba(46,230,168,.35)'};border-radius:16px;padding:16px 18px;overflow:hidden">
+    <div style="${blur}">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <span style="font-size:12px;color:var(--muted,#647388)">${v.ico} ${v.esporte} · ${v.hora}</span>
+        <span style="font-size:11.5px;font-weight:800;color:#c9a2ff;background:rgba(169,139,255,.14);padding:3px 9px;border-radius:99px">+${v.valor}% valor</span>
+      </div>
+      <div style="font-weight:700;font-size:15px;margin-bottom:10px">${escH(v.event)}</div>
+      <div style="border:1px solid var(--border,#1b2740);border-radius:12px;padding:10px 12px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:13px">${escH(v.mercado)} · <b style="color:var(--cyan,#38d4f5)">${escH(v.casa)}</b></span>
+        <span style="font-size:19px;font-weight:800">${v.odd.toFixed(2)}</span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+        ${valorMini("Valor","+"+v.valor+"%","#c9a2ff")}
+        ${valorMini("Odd justa",v.justa.toFixed(2),"var(--text,#f2f6fc)")}
+        ${valorMini("Sugerido",v.stake+"% banca","var(--dim,#a3b1c9)")}
+      </div>
+    </div>
+    ${locked ? `<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:rgba(5,7,13,.35)">
+      <div style="font-size:24px">🔒</div>
+      <button class="valor-unlock" style="background:var(--grad,linear-gradient(112deg,#2ee6a8,#38d4f5));color:#052015;font-weight:800;font-size:13px;padding:10px 16px;border:none;border-radius:11px;cursor:pointer;font-family:inherit">Desbloquear todas as odds de valor</button>
+    </div>` : ""}
+  </div>`;
+}
+function valorMini(lbl, val, cor) {
+  return `<div style="background:var(--bg,#05070d);border-radius:11px;padding:9px 10px">
+    <div style="font-size:10.5px;color:var(--muted,#647388);text-transform:uppercase;letter-spacing:.04em">${lbl}</div>
+    <div style="font-size:16px;font-weight:800;margin-top:2px;color:${cor}">${val}</div>
+  </div>`;
+}
+function renderValor() {
+  const box = $("#view-valor-body"); if (!box) return;
+  const intro = `<div style="background:linear-gradient(160deg,rgba(169,139,255,.12),var(--surface2,#121a2b));border:1px solid rgba(169,139,255,.35);border-radius:16px;padding:16px 18px;margin-bottom:18px">
+    <div style="font-weight:800;font-size:15px;margin-bottom:6px">💎 O que é uma Odd de Valor?</div>
+    <p style="font-size:13.5px;color:var(--dim,#a3b1c9);line-height:1.6;margin:0">É quando uma casa <b style="color:var(--text,#f2f6fc)">paga mais do que deveria</b> por um resultado. Você aposta <b>só nessa casa</b> (não tem outro lado como na surebet). Cada aposta pode ganhar ou perder, mas apostando <b>sempre que tem valor</b>, a matemática joga a seu favor e no <b>longo prazo você lucra</b> — igual o cassino ganha. Aposte sempre a <b>% sugerida da sua banca</b> e tenha paciência.</p>
+  </div>`;
+  const grid = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px">${
+    VALOR_SAMPLE.map((v, i) => valorCard(v, i >= VALOR_FREE)).join("")}</div>`;
+  const nota = `<p style="text-align:center;font-size:12px;color:var(--muted,#647388);margin-top:18px">🧪 Prévia com exemplos. Em breve: odds de valor reais atualizadas ao vivo.</p>`;
+  box.innerHTML = intro + grid + nota;
+  box.querySelectorAll(".valor-unlock").forEach(b => b.addEventListener("click", () => {
+    if (typeof openUpgrade === "function") openUpgrade();
+  }));
 }
 
 // ---------- Alertas no Telegram (aba própria, beta) ----------
@@ -807,6 +867,8 @@ async function initUser() {
   }
   // aba de Alertas: aparece pra todo mundo logado (FREE vê a tela de upgrade)
   if (me) { const ta = document.getElementById("tab-alertas"); if (ta) ta.style.display = ""; }
+  // aba Odds de Valor: BETA, só pros e-mails liberados (teste do visual)
+  if (me && me.valor_beta) { const tv = document.getElementById("tab-valor"); if (tv) tv.style.display = ""; }
 
   // banner do plano (só aparece no mobile) — deixa claro se é grátis e o que o PRO libera
   const pb = document.getElementById("plano-banner");
