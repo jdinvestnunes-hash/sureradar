@@ -26,6 +26,29 @@ def configurado():
     return bool(config.META_ACCESS_TOKEN and config.META_AD_ACCOUNT_ID)
 
 
+def _erro_detalhado(data, status):
+    """Mensagem de erro COMPLETA do Facebook: message + code/subcode + o texto
+    'de usuário' (error_user_title/msg), que é onde a Meta costuma dizer o motivo
+    real (conta restrita, app sem permissão, verificação pendente...)."""
+    err = (data or {}).get("error") or {}
+    partes = [err.get("message") or f"HTTP {status}"]
+    marca = []
+    if err.get("code") is not None:
+        marca.append(f"code {err['code']}")
+    if err.get("error_subcode") is not None:
+        marca.append(f"subcode {err['error_subcode']}")
+    if err.get("type"):
+        marca.append(str(err["type"]))
+    if marca:
+        partes.append("(" + " · ".join(marca) + ")")
+    # a Meta explica o motivo de verdade aqui, quando existe:
+    if err.get("error_user_title"):
+        partes.append("— " + str(err["error_user_title"]))
+    if err.get("error_user_msg"):
+        partes.append(str(err["error_user_msg"]))
+    return "Facebook recusou: " + " ".join(partes)
+
+
 def _ad_account():
     aid = (config.META_AD_ACCOUNT_ID or "").strip()
     if not aid:
@@ -61,8 +84,7 @@ def gastos(preset="hoje", level="adset"):
     except ValueError:
         raise RuntimeError("Resposta inválida do Facebook.")
     if r.status_code != 200 or "error" in data:
-        msg = ((data.get("error") or {}).get("message")) or f"HTTP {r.status_code}"
-        raise RuntimeError(f"Facebook recusou: {msg}")
+        raise RuntimeError(_erro_detalhado(data, r.status_code))
     out = []
     for row in data.get("data", []):
         def _num(v):
