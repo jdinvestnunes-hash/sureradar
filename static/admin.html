@@ -482,9 +482,10 @@ async function loadFbGastos(){
   const perLabel = {hoje:"hoje",ontem:"ontem","7dias":"últimos 7 dias","30dias":"últimos 30 dias",tudo:"desde o início"}[FB_PER]||FB_PER;
   kpis.innerHTML =
     fbKpi("Valor gasto", brl(k.gasto||0), perLabel) +
-    fbKpi("Resultados", fbNum(k.leads_fb||0), "leads do Facebook", "var(--cyan,#38d4f5)") +
-    fbKpi("Custo/resultado", cpr, "gasto ÷ resultados") +
-    fbKpi("Impressões", fbNum(k.impressoes||0), `${fbNum(k.cliques||0)} cliques`) +
+    fbKpi("Entraram", fbNum(k.membros||0), "pessoas REAIS no grupo", "var(--green)") +
+    fbKpi("💰 Custo/entrada", k.custo_por_membro!=null?brl(k.custo_por_membro):"—",
+          "gasto ÷ quem entrou (real)", "var(--green)") +
+    fbKpi("Result. FB", fbNum(k.leads_fb||0), `nº do Facebook · ${cpr}/result.`, "var(--cyan,#38d4f5)") +
     fbKpi("Receita", brl(k.receita||0), `${k.vendas||0} venda(s) · ${k.cadastros||0} cadastros`, "var(--green)") +
     fbKpi("ROAS", roas.txt, "retorno sobre o gasto", roas.cor);
   if(!gs.length){ tab.innerHTML='<div class="empty">Nenhuma campanha no período. Troque o filtro de dia ou crie um rastreio abaixo.</div>'; return; }
@@ -495,6 +496,8 @@ async function loadFbGastos(){
     const roas = fbRoas(g.receita||0, gasto);
     const temRastreio = g.campanha_id!=null;
     const membros = temRastreio ? (g.membros||0) : null;
+    // CUSTO REAL: gasto ÷ quem de fato entrou no grupo (nosso rastreio, não o "result" do FB)
+    const custoEnt = (membros>0 && gasto>0) ? brl(gasto/membros) : "—";
     // nome + status + (link do rastreio, se houver)
     const linkHtml = temRastreio
       ? `<div style="font-size:11px;margin-top:3px"><a href="${g.link_site}" target="_blank" style="color:var(--cyan,#38d4f5)">📢 anúncio → ${escH((g.link_site||'').replace(/^https?:\/\//,''))}</a> · <span data-delcamp="${g.campanha_id}" style="color:#ff6b6b;cursor:pointer">excluir rastreio</span></div>`
@@ -512,6 +515,7 @@ async function loadFbGastos(){
       ${cel(cpm)}
       ${cel(fbNum(clk))}
       ${cel(membros==null?'—':fbNum(membros), membros?'var(--green)':'var(--text-dim)')}
+      ${cel(custoEnt, custoEnt!=='—'?'var(--green)':'var(--text-dim)', ';font-weight:800')}
       ${cel(g.cadastros==null?'—':fbNum(g.cadastros), g.cadastros?'var(--cyan,#38d4f5)':'var(--text-dim)')}
       ${cel(g.receita==null?'—':brl(g.receita), (g.receita>0)?'var(--green)':'var(--text-dim)')}
       ${cel(roas.txt, roas.cor, ';font-weight:800')}
@@ -524,16 +528,17 @@ async function loadFbGastos(){
       <td><b>Total · ${d.n||gs.length} campanha(s)</b></td>
       ${cel(brl(t.gasto||0))}${cel(fbNum(t.leads_fb||0))}${cel(tCpr)}${cel(fbNum(t.impressoes||0))}
       ${cel(tCpm)}${cel(fbNum(t.cliques||0))}${cel(fbNum(t.membros||0),'var(--green)')}
+      ${cel(t.custo_por_membro!=null?brl(t.custo_por_membro):'—','var(--green)',';font-weight:800')}
       ${cel(fbNum(t.cadastros||0),'var(--cyan,#38d4f5)')}${cel(brl(t.receita||0),'var(--green)')}${cel(tRoas.txt,tRoas.cor,';font-weight:800')}
     </tr>`;
   const th=(t,al='right')=>`<th style="text-align:${al}">${t}</th>`;
   tab.innerHTML =
-    `<div style="overflow-x:auto"><table class="fbt" style="min-width:920px">
-      <thead><tr>${th('Campanha','left')}${th('Gasto')}${th('Result.')}${th('Custo/res.')}${th('Impressões')}${th('CPM')}${th('Cliques')}${th('Entraram')}${th('Cadastros')}${th('Receita')}${th('ROAS')}</tr></thead>
+    `<div style="overflow-x:auto"><table class="fbt" style="min-width:1000px">
+      <thead><tr>${th('Campanha','left')}${th('Gasto')}${th('Result. FB')}${th('Custo/res. FB')}${th('Impressões')}${th('CPM')}${th('Cliques')}${th('Entraram')}${th('💰 Custo/entrada')}${th('Cadastros')}${th('Receita')}${th('ROAS')}</tr></thead>
       <tbody>${linhas}</tbody>
       <tfoot>${rodape}</tfoot>
     </table></div>
-    <div style="font-size:11.5px;color:var(--text-dim);margin-top:10px">${FB_ST==="ativas"?'▶ Mostrando só as <b style="color:var(--green)">ATIVAS</b> — clique em <b>"+ Pausadas"</b> pra ver as pausadas/arquivadas. · ':""}💡 <b>Result.</b> = leads que o Facebook contou · <b>Entraram/Cadastros/Receita</b> vêm do nosso rastreio (só aparecem nas campanhas com rastreio próprio de mesmo nome) · <b>ROAS</b> = receita ÷ gasto.</div>`;
+    <div style="font-size:11.5px;color:var(--text-dim);margin-top:10px">${FB_ST==="ativas"?'▶ Mostrando só as <b style="color:var(--green)">ATIVAS</b> — clique em <b>"+ Pausadas"</b> pra ver as pausadas/arquivadas. · ':""}💰 <b style="color:var(--green)">Custo/entrada</b> = gasto ÷ pessoas que <b>REALMENTE entraram</b> no grupo (nosso rastreio) — <b>é esse o custo que vale</b>. · <b>Result. FB / Custo/res. FB</b> = número do Facebook (costuma inflar, use só como referência) · <b>Entraram/Cadastros/Receita</b> vêm do nosso rastreio (só nas campanhas com rastreio próprio de mesmo nome) · <b>ROAS</b> = receita ÷ gasto.</div>`;
 }
 document.addEventListener("click",(e)=>{
   const per=e.target.closest(".fb-per"), lvl=e.target.closest(".fb-lvl"), st=e.target.closest(".fb-st");
