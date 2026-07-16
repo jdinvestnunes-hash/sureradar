@@ -52,6 +52,7 @@ import pipeline
 import promo
 import recuperacao
 import tg_tracker
+import valor_feed
 
 BASE_DIR = Path(__file__).parent
 STATIC_DIR = BASE_DIR / "static"
@@ -1906,6 +1907,62 @@ def _converter_raspagem(records):
             "legs": pernas,
         })
     return contratos
+
+
+@app.get("/api/valuebets")
+def valuebets(request: Request):
+    """Odds de valor pro painel (aba BETA). Só quem tem a aba liberada recebe dados;
+    os outros recebem lista vazia (a aba nem aparece pra eles). ISOLADO da surebet."""
+    user = _usuario(request)
+    if not _valor_liberado(user):
+        return {"itens": []}
+    return {"itens": valor_feed.get_valuebets()}
+
+
+@app.post("/api/ingest-valor")
+def ingest_valor(request: Request, payload: dict = Body(...)):
+    """Recebe as ODDS DE VALOR raspadas (via navegador/robô) e guarda no armazém
+    próprio (valor_feed). TOTALMENTE separado do /api/ingest da surebet — se algo
+    aqui der erro, a surebet continua intacta. Mesma proteção de token do ingest."""
+    if config.INGEST_TOKEN:
+        enviado = request.headers.get("x-ingest-token") or payload.get("token", "")
+        if enviado != config.INGEST_TOKEN:
+            return JSONResponse({"erro": "não autorizado"}, status_code=401)
+    itens = []
+    for r in (payload.get("records") or []):
+        try:
+            odd = float(r.get("odd") or 0)
+            valor = float(r.get("valor") or 0)
+            if odd <= 1 or valor <= 0:
+                continue
+            itens.append({
+                "ico": r.get("ico") or _sport_ico(r.get("esporte", "")),
+                "esporte": r.get("esporte") or "",
+                "hora": r.get("hora") or "",
+                "event": (r.get("event") or "").strip(),
+                "mercado": (r.get("mercado") or "").strip(),
+                "casa": (r.get("casa") or "").strip(),
+                "odd": round(odd, 2),
+                "valor": round(valor, 1),
+                "justa": round(float(r.get("justa") or 0), 2),
+                "stake": r.get("stake") or 2,
+                "link": _link_casa(r.get("link")),
+            })
+        except (TypeError, ValueError):
+            continue
+    valor_feed.set_valuebets(itens)
+    return {"ok": True, "recebidos": len(itens)}
+
+
+def _sport_ico(s):
+    s = (s or "").lower()
+    if "ten" in s:
+        return "🎾"
+    if "basq" in s or "basket" in s:
+        return "🏀"
+    if "vol" in s or "vôlei" in s:
+        return "🏐"
+    return "⚽"
 
 
 @app.post("/api/ingest")

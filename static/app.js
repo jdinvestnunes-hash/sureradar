@@ -617,14 +617,17 @@ function valorCard(v, locked) {
         <span style="font-size:11.5px;font-weight:800;color:#c9a2ff;background:rgba(169,139,255,.14);padding:3px 9px;border-radius:99px">+${v.valor}% valor</span>
       </div>
       <div style="font-weight:700;font-size:15px;margin-bottom:10px">${escH(v.event)}</div>
-      <div style="border:1px solid var(--border,#1b2740);border-radius:12px;padding:10px 12px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center">
-        <span style="font-size:13px">${escH(v.mercado)} · <b style="color:var(--cyan,#38d4f5)">${escH(v.casa)}</b></span>
-        <span style="font-size:19px;font-weight:800">${v.odd.toFixed(2)}</span>
+      <div style="border:1px solid var(--border,#1b2740);border-radius:12px;padding:10px 12px;margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:13px">${escH(v.mercado)} · <b style="color:var(--cyan,#38d4f5)">${escH(v.casa)}</b></span>
+          <span style="font-size:19px;font-weight:800">${Number(v.odd).toFixed(2)}</span>
+        </div>
+        ${(!locked && v.link) ? `<div style="font-size:11.5px;margin-top:5px"><a href="${v.link}" target="_blank" rel="noopener" style="color:var(--cyan,#38d4f5)">↗ ir para a casa</a></div>` : ""}
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
         ${valorMini("Valor","+"+v.valor+"%","#c9a2ff")}
-        ${valorMini("Odd justa",v.justa.toFixed(2),"var(--text,#f2f6fc)")}
-        ${valorMini("Sugerido",v.stake+"% banca","var(--dim,#a3b1c9)")}
+        ${valorMini("Odd justa",Number(v.justa||0).toFixed(2),"var(--text,#f2f6fc)")}
+        ${valorMini("Sugerido",(v.stake||2)+"% banca","var(--dim,#a3b1c9)")}
       </div>
     </div>
     ${locked ? `<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:rgba(5,7,13,.35)">
@@ -639,15 +642,22 @@ function valorMini(lbl, val, cor) {
     <div style="font-size:16px;font-weight:800;margin-top:2px;color:${cor}">${val}</div>
   </div>`;
 }
-function renderValor() {
+async function renderValor() {
   const box = $("#view-valor-body"); if (!box) return;
+  box.innerHTML = `<div class="empty" style="text-align:center;color:var(--muted,#647388);padding:30px">Carregando odds de valor…</div>`;
+  let itens = [];
+  try { const r = await fetch("/api/valuebets"); if (r.ok) itens = (await r.json()).itens || []; } catch {}
+  const usaReal = itens.length > 0;
+  const dados = usaReal ? itens : VALOR_SAMPLE;
   const intro = `<div style="background:linear-gradient(160deg,rgba(169,139,255,.12),var(--surface2,#121a2b));border:1px solid rgba(169,139,255,.35);border-radius:16px;padding:16px 18px;margin-bottom:18px">
     <div style="font-weight:800;font-size:15px;margin-bottom:6px">💎 O que é uma Odd de Valor?</div>
     <p style="font-size:13.5px;color:var(--dim,#a3b1c9);line-height:1.6;margin:0">É quando uma casa <b style="color:var(--text,#f2f6fc)">paga mais do que deveria</b> por um resultado. Você aposta <b>só nessa casa</b> (não tem outro lado como na surebet). Cada aposta pode ganhar ou perder, mas apostando <b>sempre que tem valor</b>, a matemática joga a seu favor e no <b>longo prazo você lucra</b> — igual o cassino ganha. Aposte sempre a <b>% sugerida da sua banca</b> e tenha paciência.</p>
   </div>`;
   const grid = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px">${
-    VALOR_SAMPLE.map((v, i) => valorCard(v, i >= VALOR_FREE)).join("")}</div>`;
-  const nota = `<p style="text-align:center;font-size:12px;color:var(--muted,#647388);margin-top:18px">🧪 Prévia com exemplos. Em breve: odds de valor reais atualizadas ao vivo.</p>`;
+    dados.map((v, i) => valorCard(v, i >= VALOR_FREE)).join("")}</div>`;
+  const nota = usaReal
+    ? `<p style="text-align:center;font-size:12px;color:var(--muted,#647388);margin-top:18px">Odds de valor ao vivo. As primeiras estão liberadas — desbloqueie o resto.</p>`
+    : `<p style="text-align:center;font-size:12px;color:var(--muted,#647388);margin-top:18px">🧪 Prévia com exemplos. Em breve: odds de valor reais atualizadas ao vivo.</p>`;
   box.innerHTML = intro + grid + nota;
   box.querySelectorAll(".valor-unlock").forEach(b => b.addEventListener("click", () => {
     if (typeof openUpgrade === "function") openUpgrade();
