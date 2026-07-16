@@ -1935,16 +1935,19 @@ def ingest_valor(request: Request, payload: dict = Body(...)):
             valor = float(r.get("valor") or 0)
             if odd <= 1 or valor <= 0:
                 continue
+            prob = float(r.get("probabilidade") or 0)
+            # odd justa = 1/prob real (a prob vem das casas fortes, referência)
+            justa = round(100.0 / prob, 2) if prob > 0 else round(float(r.get("justa") or 0), 2)
             itens.append({
                 "ico": r.get("ico") or _sport_ico(r.get("esporte", "")),
                 "esporte": r.get("esporte") or "",
-                "hora": r.get("hora") or "",
+                "hora": r.get("hora") or _hora_br(r.get("start")),
                 "event": (r.get("event") or "").strip(),
                 "mercado": (r.get("mercado") or "").strip(),
                 "casa": (r.get("casa") or "").strip(),
                 "odd": round(odd, 2),
                 "valor": round(valor, 1),
-                "justa": round(float(r.get("justa") or 0), 2),
+                "justa": justa,
                 "stake": r.get("stake") or 2,
                 "link": _link_casa(r.get("link")),
             })
@@ -1952,6 +1955,17 @@ def ingest_valor(request: Request, payload: dict = Body(...)):
             continue
     valor_feed.set_valuebets(itens)
     return {"ok": True, "recebidos": len(itens)}
+
+
+def _hora_br(ts):
+    """Unix -> 'dd/mm HH:MM' no horário de Brasília (pra mostrar no card)."""
+    try:
+        ts = int(ts)
+        if ts <= 0:
+            return ""
+        return datetime.fromtimestamp(ts, tz=_BR_TZ).strftime("%d/%m %H:%M")
+    except (TypeError, ValueError, OSError):
+        return ""
 
 
 def _sport_ico(s):

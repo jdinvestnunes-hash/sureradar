@@ -36,7 +36,11 @@ def _salvar_cache():
         pass
 
 SAAS = "https://web-production-a41df.up.railway.app/api/ingest"
+SAAS_VALOR = SAAS.replace("/api/ingest", "/api/ingest-valor")   # ODDS DE VALOR (separado)
 URL_LISTA = "https://pt.surebet.com/surebets"
+URL_VALOR = "https://pt.surebet.com/valuebets"                  # aba "Apostas de valor"
+MAX_PAG_VALOR = 6              # valuebets já vêm filtradas nas suas casas — poucas págs
+MAX_VALOR = 150               # teto de segurança
 PERFIL = "pw_profile"          # sessão do Chrome fica salva aqui (login persiste)
 CICLO_MIN = 10                 # minutos entre varreduras
 MAX_PAGINAS = 40
@@ -72,6 +76,33 @@ JS_RASPAR = r"""
   return { id: rec.dataset.id, profit: parseFloat(rec.dataset.profit),
     start: parseInt(rec.dataset.startAt), legs };
 }).filter(r => r.legs.length === 2)
+"""
+
+
+# Raspagem das ODDS DE VALOR (valuebets). 1 perna por registro. Os números vêm
+# nos data-attributes do tbody (confiáveis): data-value=odd, data-overvalue=valor%,
+# data-probability=prob real. Casa/evento/mercado nos mesmos seletores da surebet.
+JS_RASPAR_VALOR = r"""
+() => [...document.querySelectorAll("tbody.valuebet_record")].map((rec) => {
+  const txt = (s) => { const e = rec.querySelector(s); return e ? e.textContent.trim().replace(/\s+/g," ") : ""; };
+  const num = (v) => { const n = parseFloat(v); return isFinite(n) ? n : 0; };
+  const casa = txt(".bookmaker-name");
+  const bk = rec.querySelector(".booker");
+  let esporte = "";
+  if (bk) { esporte = bk.textContent.trim().replace(casa, "").replace(/\s+/g," ").trim(); }
+  const ev = rec.querySelector(".event");
+  const event = ev ? ((ev.querySelector("a")||ev).textContent||"").trim().replace(/\s+/g," ") : "";
+  const vl = rec.querySelector(".value_link");
+  return {
+    casa, esporte, event,
+    mercado: txt(".coeff"),
+    odd: num(rec.dataset.value),
+    valor: num(rec.dataset.overvalue),
+    probabilidade: num(rec.dataset.probability),
+    start: parseInt(rec.dataset.startAt) || 0,
+    link: vl ? vl.href : null,
+  };
+}).filter(r => r.odd > 1 && r.valor > 0)
 """
 
 
@@ -140,6 +171,63 @@ def enviar(records, modo="merge"):
         print(f"   -> enviadas {len(records)} ao painel ({modo}, HTTP {r.status_code})")
     except Exception as e:
         print("   !! erro ao enviar:", e)
+
+
+def enviar_valor(records):
+    """Manda as ODDS DE VALOR pro endpoint SEPARADO (/api/ingest-valor)."""
+    if not records:
+        print("   valuebets: nada pra enviar.")
+        return
+    headers = {"X-Ingest-Token": INGEST_TOKEN} if INGEST_TOKEN else {}
+    try:
+        r = requests.post(SAAS_VALOR, json={"records": records}, headers=headers, timeout=25)
+        print(f"   -> {len(records)} odds de valor enviadas (HTTP {r.status_code})")
+    except Exception as e:
+        print("   !! erro ao enviar valuebets:", str(e)[:100])
+
+
+def uma_varredura_valor(page):
+    """Passada das ODDS DE VALOR — roda DEPOIS da surebet e é TOTALMENTE isolada:
+    qualquer erro aqui não afeta a surebet (que já foi enviada). Usa o filtro que
+    você salvou na página de valuebets (mesmas casas)."""
+    page.goto(URL_VALOR, wait_until="domcontentloaded", timeout=60000)
+    try:
+        page.wait_for_selector("tbody.valuebet_record", timeout=20000)
+    except Exception:
+        print("   valuebets: sem registros (filtro vazio ou sem acesso).")
+        return
+    page.wait_for_timeout(1000)
+    vistos, todos, pag = set(), [], 0
+    while pag < MAX_PAG_VALOR and len(todos) < MAX_VALOR:
+        try:
+            page.wait_for_selector("tbody.valuebet_record", timeout=15000)
+        except Exception:
+            break
+        recs = page.evaluate(JS_RASPAR_VALOR)
+        novos = 0
+        for r in recs:
+            key = (r.get("casa"), r.get("event"), r.get("mercado"), r.get("odd"))
+            if r.get("odd", 0) > 1 and key not in vistos:
+                vistos.add(key); todos.append(r); novos += 1
+        pag += 1
+        print(f"   valuebets pág {pag}: {len(recs)} na tela, {novos} novas (acum {len(todos)})")
+        if pag > 1 and novos == 0:
+            break
+        link = page.query_selector("a:has-text('próximo'), a:has-text('Próximo'), a:has-text('next')")
+        if not link:
+            break
+        id_antes = page.evaluate(
+            "() => { const r=document.querySelector('tbody.valuebet_record'); return r?r.dataset.id:''; }")
+        time.sleep(2.0 + random.random() * 2)
+        try:
+            link.click()
+            page.wait_for_function(
+                "(a) => { const r=document.querySelector('tbody.valuebet_record'); return r && r.dataset.id !== a; }",
+                arg=id_antes, timeout=20000)
+        except Exception:
+            break
+    print(f">> Valuebets: {len(todos)} odds de valor em {pag} pág. — enviando.")
+    enviar_valor(todos)
 
 
 def esperar_login(page):
@@ -244,9 +332,13 @@ def main():
         print("=" * 60)
         while True:
             try:
-                uma_varredura(page, ctx)
+                uma_varredura(page, ctx)                 # PRINCIPAL: surebet
             except Exception as e:
                 print("!! erro na varredura:", str(e)[:150])
+            try:
+                uma_varredura_valor(page)                # EXTRA: odds de valor (isolada)
+            except Exception as e:
+                print("!! erro nas valuebets (surebet NÃO afetada):", str(e)[:150])
             print(f">> Próxima varredura em {CICLO_MIN} min.\n")
             time.sleep(CICLO_MIN * 60)
 
