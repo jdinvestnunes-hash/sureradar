@@ -649,9 +649,29 @@ async function renderValor() {
   try { const r = await fetch("/api/valuebets"); if (r.ok) itens = (await r.json()).itens || []; } catch {}
   const usaReal = itens.length > 0;
   const dados = usaReal ? itens : VALOR_SAMPLE;
-  const intro = `<div style="background:linear-gradient(160deg,rgba(169,139,255,.12),var(--surface2,#121a2b));border:1px solid rgba(169,139,255,.35);border-radius:16px;padding:16px 18px;margin-bottom:18px">
-    <div style="font-weight:800;font-size:15px;margin-bottom:6px">💎 O que é uma Odd de Valor?</div>
-    <p style="font-size:13.5px;color:var(--dim,#a3b1c9);line-height:1.6;margin:0">É quando uma casa <b style="color:var(--text,#f2f6fc)">paga mais do que deveria</b> por um resultado. Você aposta <b>só nessa casa</b> (não tem outro lado como na surebet). Cada aposta pode ganhar ou perder, mas apostando <b>sempre que tem valor</b>, a matemática joga a seu favor e no <b>longo prazo você lucra</b> — igual o cassino ganha. Aposte sempre a <b>% sugerida da sua banca</b> e tenha paciência.</p>
+  const intro = `<div style="background:linear-gradient(160deg,rgba(169,139,255,.12),var(--surface2,#121a2b));border:1px solid rgba(169,139,255,.35);border-radius:16px;padding:18px 20px;margin-bottom:18px">
+    <div style="font-weight:800;font-size:16px;margin-bottom:10px">💎 O que é uma Odd de Valor? <span style="font-size:12px;color:var(--muted,#647388);font-weight:600">(leia antes de usar)</span></div>
+    <p style="font-size:13.5px;color:var(--dim,#a3b1c9);line-height:1.65;margin:0 0 14px">É uma aposta <b style="color:var(--text,#f2f6fc)">normal</b> — 1 casa, 1 resultado. A diferença é que a casa <b style="color:var(--text,#f2f6fc)">errou o preço</b> e está <b style="color:#c9a2ff">pagando MAIS do que deveria</b>. Você só aproveita esse erro dela.</p>
+    <div style="background:var(--bg,#05070d);border-radius:14px;padding:14px 16px;margin-bottom:14px">
+      <div style="font-size:12px;color:var(--muted,#647388);margin-bottom:10px">📊 Exemplo: <b style="color:var(--text,#f2f6fc)">Flamengo pra vencer</b></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div style="border:1px solid var(--border,#1b2740);border-radius:11px;padding:11px 12px">
+          <div style="font-size:11px;color:var(--muted,#647388)">Chance real (pelos números)</div>
+          <div style="font-size:17px;font-weight:800;margin-top:2px">54%</div>
+          <div style="font-size:11.5px;color:var(--dim,#a3b1c9)">preço justo: odd 1.85</div>
+        </div>
+        <div style="border:1px solid rgba(169,139,255,.45);border-radius:11px;padding:11px 12px">
+          <div style="font-size:11px;color:#c9a2ff">A casa está pagando</div>
+          <div style="font-size:17px;font-weight:800;margin-top:2px;color:#c9a2ff">odd 2.10</div>
+          <div style="font-size:11.5px;color:#c9a2ff">+13% acima do justo = seu valor</div>
+        </div>
+      </div>
+      <p style="font-size:12.5px;color:var(--dim,#a3b1c9);line-height:1.55;margin:12px 0 0">A odd justa (1.85) vem das <b style="color:var(--text,#f2f6fc)">casas mais fortes do mundo</b>, que já calculam tudo: força dos times, retrospecto, desfalques, momento. Quando uma casa comum <b>demora pra ajustar</b> e paga 2.10, essa diferença é o <b style="color:#c9a2ff">seu valor</b>.</p>
+    </div>
+    <div style="background:rgba(255,201,77,.1);border:1px solid rgba(255,201,77,.4);border-radius:12px;padding:12px 14px">
+      <div style="font-weight:800;font-size:13.5px;color:#ffdb8a;margin-bottom:5px">⚠️ NÃO é surebet — não é lucro garantido nesta aposta</div>
+      <p style="font-size:12.5px;color:var(--dim,#a3b1c9);line-height:1.6;margin:0">Você <b>pode perder esta</b> (54% de chance ainda deixa 46% de dar errado). O lucro vem no <b style="color:var(--text,#f2f6fc)">longo prazo</b>: apostando <b>sempre que tem valor</b>, a matemática vira a seu favor — igual o <b>cassino</b>, que não ganha toda rodada, mas <b>sempre ganha no volume</b>. Por isso: aposte <b>a mesma % da banca</b> em cada uma e tenha <b>paciência</b>.</p>
+    </div>
   </div>`;
   const grid = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px">${
     dados.map((v, i) => valorCard(v, i >= VALOR_FREE)).join("")}</div>`;
