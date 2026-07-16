@@ -297,7 +297,7 @@ async function loadMarketing(){
     return;
   }
   g.textContent=brl(d.gasto_total);
-  if(gs) gs.textContent=`${brl(d.gasto_30d)} nos últimos 30d`;
+  if(gs) gs.textContent=`só campanhas ATIVAS · ${brl(d.gasto_30d)} nos últimos 30d`;
   const rec=(M_CACHE&&M_CACHE.receita_total)||0, lucro=rec-d.gasto_total;
   l.textContent=brl(lucro);
   l.style.color = lucro>=0 ? "var(--green)" : "#ff6b6b";

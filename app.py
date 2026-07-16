@@ -1380,8 +1380,9 @@ def admin_fb_gastos(request: Request, preset: str = "hoje", level: str = "campai
 @app.get("/api/admin/marketing")
 def admin_marketing(request: Request):
     """Gasto com MARKETING (Meta) pra Visão geral — é o que falta pra saber o LUCRO
-    real (receita - marketing). Conta TODAS as campanhas do Facebook, inclusive as
-    pausadas: dinheiro gasto é gasto. Chamado em 2º plano (não trava o painel)."""
+    real (receita - marketing). Conta SÓ AS CAMPANHAS ATIVAS: a conta de anúncios é
+    compartilhada com outros projetos do usuário, e hoje só as ativas são deste
+    projeto. Chamado em 2º plano (não trava o painel)."""
     user = _usuario(request)
     erro = _guard_admin(request, user)
     if erro:
@@ -1389,10 +1390,16 @@ def admin_marketing(request: Request):
     if not meta_ads.configurado():
         return {"ok": False, "erro": "Meta não conectado"}
     try:
+        st_map = meta_ads.status_campanhas()
+
+        def _ativa(cid):
+            return (st_map.get(cid) or {}).get("status", "") not in meta_ads.PAUSADAS
+
         def _soma(preset):
-            return round(sum(x.get("gasto", 0) for x in
-                             meta_ads.gastos(preset=preset, level="campaign")), 2)
-        return {"ok": True, "gasto_total": _soma("tudo"),
+            return round(sum(x.get("gasto", 0)
+                             for x in meta_ads.gastos(preset=preset, level="campaign")
+                             if _ativa(x.get("id", ""))), 2)
+        return {"ok": True, "so_ativas": True, "gasto_total": _soma("tudo"),
                 "gasto_30d": _soma("30dias"), "gasto_7d": _soma("7dias")}
     except Exception as e:
         return {"ok": False, "erro": str(e)[:160]}
