@@ -43,6 +43,7 @@ MAX_PAG_VALOR = 6              # valuebets já vêm filtradas nas suas casas —
 MAX_VALOR = 150               # teto de segurança
 PERFIL = "pw_profile"          # sessão do Chrome fica salva aqui (login persiste)
 CICLO_MIN = 10                 # minutos entre varreduras
+VALOR_ATIVO = False            # liga/desliga a passada de ODDS DE VALOR (deixe True p/ raspar valuebets)
 MAX_PAGINAS = 40
 MIN_PROFIT = 0.70              # PARA quando o lucro chega aqui (lista é decrescente).
                               # FREE = 0,70–1% · PRO = 1–25% · abaixo de 0,70 ignora.
@@ -335,10 +336,11 @@ def main():
                 uma_varredura(page, ctx)                 # PRINCIPAL: surebet
             except Exception as e:
                 print("!! erro na varredura:", str(e)[:150])
-            try:
-                uma_varredura_valor(page)                # EXTRA: odds de valor (isolada)
-            except Exception as e:
-                print("!! erro nas valuebets (surebet NÃO afetada):", str(e)[:150])
+            if VALOR_ATIVO:                              # EXTRA: odds de valor (isolada, opcional)
+                try:
+                    uma_varredura_valor(page)
+                except Exception as e:
+                    print("!! erro nas valuebets (surebet NÃO afetada):", str(e)[:150])
             print(f">> Próxima varredura em {CICLO_MIN} min.\n")
             time.sleep(CICLO_MIN * 60)
 
