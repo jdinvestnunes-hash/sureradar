@@ -38,7 +38,7 @@
     .refresh:hover{border-color:var(--cyan)}
 
     /* KPI cards */
-    .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px}
+    .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(185px,1fr));gap:14px;margin-bottom:16px}
     .kpi{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px 20px;position:relative;overflow:hidden}
     .kpi.big{grid-column:span 1}
     .kpi .lbl{font-size:12px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.05em;display:flex;align-items:center;gap:7px}
@@ -284,13 +284,37 @@ function barChart(el,labels,values,color,money){
   el.innerHTML=`<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block"><defs><linearGradient id="bg2" x1="0" y1="0" x2="0" y2="1"><stop stop-color="${color}"/><stop offset="1" stop-color="${color}" stop-opacity=".35"/></linearGradient></defs>${bars}${lbls}</svg>`;
 }
 
+let M_CACHE = null;   // guarda as métricas p/ cruzar com o gasto de marketing
+
+// Busca o gasto do Facebook em 2º plano e preenche "Gasto marketing" e "Lucro real".
+async function loadMarketing(){
+  const g=$("#kpi-gasto"), l=$("#kpi-lucro"), gs=$("#kpi-gasto-sub"), ls=$("#kpi-lucro-sub");
+  if(!g||!l) return;
+  const d=await fetch("/api/admin/marketing").then(r=>r.json()).catch(()=>({ok:false,erro:"sem resposta"}));
+  if(!d.ok){
+    g.textContent="—"; if(gs) gs.textContent=d.erro||"Meta não conectado";
+    l.textContent="—"; if(ls) ls.textContent="precisa do Meta conectado";
+    return;
+  }
+  g.textContent=brl(d.gasto_total);
+  if(gs) gs.textContent=`${brl(d.gasto_30d)} nos últimos 30d`;
+  const rec=(M_CACHE&&M_CACHE.receita_total)||0, lucro=rec-d.gasto_total;
+  l.textContent=brl(lucro);
+  l.style.color = lucro>=0 ? "var(--green)" : "#ff6b6b";
+  if(ls) ls.textContent=`${brl(rec)} receita − ${brl(d.gasto_total)} marketing`;
+}
+
 function renderMetricas(m){
+  M_CACHE = m;
   $("#kpis").innerHTML=[
-    ["💰 Receita total",brl(m.receita_total),`${brl(m.receita_30d)} nos últimos 30d${m.reembolsos?` · −${brl(m.reembolsos)} reemb.`:""}`,"var(--gold)"],
-    ["🔁 MRR (recorrente)",brl(m.mrr),`ARR ${brl0(m.arr)}/ano`,"var(--green)"],
-    ["⭐ Assinantes PRO",m.pro_ativos,`de ${m.total_usuarios} usuários`,"var(--cyan)"],
-    ["📈 LTV por cliente",brl(m.ltv),`${m.pagantes} pagantes`,"var(--violet)"],
-  ].map(([l,v,s,c])=>`<div class="kpi"><div class="lbl"><span class="dot" style="background:${c}"></span>${l}</div><div class="val" style="color:${c}">${v}</div><div class="sub">${s}</div></div>`).join("");
+    ["💰 Receita total",brl(m.receita_total),`${brl(m.receita_30d)} nos últimos 30d${m.reembolsos?` · −${brl(m.reembolsos)} reemb.`:""}`,"var(--gold)",""],
+    ["📣 Gasto marketing","…","buscando no Facebook…","var(--violet)","kpi-gasto"],
+    ["🏆 Lucro real","…","receita − marketing","var(--green)","kpi-lucro"],
+    ["🔁 MRR (recorrente)",brl(m.mrr),`ARR ${brl0(m.arr)}/ano`,"var(--green)",""],
+    ["⭐ Assinantes PRO",m.pro_ativos,`de ${m.total_usuarios} usuários`,"var(--cyan)",""],
+    ["📈 LTV por cliente",brl(m.ltv),`${m.pagantes} pagantes`,"var(--violet)",""],
+  ].map(([l,v,s,c,id])=>`<div class="kpi"><div class="lbl"><span class="dot" style="background:${c}"></span>${l}</div><div class="val"${id?` id="${id}"`:""} style="color:${c}">${v}</div><div class="sub"${id?` id="${id}-sub"`:""}>${s}</div></div>`).join("");
+  loadMarketing();
 
   $("#kpis2").innerHTML=[
     ["Conversão",m.conversao+"%"],["Ticket médio",brl(m.ticket_medio)],
