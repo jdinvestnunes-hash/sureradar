@@ -1036,6 +1036,46 @@ def perfil_dados(request: Request):
     }
 
 
+@app.post("/api/admin/avisar-parcelamento")
+def admin_avisar_parcelamento(request: Request):
+    """Dispara o e-mail 'parcelamento liberado' pra quem gerou checkout e NÃO é PRO.
+    Exclui os e-mails de admin/dono e o do próprio admin logado. Dedup: cada pessoa
+    recebe só 1x (tipo 'promo_parcelamento_12x'). Envia em 2º plano (não trava)."""
+    import threading
+    user = _usuario(request)
+    erro = _guard_admin(request, user)
+    if erro:
+        return erro
+    if not config.RESEND_API_KEY:
+        return JSONResponse({"erro": "RESEND_API_KEY não configurada"}, status_code=503)
+    excluir = set()
+    for src in (getattr(config, "ADMIN_EMAILS", ""), getattr(config, "OWNER_EMAILS", "")):
+        for e in (src or "").split(","):
+            if e.strip():
+                excluir.add(e.strip().lower())
+    if user and user.get("email"):
+        excluir.add(user["email"].strip().lower())
+    audiencia = [u for u in auth.usuarios_para_recuperacao()
+                 if (u.get("email") or "").strip().lower() not in excluir]
+
+    def _rodar():
+        enviados = 0
+        for u in audiencia:
+            try:
+                if not auth.registrar_email(u["id"], "promo_parcelamento_12x"):
+                    continue                     # já recebeu esse aviso
+                unsub = config.SITE_URL + "/descadastrar?u=" + auth.unsub_token(u["id"])
+                if emailer.enviar_parcelamento(u["email"], u["nome"], unsub):
+                    enviados += 1
+            except Exception as e:
+                print("!! avisar-parcelamento:", e)
+        print(f">> aviso parcelamento: {enviados} e-mail(s) enviado(s).")
+
+    threading.Thread(target=_rodar, name="promo-parcelamento", daemon=True).start()
+    return {"ok": True, "audiencia": len(audiencia),
+            "excluidos": sorted(excluir)}
+
+
 @app.post("/api/admin/testar-email")
 def admin_testar_email(request: Request):
     """Manda um e-mail de teste pro próprio admin e devolve a resposta do Resend."""

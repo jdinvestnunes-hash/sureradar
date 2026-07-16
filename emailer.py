@@ -215,6 +215,32 @@ def enviar_recup(to: str, nome: str, tipo: str, unsub_url: str = "", idx: int = 
     return enviar(to, assunto, texto=texto, headers=headers)
 
 
+def enviar_parcelamento(to: str, nome: str, unsub_url: str = "") -> bool:
+    """Aviso ÚNICO: liberamos o PARCELAMENTO no cartão (até 12x). Pra quem gerou
+    checkout e não fechou. Plain text (melhor entrega)."""
+    assunto = "🎉 Agora dá pra parcelar o PRO em até 12x no cartão"
+    texto = (
+        "Oi {n}!\n\n"
+        "Você chegou a começar a assinar o PRO do SureRadar, mas não finalizou. "
+        "Muita gente parou por causa do valor de uma vez só — e é por isso que estou te chamando:\n\n"
+        "✅ ACABAMOS DE LIBERAR O PARCELAMENTO NO CARTÃO.\n\n"
+        "Agora dá pra dividir:\n"
+        "• Trimestral em até 3x\n"
+        "• Semestral em até 6x\n"
+        "• Anual em até 12x — sai por só ~R$ 41/mês (em vez de R$ 97 do mensal)\n\n"
+        "Com 1 ou 2 entradas do próprio SureRadar você já paga a mensalidade — e ainda tem "
+        "garantia de 7 dias: se não fizer sentido, devolvemos 100%.\n\n"
+        "Parcelar agora: {url}/planos\n\n"
+        "Qualquer dúvida, é só responder este e-mail.\nAbraço,\nEquipe SureRadar"
+    ).format(n=_primeiro(nome), url=config.SITE_URL)
+    headers = None
+    if unsub_url:
+        texto += f"\n\n---\nNão quer mais esses e-mails? Descadastre aqui: {unsub_url}"
+        headers = {"List-Unsubscribe": f"<{unsub_url}>",
+                   "List-Unsubscribe-Post": "List-Unsubscribe=One-Click"}
+    return enviar(to, assunto, texto=texto, headers=headers)
+
+
 def _layout(titulo: str, corpo_html: str) -> str:
     """Casca visual da marca (dark, verde/ciano) para os e-mails."""
     return f"""\

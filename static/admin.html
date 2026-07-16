@@ -151,6 +151,10 @@
     <div class="panel">
       <h3>💸 Geraram e não pagaram <small id="pend-count"></small></h3>
       <p style="color:var(--text-dim);font-size:12.5px;margin:4px 0 12px">Checkouts (Pix + cartão) gerados sem pagamento — potencial de recuperação.</p>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px">
+        <button class="btn b-pro" id="btn-avisar-parcelamento">📧 Avisar que liberou o parcelamento (até 12x)</button>
+        <span id="avisar-msg" style="font-size:12.5px;color:var(--text-dim)"></span>
+      </div>
       <div id="pendentes"></div>
     </div>
 
@@ -635,6 +639,18 @@ document.addEventListener("click",(e)=>{
   if(e.target.classList&&e.target.classList.contains("tk-tab")){ document.querySelectorAll(".tk-tab").forEach(x=>x.classList.remove("on")); e.target.classList.add("on"); TK_STATUS=e.target.dataset.st; loadTickets(); return; }
 });
 
+document.addEventListener("click", e=>{
+  if(e.target.id!=="btn-avisar-parcelamento") return;
+  const b=e.target, msg=$("#avisar-msg");
+  if(!confirm("Enviar o e-mail 'parcelamento liberado' pra todos que geraram checkout e ainda NÃO são PRO?\n\nCada pessoa recebe só 1x. Seu e-mail e os de admin são excluídos automaticamente.")) return;
+  b.disabled=true; b.textContent="⏳ Disparando...";
+  fetch("/api/admin/avisar-parcelamento",{method:"POST"}).then(r=>r.json().then(j=>({ok:r.ok,j}))).then(({ok,j})=>{
+    b.disabled=false; b.textContent="📧 Avisar que liberou o parcelamento (até 12x)";
+    if(!ok){ msg.style.color="#ff6b6b"; msg.textContent="❌ "+(j.erro||"erro"); return; }
+    msg.style.color="var(--green)";
+    msg.textContent=`✅ Enviando em 2º plano para até ${j.audiencia} pessoa(s). Quem já recebeu é pulado.`;
+  }).catch(()=>{ b.disabled=false; b.textContent="📧 Avisar que liberou o parcelamento (até 12x)"; msg.style.color="#ff6b6b"; msg.textContent="❌ erro de conexão"; });
+});
 async function loadPendentes(){
   const box=$("#pendentes"); if(!box) return;
   const r=await fetch("/api/admin/pendentes"); if(!r.ok) return;
