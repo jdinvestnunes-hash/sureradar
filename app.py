@@ -1285,11 +1285,14 @@ def admin_fb_gastos(request: Request, preset: str = "hoje", level: str = "campai
         return erro
     level = "adset" if level == "adset" else "campaign"
     so_ativas = (status or "ativas") != "todas"     # padrão: esconde as pausadas
+    alvo = (auth.meta_campanha_get() or {}).get("id")   # campanha DESTE projeto
     fb_on = meta_ads.configurado()
     gastos, fb_erro, st_map = [], None, {}
     if fb_on:
         try:
             gastos = meta_ads.gastos(preset=preset, level=level)
+            if alvo:      # só a campanha do projeto (e, no nível conjunto, só os dela)
+                gastos = [g for g in gastos if (g.get("campaign_id") or g.get("id")) == alvo]
             st_map = (meta_ads.status_campanhas() if level == "campaign"
                       else meta_ads.status_adsets())
         except Exception as e:
@@ -1332,8 +1335,9 @@ def admin_fb_gastos(request: Request, preset: str = "hoje", level: str = "campai
         if extra:
             row.update(extra)
         linhas.append(row)
-    # 2) Nossas campanhas manuais que NÃO têm gasto no Meta (não somem do painel)
-    for c in internas:
+    # 2) Nossas campanhas manuais que NÃO têm gasto no Meta (não somem do painel).
+    #    Com uma campanha do projeto escolhida, esconde os rastreios soltos (confundem).
+    for c in (internas if not alvo else []):
         if c["id"] in usados:
             continue
         m = met.get(str(c["id"]), {})
@@ -1377,6 +1381,37 @@ def admin_fb_gastos(request: Request, preset: str = "hoje", level: str = "campai
     }
 
 
+@app.get("/api/admin/meta-campanhas")
+def admin_meta_campanhas(request: Request):
+    """Lista as campanhas do Facebook pro seletor 'qual é a campanha deste projeto'."""
+    user = _usuario(request)
+    erro = _guard_admin(request, user)
+    if erro:
+        return erro
+    if not meta_ads.configurado():
+        return {"campanhas": [], "escolhida": {}}
+    itens = []
+    for cid, d in (meta_ads.status_campanhas() or {}).items():
+        itens.append({"id": cid, "nome": d.get("nome") or cid,
+                      "status": d.get("status", ""),
+                      "ativa": d.get("status", "") not in meta_ads.PAUSADAS})
+    itens.sort(key=lambda x: (not x["ativa"], x["nome"].lower()))
+    return {"campanhas": itens, "escolhida": auth.meta_campanha_get()}
+
+
+@app.post("/api/admin/meta-campanha")
+def admin_meta_campanha_salvar(request: Request, payload: dict = Body(...)):
+    """Salva qual campanha do Facebook é a DESTE projeto (id vazio = limpar)."""
+    user = _usuario(request)
+    erro = _guard_admin(request, user)
+    if erro:
+        return erro
+    cid = (payload.get("id") or "").strip()
+    nome = (payload.get("nome") or "").strip()
+    auth.meta_campanha_set({"id": cid, "nome": nome} if cid else {})
+    return {"ok": True, "escolhida": auth.meta_campanha_get()}
+
+
 @app.get("/api/admin/marketing")
 def admin_marketing(request: Request):
     """Gasto com MARKETING (Meta) pra Visão geral — é o que falta pra saber o LUCRO
@@ -1390,17 +1425,23 @@ def admin_marketing(request: Request):
     if not meta_ads.configurado():
         return {"ok": False, "erro": "Meta não conectado"}
     try:
-        st_map = meta_ads.status_campanhas()
+        sel = auth.meta_campanha_get()          # a campanha DESTE projeto (se escolhida)
+        alvo = sel.get("id")
+        st_map = meta_ads.status_campanhas() if not alvo else {}
 
-        def _ativa(cid):
-            return (st_map.get(cid) or {}).get("status", "") not in meta_ads.PAUSADAS
+        def _conta(x):
+            if alvo:                             # só a campanha escolhida
+                return x.get("id") == alvo
+            # sem escolha: cai no antigo (todas as ativas) — pode misturar projetos
+            return (st_map.get(x.get("id", "")) or {}).get("status", "") not in meta_ads.PAUSADAS
 
         def _soma(preset):
             return round(sum(x.get("gasto", 0)
                              for x in meta_ads.gastos(preset=preset, level="campaign")
-                             if _ativa(x.get("id", ""))), 2)
-        return {"ok": True, "so_ativas": True, "gasto_total": _soma("tudo"),
-                "gasto_30d": _soma("30dias"), "gasto_7d": _soma("7dias")}
+                             if _conta(x)), 2)
+        return {"ok": True, "campanha": sel.get("nome", ""), "so_ativas": not alvo,
+                "gasto_total": _soma("tudo"), "gasto_30d": _soma("30dias"),
+                "gasto_7d": _soma("7dias")}
     except Exception as e:
         return {"ok": False, "erro": str(e)[:160]}
 

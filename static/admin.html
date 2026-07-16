@@ -187,6 +187,13 @@
       </div>
 
       <div id="fb-wrap">
+        <!-- qual campanha do Facebook é DESTE projeto (a conta é compartilhada) -->
+        <div class="panel" style="margin-bottom:14px;padding:14px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+          <span style="font-size:13px;font-weight:700;white-space:nowrap">🎯 Campanha deste projeto:</span>
+          <select id="fb-campanha" class="search" style="margin:0;flex:1;min-width:220px;max-width:420px"></select>
+          <span id="fb-campanha-msg" style="font-size:12px;color:var(--text-dim)"></span>
+        </div>
+
         <!-- controles estilo Gerenciador: nível + período -->
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px">
           <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
@@ -297,7 +304,8 @@ async function loadMarketing(){
     return;
   }
   g.textContent=brl(d.gasto_total);
-  if(gs) gs.textContent=`só campanhas ATIVAS · ${brl(d.gasto_30d)} nos últimos 30d`;
+  if(gs) gs.textContent = (d.campanha ? `campanha: ${d.campanha}` : "⚠️ todas as ativas — escolha a campanha")
+                        + ` · ${brl(d.gasto_30d)} nos últimos 30d`;
   const rec=(M_CACHE&&M_CACHE.receita_total)||0, lucro=rec-d.gasto_total;
   l.textContent=brl(lucro);
   l.style.color = lucro>=0 ? "var(--green)" : "#ff6b6b";
@@ -404,7 +412,7 @@ function mostrarView(v){
     : v==="conteudo" ? "Conteúdo — calendário de SEO e publicação."
     : "Visão do negócio — receita, assinantes e crescimento.";
   if(v==="tickets") loadTickets();
-  if(v==="gastos") loadFbGastos();
+  if(v==="gastos"){ loadCampanhaSel(); loadFbGastos(); }
   if(v==="conteudo") loadConteudo();
 }
 
@@ -486,6 +494,27 @@ async function metaTest(){
     </div>`;
   }
 }
+// Seletor "qual campanha do Facebook é deste projeto" (a conta é compartilhada
+// com outros projetos, então sem isso o gasto/lucro mistura tudo).
+async function loadCampanhaSel(){
+  const sel=$("#fb-campanha"), msg=$("#fb-campanha-msg");
+  if(!sel) return;
+  const d=await fetch("/api/admin/meta-campanhas").then(r=>r.json()).catch(()=>({campanhas:[]}));
+  const cs=d.campanhas||[], esc=(d.escolhida||{}).id||"";
+  if(!cs.length){ sel.innerHTML='<option value="">(Meta não conectado)</option>'; return; }
+  sel.innerHTML='<option value="">— todas as ativas (mistura projetos) —</option>'+
+    cs.map(c=>`<option value="${escH(c.id)}" data-nome="${escH(c.nome)}"${c.id===esc?" selected":""}>${c.ativa?"▶ ":"⏸ "}${escH(c.nome)}</option>`).join("");
+  if(msg) msg.textContent = esc ? "✅ só ela conta no gasto e no lucro" : "⚠️ escolha a sua p/ o lucro ficar certo";
+  sel.onchange = async ()=>{
+    const o=sel.selectedOptions[0];
+    if(msg) msg.textContent="salvando…";
+    await fetch("/api/admin/meta-campanha",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({id:sel.value,nome:o?(o.dataset.nome||""):""})}).catch(()=>{});
+    if(msg) msg.textContent = sel.value ? "✅ só ela conta no gasto e no lucro" : "⚠️ escolha a sua p/ o lucro ficar certo";
+    loadFbGastos();
+  };
+}
+
 async function loadFbGastos(){
   const setup=$("#fb-setup"), wrap=$("#fb-wrap"), kpis=$("#fb-kpis"), tab=$("#fb-tabela");
   tab.innerHTML='<div class="empty">Carregando campanhas do Meta…</div>'; kpis.innerHTML="";

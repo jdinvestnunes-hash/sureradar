@@ -69,9 +69,12 @@ def gastos(preset="hoje", level="adset"):
     campo_id = "campaign_id" if level == "campaign" else "adset_id"
     campo_nome = "campaign_name" if level == "campaign" else "adset_name"
     url = f"{_BASE}/{config.META_API_VER}/{_ad_account()}/insights"
+    campos = f"{campo_id},{campo_nome},spend,impressions,clicks,actions"
+    if level == "adset":
+        campos += ",campaign_id,campaign_name"   # p/ filtrar conjuntos por campanha
     params = {
         "level": level,
-        "fields": f"{campo_id},{campo_nome},spend,impressions,clicks,actions",
+        "fields": campos,
         "date_preset": date_preset,
         "limit": 300,
         "access_token": config.META_ACCESS_TOKEN,
@@ -109,6 +112,9 @@ def gastos(preset="hoje", level="adset"):
         out.append({
             "id": row.get(campo_id, ""),
             "nome": row.get(campo_nome, ""),
+            # campanha "pai" (no nível campanha é ela mesma) — usado pra filtrar
+            "campaign_id": row.get("campaign_id") or (row.get(campo_id, "") if level == "campaign" else ""),
+            "campaign_nome": row.get("campaign_name", ""),
             "gasto": round(_num(row.get("spend")), 2),
             "cliques": int(_num(row.get("clicks"))),
             "impressoes": int(_num(row.get("impressions"))),
@@ -138,6 +144,7 @@ def _status(edge, campos):
     out = {}
     for row in data.get("data", []):
         out[row.get("id", "")] = {
+            "nome": row.get("name", ""),
             "status": row.get("effective_status", ""),
             "objetivo": row.get("objective", ""),
         }

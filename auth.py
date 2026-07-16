@@ -1184,6 +1184,41 @@ def catalogo_set(catalogo):
         print("!! catalogo_set:", e)
 
 
+def meta_campanha_get():
+    """Campanha do Facebook escolhida como 'a campanha DESTE projeto' (linha id=3).
+    A conta de anúncios é compartilhada com outros projetos — só ela conta no
+    gasto/lucro. {} = nenhuma escolhida (aí o painel cai no 'todas as ativas')."""
+    import json
+    try:
+        with _db() as c:
+            row = c.execute(_q("SELECT dados FROM feed_cache WHERE id=3")).fetchone()
+        if row:
+            d = json.loads(row["dados"])
+            if isinstance(d, dict) and d.get("id"):
+                return d
+    except Exception as e:
+        print("!! meta_campanha_get:", e)
+    return {}
+
+
+def meta_campanha_set(dados):
+    """Salva {id, nome} da campanha do projeto (ou {} pra limpar)."""
+    import json
+    txt = json.dumps(dados or {}, ensure_ascii=False)
+    agora = time.time()
+    try:
+        with _db() as c:
+            if PG:
+                c.execute(_q("""INSERT INTO feed_cache(id,dados,atualizado) VALUES(3,?,?)
+                               ON CONFLICT (id) DO UPDATE SET dados=EXCLUDED.dados,
+                               atualizado=EXCLUDED.atualizado"""), (txt, agora))
+            else:
+                c.execute("INSERT OR REPLACE INTO feed_cache(id,dados,atualizado) VALUES(3,?,?)",
+                          (txt, agora))
+    except Exception as e:
+        print("!! meta_campanha_set:", e)
+
+
 # ---------------------------------------------------------------------------
 # Banca (entradas lançadas pelo usuário) — persistida no banco
 # ---------------------------------------------------------------------------
