@@ -1273,7 +1273,8 @@ def _membros_no_periodo(camp, dias_set):
 
 
 @app.get("/api/admin/fb-gastos")
-def admin_fb_gastos(request: Request, preset: str = "hoje", level: str = "campaign"):
+def admin_fb_gastos(request: Request, preset: str = "hoje", level: str = "campaign",
+                    status: str = "ativas"):
     """Dashboard estilo Gerenciador de Anúncios: puxa AS CAMPANHAS DO META
     automaticamente (auto-sync via token) e mostra Gasto, Resultados(leads),
     Impressões, Cliques, Veiculação + cruza com nosso rastreio (membros/cadastros/
@@ -1283,13 +1284,14 @@ def admin_fb_gastos(request: Request, preset: str = "hoje", level: str = "campai
     if erro:
         return erro
     level = "adset" if level == "adset" else "campaign"
+    so_ativas = (status or "ativas") != "todas"     # padrão: esconde as pausadas
     fb_on = meta_ads.configurado()
-    gastos, fb_erro, status = [], None, {}
+    gastos, fb_erro, st_map = [], None, {}
     if fb_on:
         try:
             gastos = meta_ads.gastos(preset=preset, level=level)
-            if level == "campaign":
-                status = meta_ads.status_campanhas()
+            st_map = (meta_ads.status_campanhas() if level == "campaign"
+                      else meta_ads.status_adsets())
         except Exception as e:
             fb_erro = str(e)
     internas = auth.listar_campanhas()
@@ -1317,7 +1319,7 @@ def admin_fb_gastos(request: Request, preset: str = "hoje", level: str = "campai
     linhas = []
     # 1) TODAS as campanhas que vieram do Meta (auto-sync) — mesmo sem rastreio nosso
     for g in gastos:
-        st = status.get(g.get("id", ""), {})
+        st = st_map.get(g.get("id", ""), {})
         row = {
             "origem": "meta", "nome": g.get("nome", "—"), "gasto": round(g.get("gasto", 0.0), 2),
             "impressoes": int(g.get("impressoes", 0)), "cliques": int(g.get("cliques", 0)),
@@ -1343,7 +1345,13 @@ def admin_fb_gastos(request: Request, preset: str = "hoje", level: str = "campai
             "cadastros": int(m.get("cadastros", 0)), "vendas": int(m.get("vendas", 0)),
             "receita": round(float(m.get("receita", 0.0)), 2),
         })
-    # totais (linha de rodapé estilo Gerenciador)
+    # filtro de veiculação: por padrão só ATIVAS (esconde pausadas/arquivadas).
+    # Mantém as internas (rastreio nosso, sem status do Meta) e as de status desconhecido.
+    if so_ativas:
+        linhas = [r for r in linhas
+                  if r.get("origem") == "interna"
+                  or (r.get("status") or "") not in meta_ads.PAUSADAS]
+    # totais (linha de rodapé estilo Gerenciador) — já refletem o filtro
     t = {"gasto": 0.0, "impressoes": 0, "cliques": 0, "leads_fb": 0,
          "membros": 0, "cadastros": 0, "vendas": 0, "receita": 0.0}
     for r in linhas:
@@ -1354,7 +1362,8 @@ def admin_fb_gastos(request: Request, preset: str = "hoje", level: str = "campai
     linhas.sort(key=lambda x: (x["gasto"], x["receita"] or 0), reverse=True)
     return {
         "configurado": True, "fb_conectado": fb_on, "fb_erro": fb_erro,
-        "preset": preset, "level": level, "n": len(linhas),
+        "preset": preset, "level": level, "status": "ativas" if so_ativas else "todas",
+        "n": len(linhas),
         "kpis": {
             "gasto": round(t["gasto"], 2), "membros": int(t["membros"]),
             "leads_fb": int(t["leads_fb"]), "impressoes": int(t["impressoes"]),

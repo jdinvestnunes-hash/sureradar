@@ -53,8 +53,8 @@
     .fb-per{font-size:12.5px;font-weight:700;color:var(--dim);background:var(--card);border:1px solid var(--line);border-radius:9px;padding:7px 13px;cursor:pointer}
     .fb-per:hover{border-color:var(--cyan)}
     .fb-per.on{background:var(--cyan);color:#04121a;border-color:var(--cyan)}
-    .fb-lvl{font-size:12.5px;font-weight:700;color:var(--dim);background:transparent;border:0;border-radius:8px;padding:6px 14px;cursor:pointer}
-    .fb-lvl.on{background:var(--card2);color:var(--text)}
+    .fb-lvl,.fb-st{font-size:12.5px;font-weight:700;color:var(--dim);background:transparent;border:0;border-radius:8px;padding:6px 14px;cursor:pointer}
+    .fb-lvl.on,.fb-st.on{background:var(--card2);color:var(--text)}
     .fbt th{white-space:nowrap}
     .fbt td{padding:12px 10px;border-top:1px solid var(--line);font-variant-numeric:tabular-nums}
     .fbt tbody tr:hover{background:var(--card2)}
@@ -193,6 +193,10 @@
             <div style="display:inline-flex;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:3px">
               <button class="fb-lvl on" data-lvl="campaign">Campanhas</button>
               <button class="fb-lvl" data-lvl="adset">Conjuntos</button>
+            </div>
+            <div style="display:inline-flex;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:3px">
+              <button class="fb-st on" data-st="ativas" title="Só as que estão rodando">▶ Ativas</button>
+              <button class="fb-st" data-st="todas" title="Inclui pausadas e arquivadas">+ Pausadas</button>
             </div>
             <span style="width:1px;height:22px;background:var(--line);margin:0 4px"></span>
             <button class="fb-per on" data-per="hoje">Hoje</button>
@@ -402,7 +406,7 @@ document.addEventListener("click",(e)=>{
 });
 
 // ---- Dashboard Meta (estilo Gerenciador de Anúncios) ----
-let FB_PER = "hoje", FB_LVL = "campaign";
+let FB_PER = "hoje", FB_LVL = "campaign", FB_ST = "ativas";
 function fbKpi(label, valor, sub, cor){
   return `<div style="background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:16px 18px">
     <div style="font-size:12px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.05em;font-weight:700">${label}</div>
@@ -461,7 +465,7 @@ async function metaTest(){
 async function loadFbGastos(){
   const setup=$("#fb-setup"), wrap=$("#fb-wrap"), kpis=$("#fb-kpis"), tab=$("#fb-tabela");
   tab.innerHTML='<div class="empty">Carregando campanhas do Meta…</div>'; kpis.innerHTML="";
-  const r=await fetch("/api/admin/fb-gastos?level="+FB_LVL+"&preset="+FB_PER);
+  const r=await fetch("/api/admin/fb-gastos?level="+FB_LVL+"&preset="+FB_PER+"&status="+FB_ST);
   const d=await r.json().catch(()=>({}));
   wrap.style.display="";
   if(d.fb_conectado===false){
@@ -529,12 +533,13 @@ async function loadFbGastos(){
       <tbody>${linhas}</tbody>
       <tfoot>${rodape}</tfoot>
     </table></div>
-    <div style="font-size:11.5px;color:var(--text-dim);margin-top:10px">💡 <b>Result.</b> = leads que o Facebook contou · <b>Entraram/Cadastros/Receita</b> vêm do nosso rastreio (só aparecem nas campanhas com rastreio próprio de mesmo nome) · <b>ROAS</b> = receita ÷ gasto.</div>`;
+    <div style="font-size:11.5px;color:var(--text-dim);margin-top:10px">${FB_ST==="ativas"?'▶ Mostrando só as <b style="color:var(--green)">ATIVAS</b> — clique em <b>"+ Pausadas"</b> pra ver as pausadas/arquivadas. · ':""}💡 <b>Result.</b> = leads que o Facebook contou · <b>Entraram/Cadastros/Receita</b> vêm do nosso rastreio (só aparecem nas campanhas com rastreio próprio de mesmo nome) · <b>ROAS</b> = receita ÷ gasto.</div>`;
 }
 document.addEventListener("click",(e)=>{
-  const per=e.target.closest(".fb-per"), lvl=e.target.closest(".fb-lvl");
+  const per=e.target.closest(".fb-per"), lvl=e.target.closest(".fb-lvl"), st=e.target.closest(".fb-st");
   if(per){ document.querySelectorAll(".fb-per").forEach(b=>b.classList.remove("on")); per.classList.add("on"); FB_PER=per.dataset.per; loadFbGastos(); }
   if(lvl){ document.querySelectorAll(".fb-lvl").forEach(b=>b.classList.remove("on")); lvl.classList.add("on"); FB_LVL=lvl.dataset.lvl; loadFbGastos(); }
+  if(st){ document.querySelectorAll(".fb-st").forEach(b=>b.classList.remove("on")); st.classList.add("on"); FB_ST=st.dataset.st; loadFbGastos(); }
 });
 
 // ---- Conteúdo / SEO ----

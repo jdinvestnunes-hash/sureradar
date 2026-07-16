@@ -118,18 +118,16 @@ def gastos(preset="hoje", level="adset"):
     return out
 
 
-def status_campanhas():
-    """{id_campanha: {"status": effective_status, "objetivo": objective}} pra
-    mostrar a coluna 'Veiculação' (Ativa/Pausada/Em análise) igual o gerenciador.
-    Best-effort: se der erro, devolve {} e o painel só não mostra o status."""
+# effective_status que contam como "não está rodando" (usado pra filtrar as ativas)
+PAUSADAS = {"PAUSED", "CAMPAIGN_PAUSED", "ADSET_PAUSED", "ARCHIVED", "DELETED"}
+
+
+def _status(edge, campos):
+    """{id: {status, objetivo}} do edge (campaigns/adsets). Best-effort: erro -> {}."""
     if not configurado():
         return {}
-    url = f"{_BASE}/{config.META_API_VER}/{_ad_account()}/campaigns"
-    params = {
-        "fields": "id,name,effective_status,objective",
-        "limit": 300,
-        "access_token": config.META_ACCESS_TOKEN,
-    }
+    url = f"{_BASE}/{config.META_API_VER}/{_ad_account()}/{edge}"
+    params = {"fields": campos, "limit": 300, "access_token": config.META_ACCESS_TOKEN}
     try:
         r = requests.get(url, params=params, timeout=15)
         data = r.json() if r.content else {}
@@ -144,6 +142,16 @@ def status_campanhas():
             "objetivo": row.get("objective", ""),
         }
     return out
+
+
+def status_campanhas():
+    """Status/objetivo por CAMPANHA — pra 'Veiculação' e pro filtro de ativas."""
+    return _status("campaigns", "id,name,effective_status,objective")
+
+
+def status_adsets():
+    """Status por CONJUNTO — mesmo filtro funciona na visão de Conjuntos."""
+    return _status("adsets", "id,name,effective_status")
 
 
 def testar():
