@@ -373,17 +373,23 @@ def registrar_email(user_id, tipo):
         return False
 
 
-def usuarios_para_recuperacao():
+def usuarios_para_recuperacao(planos=None):
     """Quem GEROU checkout (Pix/cartão) e NÃO é PRO agora (nem descadastrou). Traz o
-    1º checkout (momento da intenção). PRO ativo = plano='pro' E expira no futuro."""
+    1º checkout (momento da intenção). PRO ativo = plano='pro' E expira no futuro.
+    `planos`: se passado (ex.: ('trimestral','anual')), só quem gerou checkout NESSES."""
+    filtro, params = "", []
+    if planos:
+        filtro = " AND ck.plano IN (" + ",".join(["?"] * len(planos)) + ")"
+        params.extend(planos)
+    params.append(time.time())
     with _db() as c:
         rows = c.execute(_q(
             """SELECT u.id, u.nome, u.email, MIN(ck.criado) AS primeiro_checkout
                FROM users u JOIN checkouts ck ON ck.user_id = u.id
                WHERE COALESCE(u.email_optout,0) = 0
-                 AND COALESCE(u.email_verificado,1) = 1
+                 AND COALESCE(u.email_verificado,1) = 1""" + filtro + """
                  AND NOT (u.plano = 'pro' AND COALESCE(u.plano_expira,0) > ?)
-               GROUP BY u.id, u.nome, u.email"""), (time.time(),)).fetchall()
+               GROUP BY u.id, u.nome, u.email"""), tuple(params)).fetchall()
     return [dict(r) for r in rows]
 
 

@@ -1036,6 +1036,19 @@ def perfil_dados(request: Request):
     }
 
 
+def _emails_excluidos(user=None):
+    """E-mails que NÃO entram em broadcast nem no painel de pendentes: admin, dono e
+    o do próprio admin logado (contas de teste)."""
+    ex = set()
+    for src in (getattr(config, "ADMIN_EMAILS", ""), getattr(config, "OWNER_EMAILS", "")):
+        for e in (src or "").split(","):
+            if e.strip():
+                ex.add(e.strip().lower())
+    if user and user.get("email"):
+        ex.add(user["email"].strip().lower())
+    return ex
+
+
 @app.post("/api/admin/avisar-parcelamento")
 def admin_avisar_parcelamento(request: Request):
     """Dispara o e-mail 'parcelamento liberado' pra quem gerou checkout e NÃO é PRO.
@@ -1048,14 +1061,8 @@ def admin_avisar_parcelamento(request: Request):
         return erro
     if not config.RESEND_API_KEY:
         return JSONResponse({"erro": "RESEND_API_KEY não configurada"}, status_code=503)
-    excluir = set()
-    for src in (getattr(config, "ADMIN_EMAILS", ""), getattr(config, "OWNER_EMAILS", "")):
-        for e in (src or "").split(","):
-            if e.strip():
-                excluir.add(e.strip().lower())
-    if user and user.get("email"):
-        excluir.add(user["email"].strip().lower())
-    audiencia = [u for u in auth.usuarios_para_recuperacao()
+    excluir = _emails_excluidos(user)
+    audiencia = [u for u in auth.usuarios_para_recuperacao(planos=("trimestral", "semestral", "anual"))
                  if (u.get("email") or "").strip().lower() not in excluir]
 
     def _rodar():
@@ -1382,8 +1389,11 @@ def admin_pendentes(request: Request):
     if erro:
         return erro
     agora = _t.time()
+    excluir = _emails_excluidos(user)     # tira seu e-mail e os de admin do painel
     linhas, tot = [], 0.0
     for c in auth.checkouts_pendentes():
+        if (c.get("email") or "").strip().lower() in excluir:
+            continue
         val = float(c.get("valor", 0) or 0)
         tot += val
         linhas.append({
