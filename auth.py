@@ -1047,6 +1047,13 @@ def metricas():
                   - sum(p["valor"] for p in reembolsos if p["criado"] > d30))
     receita_7 = (sum(p["valor"] for p in reais if p["criado"] > d7)
                  - sum(p["valor"] for p in reembolsos if p["criado"] > d7))
+    # HOJE (dia-calendário no horário de Brasília) — pro placar do dia
+    from datetime import timezone
+    _br = timezone(timedelta(hours=-3))
+    hoje0 = datetime.now(_br).replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
+    receita_hoje = (sum(p["valor"] for p in reais if p["criado"] >= hoje0)
+                    - sum(p["valor"] for p in reembolsos if p["criado"] >= hoje0))
+    vendas_hoje = len([p for p in reais if p["criado"] >= hoje0])
     pagantes = len({p["user_id"] for p in reais})
     ticket = (receita_bruta / len(reais)) if reais else 0.0
     conversao = (pagantes / total * 100) if total else 0.0
@@ -1104,7 +1111,8 @@ def metricas():
     return {
         "total_usuarios": total, "pro_ativos": n_pro, "free": n_free,
         "receita_total": round(receita_total, 2), "receita_30d": round(receita_30, 2),
-        "receita_7d": round(receita_7, 2), "reembolsos": round(reembolso_total, 2),
+        "receita_7d": round(receita_7, 2), "receita_hoje": round(receita_hoje, 2),
+        "vendas_hoje": vendas_hoje, "reembolsos": round(reembolso_total, 2),
         "mrr": round(mrr, 2),
         "arr": round(mrr * 12, 2), "ltv": round(ltv, 2), "arpu": round(arpu, 2),
         "ticket_medio": round(ticket, 2), "conversao": round(conversao, 1),

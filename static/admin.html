@@ -131,6 +131,28 @@
     </div>
 
     <div id="view-dash">
+    <!-- placar de HOJE: gastei x vendi x lucro -->
+    <div id="hoje-box" class="panel" style="margin-bottom:16px;display:none">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+        <h3 style="margin:0">📅 Hoje</h3>
+        <span id="hoje-sub" style="font-size:12px;color:var(--text-dim)"></span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+        <div style="background:var(--bg);border:1px solid var(--line);border-radius:13px;padding:14px 16px">
+          <div style="font-size:11.5px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.04em">📣 Gastei hoje</div>
+          <div id="hoje-gasto" style="font-size:24px;font-weight:800;margin-top:4px;color:var(--violet)">…</div>
+        </div>
+        <div style="background:var(--bg);border:1px solid var(--line);border-radius:13px;padding:14px 16px">
+          <div style="font-size:11.5px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.04em">💰 Vendi hoje</div>
+          <div id="hoje-receita" style="font-size:24px;font-weight:800;margin-top:4px;color:var(--green)">…</div>
+        </div>
+        <div style="background:var(--bg);border:2px solid var(--line2);border-radius:13px;padding:14px 16px">
+          <div style="font-size:11.5px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.04em">🏆 Lucro do dia</div>
+          <div id="hoje-lucro" style="font-size:24px;font-weight:800;margin-top:4px">…</div>
+        </div>
+      </div>
+    </div>
+
     <!-- KPIs principais -->
     <div class="kpis" id="kpis"></div>
     <div class="kpis2" id="kpis2"></div>
@@ -310,6 +332,19 @@ async function loadMarketing(){
   l.textContent=brl(lucro);
   l.style.color = lucro>=0 ? "var(--green)" : "#ff6b6b";
   if(ls) ls.textContent=`${brl(rec)} receita − ${brl(d.gasto_total)} marketing`;
+
+  // placar de HOJE: gastei x vendi x lucro do dia
+  const box=$("#hoje-box");
+  if(box && M_CACHE){
+    const gh=d.gasto_hoje||0, rh=M_CACHE.receita_hoje||0, lh=rh-gh;
+    $("#hoje-gasto").textContent=brl(gh);
+    $("#hoje-receita").textContent=brl(rh);
+    const el2=$("#hoje-lucro");
+    el2.textContent=(lh>=0?"+":"")+brl(lh);
+    el2.style.color = lh>=0 ? "var(--green)" : "#ff6b6b";
+    $("#hoje-sub").textContent = `${M_CACHE.vendas_hoje||0} venda(s) hoje` + (d.campanha?` · gasto da ${d.campanha}`:"");
+    box.style.display="";
+  }
 }
 
 function renderMetricas(m){

@@ -1441,7 +1441,7 @@ def admin_marketing(request: Request):
                              if _conta(x)), 2)
         return {"ok": True, "campanha": sel.get("nome", ""), "so_ativas": not alvo,
                 "gasto_total": _soma("tudo"), "gasto_30d": _soma("30dias"),
-                "gasto_7d": _soma("7dias")}
+                "gasto_7d": _soma("7dias"), "gasto_hoje": _soma("hoje")}
     except Exception as e:
         return {"ok": False, "erro": str(e)[:160]}
 
