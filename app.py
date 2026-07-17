@@ -2300,6 +2300,14 @@ def tela_grupo():
     return FileResponse(STATIC_DIR / "oportunidade.html")
 
 
+@app.get("/nao-ser-limitado")
+@app.get("/limitacoes")
+@app.get("/aprenda/limitacoes")
+def tela_limitacoes():
+    """Guia: por que as casas limitam e como durar mais (conteúdo + SEO + marketing)."""
+    return FileResponse(STATIC_DIR / "limitacoes.html")
+
+
 @app.get("/termos")
 def tela_termos():
     return FileResponse(STATIC_DIR / "termos.html")
