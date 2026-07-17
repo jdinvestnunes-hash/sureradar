@@ -128,6 +128,32 @@
 
     <div class="metrics" id="bank-metrics"></div>
 
+    <div style="margin:14px 0">
+      <button id="bank-add-btn" class="btn-manual">➕ Lançar lucro manual</button>
+      <div id="bank-add-form" class="hidden" style="margin-top:12px;background:var(--surface2,#121a2b);border:1px solid var(--border2,#27395c);border-radius:14px;padding:16px">
+        <div style="font-weight:800;font-size:14.5px;margin-bottom:4px">Lançar resultado de fora do painel</div>
+        <div style="font-size:12.5px;color:var(--muted,#647388);margin-bottom:12px">Value bet, subida de odd, aposta manual… entra no seu lucro real.</div>
+        <div style="display:grid;gap:10px">
+          <label style="font-size:12px;color:var(--dim,#a3b1c9)">Descrição
+            <input id="bm-desc" class="search" style="margin:4px 0 0;width:100%" placeholder="Ex.: Subida de odd — Palmeiras x Grêmio" />
+          </label>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <label style="font-size:12px;color:var(--dim,#a3b1c9)">Lucro (R$) — negativo = perda
+              <input id="bm-lucro" type="number" step="1" class="search" style="margin:4px 0 0;width:100%" placeholder="Ex.: 45.00" />
+            </label>
+            <label style="font-size:12px;color:var(--dim,#a3b1c9)">Apostado (opcional)
+              <input id="bm-total" type="number" step="1" class="search" style="margin:4px 0 0;width:100%" placeholder="Ex.: 300.00" />
+            </label>
+          </div>
+          <div id="bm-err" style="color:#ff6b6b;font-size:12.5px;display:none"></div>
+          <div style="display:flex;gap:8px;justify-content:flex-end">
+            <button id="bm-cancel" class="cv-mini" style="background:transparent">Cancelar</button>
+            <button id="bm-save" class="cv-launch" style="width:auto;padding:11px 22px;margin:0">Lançar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div id="bank-chart"></div>
 
     <div id="bank-list" class="bank-list"></div>
@@ -283,7 +309,7 @@
     </div>
   </div>
 
-  <script src="/static/app.js?v=12"></script>
+  <script src="/static/app.js?v=13"></script>
 
   <style>
     #view-calc .cv-leg{background:var(--surface2,#121a2b);border:1px solid var(--border,#1b2740);border-radius:14px;padding:16px;margin-bottom:14px}
@@ -308,6 +334,8 @@
     #view-calc .cv-launch,#view-alertas .cv-launch{width:100%;margin-top:14px;background:var(--grad,linear-gradient(112deg,#2ee6a8,#38d4f5));color:#052015;font-weight:800;font-size:15px;padding:14px;border:none;border-radius:12px;cursor:pointer;font-family:inherit}
     #view-calc .cv-launch:hover,#view-alertas .cv-launch:hover{filter:brightness(1.05)}
     #view-calc .cv-launch:disabled,#view-alertas .cv-launch:disabled{opacity:.6;cursor:default}
+    .btn-manual{background:rgba(46,230,168,.1);border:1px solid rgba(46,230,168,.4);color:var(--green,#2ee6a8);font-weight:800;font-size:14px;padding:11px 18px;border-radius:11px;cursor:pointer;font-family:inherit}
+    .btn-manual:hover{background:rgba(46,230,168,.16)}
   </style>
   <script>
   (function(){

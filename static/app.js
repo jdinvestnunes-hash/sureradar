@@ -537,7 +537,7 @@ function renderBanca() {
   banca.slice().reverse().forEach((e) => {
     const row = el("div", "bank-row");
     const ev = el("div", "bank-ev"); ev.appendChild(document.createTextNode(e.event));
-    ev.appendChild(el("small", null, e.market + " · " + sportUI(e.sport).label));
+    ev.appendChild(el("small", null, e.manual ? e.market : (e.market + " · " + sportUI(e.sport).label)));
     // Dia + horário do JOGO (bem visível pra saber quando é)
     if (e.jogo) ev.appendChild(el("div", "bank-jogo", "🕒 Jogo: " + e.jogo));
     // Pernas: casa onde apostar + quanto em cada uma
@@ -559,6 +559,9 @@ function renderBanca() {
     const inp = el("input", "bank-edit"); inp.type = "number"; inp.value = e.total.toFixed(2); inp.step = "10";
     inp.addEventListener("change", () => {
       const nv = parseFloat(inp.value) || 0;
+      if (e.manual || !e.legs || !e.legs.length) {   // manual: não recalcula por perna
+        e.total = nv; saveBanca(); renderBanca(); return;
+      }
       const { stakes, lucro } = calcStakes({ legs: e.legs.map((l) => ({ odd: l.odd })) }, nv);
       e.total = nv; e.expected = lucro;
       e.legs.forEach((l, i) => { l.stake = stakes[i]; });   // atualiza o valor por casa
@@ -566,8 +569,16 @@ function renderBanca() {
     });
     stakeCol.appendChild(inp); row.appendChild(stakeCol);
     const profCol = el("div", "bank-col"); profCol.appendChild(el("div", "k", "Lucro"));
-    const neg = (e.expected || 0) < 0;
-    profCol.appendChild(el("div", "v " + (neg ? "red" : "green"), (neg ? "" : "+") + brl(e.expected)));
+    if (e.manual) {   // lançamento manual: o lucro é editável direto
+      const pin = el("input", "bank-edit"); pin.type = "number"; pin.step = "1";
+      pin.value = Number(e.expected || 0).toFixed(2);
+      pin.style.color = (e.expected || 0) < 0 ? "#ff6b6b" : "#2ee6a8";
+      pin.addEventListener("change", () => { e.expected = parseFloat(pin.value) || 0; saveBanca(); renderBanca(); });
+      profCol.appendChild(pin);
+    } else {
+      const neg = (e.expected || 0) < 0;
+      profCol.appendChild(el("div", "v " + (neg ? "red" : "green"), (neg ? "" : "+") + brl(e.expected)));
+    }
     row.appendChild(profCol);
     const stBtn = el("button", "bank-status" + (e.status === "concluida" ? " done" : ""), e.status === "concluida" ? "✓ Concluída" : "Pendente");
     stBtn.addEventListener("click", () => { e.status = e.status === "concluida" ? "pendente" : "concluida"; saveBanca(); renderBanca(); });
@@ -577,6 +588,31 @@ function renderBanca() {
     row.appendChild(del); list.appendChild(row);
   });
 }
+
+// Lançamento manual de lucro (value bet, subida de odd, aposta de fora do painel)
+(function(){
+  const btn = $("#bank-add-btn"), form = $("#bank-add-form"), err = $("#bm-err");
+  if (!btn) return;
+  const toggle = (show) => {
+    form.classList.toggle("hidden", !show);
+    if (show) { $("#bm-desc").value=""; $("#bm-lucro").value=""; $("#bm-total").value=""; err.style.display="none"; $("#bm-desc").focus(); }
+  };
+  btn.addEventListener("click", () => toggle(form.classList.contains("hidden")));
+  $("#bm-cancel").addEventListener("click", () => toggle(false));
+  $("#bm-save").addEventListener("click", () => {
+    const desc = ($("#bm-desc").value || "").trim();
+    const lucro = parseFloat($("#bm-lucro").value);
+    const total = parseFloat($("#bm-total").value) || 0;
+    if (!desc) { err.textContent = "Escreva uma descrição."; err.style.display = "block"; return; }
+    if (!isFinite(lucro)) { err.textContent = "Informe o valor do lucro (pode ser negativo)."; err.style.display = "block"; return; }
+    banca.push({
+      id: "m-" + Date.now(), manual: true, event: desc, market: "✍️ Lançamento manual",
+      sport: "?", profit_pct: null, total: total, expected: lucro, status: "concluida",
+      legs: [], jogo: "", created: new Date().toLocaleDateString("pt-BR"),
+    });
+    saveBanca(); toggle(false); renderBanca();
+  });
+})();
 
 // ---------- Abas ----------
 function switchView(v) {
