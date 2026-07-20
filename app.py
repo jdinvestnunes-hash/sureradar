@@ -759,17 +759,20 @@ def _abacate_v2_key():
 
 def _abacate_produto_id(plano, p):
     """Garante que o produto do plano existe na AbacatePay (v2) e devolve o prod_id.
-    Idempotente por externalId 'pro-<plano>': acha o existente ou cria um novo."""
-    if plano in _abacate_prod_cache:
-        return _abacate_prod_cache[plano]
-    ext = "pro-" + plano
+
+    ⚠️ No checkout v2 o PREÇO vem do PRODUTO (não do config). Por isso o externalId
+    carrega o preço em centavos: se você mudar o valor no config, o id muda e um
+    produto NOVO é criado com o preço certo (senão continuaria cobrando o antigo)."""
+    ext = "pro-%s-%d" % (plano, int(round(p["valor"] * 100)))
+    if ext in _abacate_prod_cache:
+        return _abacate_prod_cache[ext]
     hdr = {"Authorization": "Bearer " + _abacate_v2_key()}
     try:
         r = requests.get(_ABACATE_V2 + "/products/list", headers=hdr, timeout=8)
         if r.ok:
             for prod in ((r.json() or {}).get("data") or []):
                 if prod.get("externalId") == ext and prod.get("id"):
-                    _abacate_prod_cache[plano] = prod["id"]
+                    _abacate_prod_cache[ext] = prod["id"]
                     return prod["id"]
     except requests.RequestException:
         pass
@@ -782,7 +785,7 @@ def _abacate_produto_id(plano, p):
     pid = ((r.json() or {}).get("data") or {}).get("id")
     if not pid:
         raise RuntimeError("produto criado sem id")
-    _abacate_prod_cache[plano] = pid
+    _abacate_prod_cache[ext] = pid
     return pid
 
 
@@ -802,10 +805,10 @@ def _abacate_prewarm_produtos():
     except requests.RequestException:
         pass
     for plano, p in config.PLANOS.items():
-        ext = "pro-" + plano
+        ext = "pro-%s-%d" % (plano, int(round(p["valor"] * 100)))   # id carrega o preço
         if ext in existentes:
-            _abacate_prod_cache[plano] = existentes[ext]
-        elif plano not in _abacate_prod_cache:
+            _abacate_prod_cache[ext] = existentes[ext]
+        elif ext not in _abacate_prod_cache:
             try:
                 _abacate_produto_id(plano, p)
             except Exception as e:
