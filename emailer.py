@@ -227,7 +227,7 @@ def enviar_parcelamento(to: str, nome: str, unsub_url: str = "") -> bool:
         "Agora dá pra dividir:\n"
         "• Trimestral em até 3x\n"
         "• Semestral em até 6x\n"
-        "• Anual em até 12x — sai por só ~R$ 41/mês (em vez de R$ 97 do mensal)\n\n"
+        "• Anual em até 12x — sai por só ~R$ 41/mês (em vez de R$ 147 do mensal)\n\n"
         "Com 1 ou 2 entradas do próprio SureRadar você já paga a mensalidade — e ainda tem "
         "garantia de 7 dias: se não fizer sentido, devolvemos 100%.\n\n"
         "Parcelar agora: {url}/planos\n\n"

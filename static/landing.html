@@ -51,7 +51,7 @@
     "description": "Plataforma de apostas certas (surebets) com lucro garantido de 1% a 15% por entrada, nas casas de aposta do Brasil.",
     "offers": [
       {"@type": "Offer", "name": "Grátis", "price": "0", "priceCurrency": "BRL"},
-      {"@type": "Offer", "name": "Pro Mensal", "price": "97", "priceCurrency": "BRL"},
+      {"@type": "Offer", "name": "Pro Mensal", "price": "147", "priceCurrency": "BRL"},
       {"@type": "Offer", "name": "Pro Anual", "price": "497", "priceCurrency": "BRL"}
     ],
     "aggregateRating": {"@type": "AggregateRating", "ratingValue": "4.8", "reviewCount": "312"}
@@ -463,10 +463,10 @@
     </div>
 
     <div class="plan pop">
-      <div class="badge">⭐ MAIS ESCOLHIDO · 57% OFF</div>
+      <div class="badge">⭐ MAIS ESCOLHIDO · 72% OFF</div>
       <div class="pname">Pro Anual</div>
       <div class="price">R$ 497<small>/ano</small></div>
-      <div class="pnote">sai por <b>R$ 41/mês</b> · <span class="save">economize R$ 667</span></div>
+      <div class="pnote">sai por <b>R$ 41/mês</b> · <span class="save">economize R$ 1.267</span></div>
       <ul>
         <li><span class="ck">✓</span> <b>TODAS as entradas — de 1% a 15%+</b></li>
         <li><span class="ck">✓</span> Sem limite de entradas por dia</li>
@@ -481,7 +481,7 @@
 
     <div class="plan">
       <div class="pname">Pro Mensal</div>
-      <div class="price">R$ 97<small>/mês</small></div>
+      <div class="price">R$ 147<small>/mês</small></div>
       <div class="pnote">cancele quando quiser</div>
       <ul>
         <li><span class="ck">✓</span> <b>TODAS as entradas — de 1% a 15%+</b></li>
@@ -579,7 +579,7 @@ function calc(){
   document.getElementById('o-mes').textContent = fmt(mes);
   document.getElementById('o-ano').textContent = fmt(mes*12);
   document.getElementById('o-rf').textContent = fmt(banca*0.01);
-  const x = mes/97;
+  const x = mes/147;
   document.getElementById('o-x').textContent = (x>=10 ? Math.round(x) : x.toFixed(1).replace('.',',')) + '×';
 }
 ['r-banca','r-ent','r-tx'].forEach(id=>document.getElementById(id).addEventListener('input',calc));

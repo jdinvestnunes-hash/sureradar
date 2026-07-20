@@ -169,7 +169,7 @@ async function load(){
   try {
     const _p = new URLSearchParams(location.search);
     if (_p.get("pago") === "1" && window.gtag) {
-      const _val = (d.dias != null && d.dias > 60) ? 497.0 : 97.0; // anual vs mensal
+      const _val = (d.dias != null && d.dias > 60) ? 497.0 : 147.0; // anual vs mensal
       gtag('event', 'conversion', {
         'send_to': 'AW-17915571478/_s7-CK2V6sscEJba595C',
         'value': _val, 'currency': 'BRL',
@@ -237,7 +237,7 @@ async function load(){
     const ORDER = {mensal:1, trimestral:2, semestral:3, anual:4};
     const UP = {
       trimestral: {nome:"Trimestral", preco:"R$ 237", extra:"3 meses"},
-      semestral:  {nome:"Semestral",  preco:"R$ 387", extra:"6 meses · 33% OFF"},
+      semestral:  {nome:"Semestral",  preco:"R$ 387", extra:"6 meses · 56% OFF"},
       anual:      {nome:"Anual",       preco:"R$ 497", extra:"1 ano · só R$ 41/mês"},
     };
     const _ts = v => (v==null?0:(typeof v==="number"?v:(Date.parse(v)||0)));
@@ -279,9 +279,9 @@ async function load(){
         <li><span class="ck">✓</span> Sem limite de entradas por dia</li>
         <li><span class="ck">✓</span> Alertas prioritários no Telegram</li>
       </ul>
-      <button class="btn btn-primary" id="up-anual">Assinar Pro Anual — R$ 497/ano (economize 57%)</button>
+      <button class="btn btn-primary" id="up-anual">Assinar Pro Anual — R$ 497/ano (economize 72%)</button>
       <div style="height:10px"></div>
-      <button class="btn btn-ghost" id="up-mensal" style="width:100%">Assinar Pro Mensal — R$ 97/mês</button>
+      <button class="btn btn-ghost" id="up-mensal" style="width:100%">Assinar Pro Mensal — R$ 147/mês</button>
       <p style="font-size:12px;color:var(--mute);margin-top:12px;text-align:center">🔒 Pagamento seguro · Garantia de 7 dias</p>`;
     // Vão pra tela de planos (com Cartão/Pix). Já rola pro plano escolhido.
     $("#up-anual").onclick = ()=>location.href="/planos#anual";
