@@ -2054,12 +2054,21 @@ def _converter_raspagem(records):
 
 @app.get("/api/valuebets")
 def valuebets(request: Request):
-    """Odds de valor pro painel (aba BETA). Só quem tem a aba liberada recebe dados;
-    os outros recebem lista vazia (a aba nem aparece pra eles). ISOLADO da surebet."""
+    """Odds de valor pro painel. As odds são SEMPRE de verdade — inclusive pra quem
+    não comprou o add-on: ele vê uma AMOSTRA real (as N mais valiosas) e o painel
+    borra parte pra dar vontade de liberar o resto. Quem tem o add-on recebe TODAS,
+    com os links diretos das entradas. ISOLADO da surebet."""
     user = _usuario(request)
-    if not _valor_liberado(user):
-        return {"itens": []}
-    return {"itens": valor_feed.get_valuebets()}
+    tem = _valor_liberado(user)
+    itens = valor_feed.get_valuebets()
+    if tem:
+        return {"itens": itens, "tem": True}
+    # Sem add-on: manda só uma amostra real (as de maior % acima do justo), pra não
+    # entregar o feed inteiro de graça. Sem o link direto — o atalho da entrada é do
+    # pagante; a amostra ainda funciona pelo botão "IR PRA CASA" (site da casa).
+    amostra = sorted(itens, key=lambda i: i.get("valor", 0), reverse=True)[:config.VALOR_AMOSTRA_FREE]
+    amostra = [{**i, "link": None} for i in amostra]
+    return {"itens": amostra, "tem": False}
 
 
 @app.post("/api/ingest-valor")

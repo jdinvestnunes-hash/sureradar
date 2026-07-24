@@ -145,6 +145,11 @@ FREE_LUCRO_MAX = 2.0
 FREE_MAX_ENTRADAS = 25     # FREE vê as 25 primeiras de 0 a 1%
 PRO_LUCRO_MIN = 1.0001     # PRO vê TUDO acima de 1% (até o teto são de 25%)
 
+# Odds Erradas (add-on avulso): quem NÃO comprou vê uma amostra REAL desse tamanho
+# (as de maior % acima do justo). O painel deixa 2 abertas e borra o resto — é o
+# gancho pra pagar. Quem tem o add-on recebe todas.
+VALOR_AMOSTRA_FREE = 6
+
 # Ligas a monitorar (keys da The Odds API). Ajustadas para o que está EM
 # TEMPORADA agora (jul/2026).
 ESPORTES = [
