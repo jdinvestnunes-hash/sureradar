@@ -100,6 +100,11 @@ async def lifespan(app):
         if cache:
             feed.merge_surebets(cache, quando=pipeline._agora_iso() + " (cache)")
             print(f">> Feed restaurado do cache: {len(cache)} surebets.")
+        # Mesma coisa pras ODDS ERRADAS: restaura do banco pra não zerar no deploy.
+        cache_valor = auth.valor_cache_get()
+        if cache_valor:
+            valor_feed.merge_valuebets(cache_valor)
+            print(f">> Odds erradas restauradas do cache: {len(cache_valor)}.")
         _recalcular_filtros()          # filtro = catálogo inteiro (mesmo sem cache)
     except Exception as e:
         print(f"!! Falha ao restaurar feed do cache: {e}")
@@ -2142,6 +2147,11 @@ def ingest_valor(request: Request, payload: dict = Body(...)):
         except (TypeError, ValueError):
             continue
     valor_feed.merge_valuebets(itens)
+    # persiste as odds vivas pra sobreviver a redeploys (igual às surebets)
+    try:
+        auth.valor_cache_set(valor_feed.get_valuebets())
+    except Exception:
+        pass
     return {"ok": True, "recebidos": len(itens)}
 
 

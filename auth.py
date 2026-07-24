@@ -1197,6 +1197,39 @@ def feed_cache_set(bets):
         print("!! feed_cache_set:", e)
 
 
+# Cache das ODDS ERRADAS (valuebets) — linha id=4 da mesma tabela feed_cache.
+# Sobrevive a redeploys igual às surebets: o feed em memória zera no restart e a
+# gente restaura no startup, então o painel nunca fica vazio depois de um deploy.
+def valor_cache_get():
+    import json
+    try:
+        with _db() as c:
+            row = c.execute(_q("SELECT dados FROM feed_cache WHERE id=4")).fetchone()
+        if row:
+            d = json.loads(row["dados"])
+            return d if isinstance(d, list) else []
+    except Exception as e:
+        print("!! valor_cache_get:", e)
+    return []
+
+
+def valor_cache_set(itens):
+    import json
+    dados = json.dumps(itens or [], ensure_ascii=False)
+    agora = time.time()
+    try:
+        with _db() as c:
+            if PG:
+                c.execute(_q("""INSERT INTO feed_cache(id,dados,atualizado) VALUES(4,?,?)
+                               ON CONFLICT (id) DO UPDATE SET dados=EXCLUDED.dados,
+                               atualizado=EXCLUDED.atualizado"""), (dados, agora))
+            else:
+                c.execute("INSERT OR REPLACE INTO feed_cache(id,dados,atualizado) VALUES(4,?,?)",
+                          (dados, agora))
+    except Exception as e:
+        print("!! valor_cache_set:", e)
+
+
 def catalogo_get():
     """Catálogo ACUMULADO de casas/esportes já vistos (linha id=2). O filtro
     sempre mostra TODAS as casas já raspadas — nunca encolhe, mesmo que uma
