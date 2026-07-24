@@ -1031,16 +1031,20 @@ def _valor_liberado(user):
     """Aba 'Odds Erradas das Casas': quem comprou o add-on (avulso ou no order bump)
     e os e-mails do beta em VALUEBET_BETA_EMAILS. A aba aparece pra todo mundo — quem
     não comprou vê só uma amostra, o resto borrado."""
-    # Modo vitrine de lançamento: NINGUÉM tem acesso total (nem PRO, nem quem comprou).
-    # Todo mundo cai na amostra borrada. Desliga com a env VALOR_TEASER_GERAL=0.
+    # E-mails liberados na mão (demo/gravação de vídeo) entram SEMPRE, mesmo no modo
+    # vitrine. É o caso do Leo: vê tudo desbloqueado, como se tivesse pago.
+    emails = [e.strip().lower() for e in (config.VALUEBET_BETA_EMAILS or "").split(",") if e.strip()]
+    if user and user.get("email", "").strip().lower() in emails:
+        return True
+    # Modo vitrine de lançamento: NINGUÉM MAIS tem acesso total (nem PRO, nem quem
+    # comprou). Todo mundo cai na amostra borrada. Desliga com a env VALOR_TEASER_GERAL=0.
     if config.VALOR_TEASER_GERAL:
         return False
     if not user:
         return False
     if auth.valor_dias_restantes(user):
         return True
-    emails = [e.strip().lower() for e in (config.VALUEBET_BETA_EMAILS or "").split(",") if e.strip()]
-    return user.get("email", "").strip().lower() in emails
+    return False
 
 
 def _alerta_liberado(user):
