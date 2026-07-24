@@ -758,9 +758,12 @@ function valorOpEl(v, locked) {
   if (link && !locked) box.addEventListener("click", () => window.open(link, "_blank", "noopener"));
   odds.appendChild(box);
 
-  // referência de preço: o que a casa paga x o que valeria, e quanto arriscar
+  // referência de preço: a chance real do lance, o que valeria e quanto arriscar.
+  // A prob vem da raspagem (data-probability); em item antigo/sem prob, deduz da justa.
+  const prob = Number(v.prob || (v.justa > 0 ? 100 / v.justa : 0));
   odds.appendChild(el("div", "op-ref",
-    `<span>Odd justa <b>${Number(v.justa || 0).toFixed(2)}</b></span>` +
+    (prob > 0 ? `<span title="Chance real do lance acontecer, segundo as casas mais precisas do mercado">Chance real <b>${prob.toFixed(1)}%</b></span>` : "") +
+    `<span title="Odd que pagaria essa chance sem margem da casa">Odd justa <b>${Number(v.justa || 0).toFixed(2)}</b></span>` +
     `<span>Sugerido <b>${v.stake || 2}% da banca</b></span>`));
   body.appendChild(odds);
   op.appendChild(body);

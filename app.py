@@ -2091,6 +2091,9 @@ def ingest_valor(request: Request, payload: dict = Body(...)):
                 "odd": round(odd, 2),
                 "valor": round(valor, 1),
                 "justa": justa,
+                # chance real do lance (%) — é a referência das casas fortes; o
+                # painel mostra pro cliente entender de onde sai a "odd justa"
+                "prob": round(prob if prob > 0 else (100.0 / justa if justa > 0 else 0), 1),
                 "stake": r.get("stake") or 2,
                 "link": _link_casa(r.get("link")),
             })

@@ -344,7 +344,7 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 17p
 .op-valor .op-return { background: linear-gradient(90deg, #a98bff, #7f5bff); }
 .op-valor .op-calc:hover { color: #c9a2ff; }
 /* linha de referência (odd justa x stake sugerida) dentro do card */
-.op-ref { display: flex; justify-content: space-between; gap: 10px; margin-top: 11px; padding-top: 10px; border-top: 1px dashed var(--border-soft); font-size: 11.5px; color: var(--text-mute); }
+.op-ref { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 10px; margin-top: 11px; padding-top: 10px; border-top: 1px dashed var(--border-soft); font-size: 11.5px; color: var(--text-mute); }
 .op-ref b { color: var(--text); font-variant-numeric: tabular-nums; }
 
 /* Banner do plano e botão de filtros — só aparecem no mobile */
