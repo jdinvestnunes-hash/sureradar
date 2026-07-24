@@ -2116,13 +2116,20 @@ def ingest_valor(request: Request, payload: dict = Body(...)):
             prob = float(r.get("probabilidade") or 0)
             # odd justa = 1/prob real (a prob vem das casas fortes, referência)
             justa = round(100.0 / prob, 2) if prob > 0 else round(float(r.get("justa") or 0), 2)
+            event = (r.get("event") or "").strip()
+            mercado = (r.get("mercado") or "").strip()
+            casa = (r.get("casa") or "").strip()
             itens.append({
+                # id estável (evento|mercado|casa) pro merge por id no valor_feed:
+                # a MESMA odd que reaparece atualiza no lugar (renova preço + tempo),
+                # em vez de o painel piscar vazio a cada troca de leva.
+                "id": (event + "|" + mercado + "|" + casa).lower(),
                 "ico": r.get("ico") or _sport_ico(r.get("esporte", "")),
                 "esporte": r.get("esporte") or "",
                 "hora": r.get("hora") or _hora_br(r.get("start")),
-                "event": (r.get("event") or "").strip(),
-                "mercado": (r.get("mercado") or "").strip(),
-                "casa": (r.get("casa") or "").strip(),
+                "event": event,
+                "mercado": mercado,
+                "casa": casa,
                 "odd": round(odd, 2),
                 "valor": round(valor, 1),
                 "justa": justa,
@@ -2134,7 +2141,7 @@ def ingest_valor(request: Request, payload: dict = Body(...)):
             })
         except (TypeError, ValueError):
             continue
-    valor_feed.set_valuebets(itens)
+    valor_feed.merge_valuebets(itens)
     return {"ok": True, "recebidos": len(itens)}
 
 
