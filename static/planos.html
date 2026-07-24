@@ -64,6 +64,32 @@
     .seg-opt.on{background:var(--grad);color:#052015}
     .seg-opt:not(.on):hover{color:var(--text)}
 
+    /* ---- Order bump: caixinha das "Odds Erradas das Casas" dentro do card do plano ---- */
+    .bump{display:flex;gap:11px;align-items:flex-start;cursor:pointer;margin-bottom:12px;padding:13px 14px;border-radius:14px;background:rgba(169,139,255,.09);border:1px dashed rgba(169,139,255,.5);transition:.15s}
+    .bump:hover{background:rgba(169,139,255,.16);border-color:rgba(169,139,255,.8)}
+    .bump input{appearance:none;-webkit-appearance:none;width:20px;height:20px;flex-shrink:0;margin-top:1px;border:1.5px solid rgba(169,139,255,.7);border-radius:6px;background:var(--bg);cursor:pointer;position:relative}
+    .bump input:checked{background:#a98bff;border-color:#a98bff}
+    .bump input:checked::after{content:"✓";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#0b0b12;font-size:13px;font-weight:900}
+    .bump-txt{font-size:12.5px;color:var(--dim);line-height:1.5}
+    .bump-txt b{display:block;color:#c9a2ff;font-size:13px;margin-bottom:2px}
+
+    /* ---- Add-on avulso (quem já é PRO compra só as Odds Erradas) ---- */
+    .addon{max-width:720px;margin:34px auto 8px;background:linear-gradient(150deg,rgba(169,139,255,.13),var(--card) 62%);border:1.5px solid rgba(169,139,255,.45);border-radius:22px;padding:28px 26px}
+    .addon.flash{box-shadow:0 0 0 3px rgba(169,139,255,.35);transition:box-shadow .4s}
+    .addon-top{display:flex;align-items:baseline;justify-content:space-between;gap:16px;flex-wrap:wrap}
+    .addon h2{font-family:var(--font-d);font-size:22px;font-weight:800;letter-spacing:-.02em}
+    .addon .price{font-size:34px;margin:0}
+    .addon .price small{font-size:14px}
+    .addon p{color:var(--dim);font-size:14px;line-height:1.6;margin-top:12px}
+    .addon p b{color:var(--text)}
+    .addon ul{list-style:none;margin:18px 0;display:flex;flex-direction:column;gap:9px}
+    .addon li{font-size:13.5px;color:var(--dim);display:flex;gap:10px;line-height:1.45}
+    .addon li .ck{color:#c9a2ff;font-weight:900;flex-shrink:0}
+    .addon .pay-row{max-width:420px}
+    .btn-valor{background:linear-gradient(90deg,#a98bff,#7f5bff);color:#0b0b12;box-shadow:0 12px 30px rgba(169,139,255,.25)}
+    .btn-valor:hover{filter:brightness(1.08);transform:translateY(-1px)}
+    .addon-nota{font-size:12px;color:var(--mute);margin-top:12px;text-align:center}
+
     .modal-bg{position:fixed;inset:0;background:rgba(3,5,10,.72);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;z-index:50;padding:20px}
     .modal-bg.show{display:flex}
     .modal{background:var(--card);border:1px solid var(--line2);border-radius:20px;padding:28px;max-width:420px;width:100%;box-shadow:0 30px 80px rgba(0,0,0,.5)}
@@ -140,6 +166,11 @@
         <li><span class="ck">✓</span> Todas as casas e mercados</li>
         <li><span class="ck">✓</span> Suporte exclusivo</li>
       </ul>
+      <label class="bump">
+        <input type="checkbox" data-bump />
+        <span class="bump-txt"><b>💎 Adicionar Odds Erradas das Casas — R$ 47</b>
+          30 dias de acesso à aba onde a casa <b style="display:inline">errou o preço</b> e paga acima do justo. Vai junto no mesmo pagamento.</span>
+      </label>
       <div class="pay-row">
         <button class="btn btn-primary" data-pay="cartao">💳 Cartão</button>
         <button class="btn btn-pix" data-pay="pix">⚡ Pix</button>
@@ -163,6 +194,11 @@
         <li><span class="ck">✓</span> Todas as casas e mercados</li>
         <li><span class="ck">✓</span> Suporte exclusivo</li>
       </ul>
+      <label class="bump">
+        <input type="checkbox" data-bump />
+        <span class="bump-txt"><b>💎 Adicionar Odds Erradas das Casas — R$ 47</b>
+          30 dias de acesso à aba onde a casa <b style="display:inline">errou o preço</b> e paga acima do justo. Vai junto no mesmo pagamento.</span>
+      </label>
       <div class="pay-row">
         <button class="btn btn-ghost" data-pay="cartao">💳 Cartão</button>
         <button class="btn btn-pix" data-pay="pix">⚡ Pix</button>
@@ -175,6 +211,26 @@
     💳 <b style="color:var(--dim)">Cartão</b> = parcele em até 12x (Anual).
     &nbsp;·&nbsp; ⚡ <b style="color:var(--dim)">Pix</b> = à vista, aprovação na hora.
   </p>
+
+  <!-- ADD-ON AVULSO: pra quem já tem plano (ou só quer as odds erradas) -->
+  <div class="addon" id="addon-box" data-plano="valor">
+    <div class="addon-top">
+      <h2>💎 Odds Erradas das Casas</h2>
+      <div class="price">R$ 47<small>/30 dias</small></div>
+    </div>
+    <p>A casa <b>errou o preço</b> e está pagando <b>acima do justo</b> — 1 aposta, 1 casa. Não é lucro garantido como a surebet: o lucro vem <b>no volume</b>, com disciplina. Compra <b>à parte do plano</b>, não mexe na sua assinatura.</p>
+    <ul>
+      <li><span class="ck">✓</span> Todas as odds erradas do dia, sem borrado</li>
+      <li><span class="ck">✓</span> Odd justa + stake sugerida em cada entrada</li>
+      <li><span class="ck">✓</span> Filtro por casa e por % acima do justo</li>
+      <li><span class="ck">✓</span> 30 dias — renovou antes de vencer, os dias somam</li>
+    </ul>
+    <div class="pay-row">
+      <button class="btn btn-valor" data-pay="cartao">💳 Cartão</button>
+      <button class="btn btn-pix" data-pay="pix">⚡ Pix</button>
+    </div>
+    <div class="addon-nota">Pagamento único de R$ 47 — não é assinatura, não renova sozinho.</div>
+  </div>
 
   <div class="guarantee">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l8 3v6c0 4.5-3.2 8-8 9-4.8-1-8-4.5-8-9V6l8-3z"/><path d="M9 12l2 2 4-4"/></svg>
@@ -227,9 +283,9 @@ let ME_WHATS = "";   // WhatsApp salvo no cadastro (prefill do celular no Pix)
 fetch("/api/me").then(r => r.ok ? r.json() : null).then(d => { if (d) ME_WHATS = (d.whatsapp || "").replace(/\D/g, ""); }).catch(() => {});
 // pré-cria o customer da AbacatePay (email preenchido + cartão mais rápido no clique)
 fetch("/api/checkout/prep").catch(() => {});
-function abrirPix(plano, btn, metodo){
+function abrirPix(plano, btn, metodo, extras){
   metodo = metodo || 'pix';
-  pixCtx = {plano, btn, metodo}; $id('pix-err').textContent='';
+  pixCtx = {plano, btn, metodo, extras: extras || {}}; $id('pix-err').textContent='';
   const cartao = metodo === 'cartao';
   $id('pix-title').textContent = cartao ? '💳 Pagar com cartão' : '⚡ Pagar com Pix';
   $id('pix-sub').textContent = cartao
@@ -264,7 +320,8 @@ $id('pix-go').onclick = ()=>{
   if (cpf.length !== 11){ $id('pix-err').textContent = 'CPF inválido — 11 dígitos.'; return; }
   if (cel.length < 10 || cel.length > 11){ $id('pix-err').textContent = 'Celular inválido — inclua o DDD.'; return; }
   fecharPix();
-  pagar(pixCtx.plano, pixCtx.metodo, pixCtx.btn, {cpf, celular: cel});
+  // leva junto o que o card mandou (ex.: addon=true do order bump)
+  pagar(pixCtx.plano, pixCtx.metodo, pixCtx.btn, Object.assign({cpf, celular: cel}, pixCtx.extras));
 };
 
 // ---- Seletor de período (Mensal/Trimestral · Semestral/Anual) ----
@@ -307,12 +364,26 @@ document.querySelectorAll('.seg-opt').forEach(opt=>{
 
 document.querySelectorAll('[data-pay]').forEach(b=>{
   b.addEventListener('click', ()=>{
-    const metodo = b.dataset.pay;                    // 'cartao' | 'pix'
-    const plano = b.closest('.plan').dataset.plano;  // plano selecionado no seletor do card
-    if (metodo === 'pix') abrirPix(plano, b, 'pix'); // Pix (v1) pede CPF no modal
-    else pagar(plano, metodo, b);                    // Cartão (v2) coleta CPF na tela da AbacatePay
+    const metodo = b.dataset.pay;                       // 'cartao' | 'pix'
+    const card = b.closest('[data-plano]');             // card do plano OU o bloco do add-on
+    const plano = card.dataset.plano;                   // 'mensal'... ou 'valor' (add-on avulso)
+    const bump = card.querySelector('[data-bump]');     // caixinha das Odds Erradas marcada?
+    const extras = bump && bump.checked ? {addon:true} : {};
+    if (metodo === 'pix') abrirPix(plano, b, 'pix', extras); // Pix (v1) pede CPF no modal
+    else pagar(plano, metodo, b, extras);               // Cartão (v2) coleta CPF na tela da AbacatePay
   });
 });
+
+// ---- Veio do painel pelo botão "Desbloquear" das Odds Erradas (/planos?addon=1) ----
+(function(){
+  if (new URLSearchParams(location.search).get('addon') !== '1') return;
+  const box = document.getElementById('addon-box'); if (!box) return;
+  setTimeout(()=>{
+    box.scrollIntoView({behavior:'smooth', block:'center'});
+    box.classList.add('flash');
+    setTimeout(()=>box.classList.remove('flash'), 1800);
+  }, 250);
+})();
 </script>
 </body>
 </html>

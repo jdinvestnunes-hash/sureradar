@@ -300,6 +300,53 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 17p
 .up-list { list-style: none; padding: 0; margin: 20px 0; text-align: left; display: flex; flex-direction: column; gap: 10px; }
 .up-list li { font-size: 14px; font-weight: 500; }
 
+/* ---------- Odds Erradas das Casas (valuebets) ----------
+   Reusa TODO o esqueleto das surebets (.layout/.sidebar/.content/.grid/.op) —
+   só troca o sotaque de cor pra roxo, deixando claro que NÃO é lucro garantido. */
+.valor-top {
+  display: flex; align-items: center; justify-content: space-between; gap: 18px; flex-wrap: wrap;
+  margin-bottom: 16px; padding: 15px 20px; border-radius: var(--radius);
+  background: linear-gradient(100deg, rgba(169,139,255,.15), rgba(56,212,245,.05) 55%, transparent);
+  border: 1px solid rgba(169,139,255,.3);
+}
+.valor-top h2 { margin: 0; font-size: 18px; font-weight: 800; letter-spacing: -0.01em; }
+.valor-top p { margin: 5px 0 0; font-size: 13px; color: var(--text-dim); line-height: 1.55; max-width: 640px; }
+.valor-top p b { color: var(--text); }
+.valor-help {
+  background: rgba(169,139,255,.14); border: 1px solid rgba(169,139,255,.45); color: #c9a2ff;
+  font-family: inherit; font-weight: 700; font-size: 12.5px; padding: 10px 16px;
+  border-radius: 999px; cursor: pointer; white-space: nowrap; transition: .15s;
+}
+.valor-help:hover { background: rgba(169,139,255,.25); }
+
+/* faixa que vende o add-on (só pra quem ainda não comprou) */
+.valor-cta {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+  margin-bottom: 14px; padding: 14px 18px; border-radius: var(--radius);
+  background: linear-gradient(100deg, rgba(169,139,255,.18), rgba(169,139,255,.05) 70%);
+  border: 1px solid rgba(169,139,255,.38);
+}
+.valor-cta b { display: block; font-size: 14px; font-weight: 800; }
+.valor-cta span { display: block; margin-top: 3px; font-size: 12.5px; color: var(--text-dim); }
+.valor-cta-btn {
+  background: linear-gradient(90deg, #a98bff, #7f5bff); border: 0; color: #0b0b12;
+  font-family: inherit; font-weight: 800; font-size: 13px; padding: 11px 20px;
+  border-radius: 999px; cursor: pointer; white-space: nowrap; transition: .15s;
+}
+.valor-cta-btn:hover { filter: brightness(1.1); transform: translateY(-1px); }
+
+.op-valor { border-color: rgba(169,139,255,.3); }
+.op-valor:hover { border-color: rgba(169,139,255,.62); }
+.op-valor .op-market { color: #c9a2ff; }
+.op-valor .op-box-book { color: #c9a2ff; }
+.op-valor .op-box:hover { border-color: #a98bff; }
+.op-valor .op-box-odd { color: #c9a2ff; }
+.op-valor .op-return { background: linear-gradient(90deg, #a98bff, #7f5bff); }
+.op-valor .op-calc:hover { color: #c9a2ff; }
+/* linha de referência (odd justa x stake sugerida) dentro do card */
+.op-ref { display: flex; justify-content: space-between; gap: 10px; margin-top: 11px; padding-top: 10px; border-top: 1px dashed var(--border-soft); font-size: 11.5px; color: var(--text-mute); }
+.op-ref b { color: var(--text); font-variant-numeric: tabular-nums; }
+
 /* Banner do plano e botão de filtros — só aparecem no mobile */
 #plano-banner { display: none; }
 .btn-filtros { display: none; }

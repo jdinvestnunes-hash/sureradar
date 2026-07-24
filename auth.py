@@ -276,6 +276,8 @@ def init():
     # Migrações leves para bancos antigos: cada ALTER na SUA transação (no
     # Postgres, um erro aborta a transação inteira). Erro = coluna já existe.
     for tabela, coluna in [("checkouts", "pi TEXT"),
+                           ("checkouts", "addon TEXT"),
+                           ("users", f"valor_expira {_NUM}"),
                            ("users", f"plano_expira {_NUM}"),
                            ("users", "whatsapp TEXT"),
                            ("users", f"email_verificado {_NUM} DEFAULT 1"),
@@ -312,10 +314,19 @@ def _hash(senha: str, salt: bytes) -> bytes:
     return hashlib.pbkdf2_hmac("sha256", senha.encode(), bytes(salt), 120_000)
 
 
+def _col(row, nome):
+    """Lê uma coluna que pode ainda não existir (banco antigo, antes da migração)."""
+    try:
+        return row[nome]
+    except (KeyError, IndexError):
+        return None
+
+
 def _perfil(row):
     return {
         "id": row["id"], "nome": row["nome"], "email": row["email"],
         "plano": row["plano"], "plano_expira": row["plano_expira"],
+        "valor_expira": _col(row, "valor_expira"),
     }
 
 
@@ -904,18 +915,21 @@ def voltar_free(user_id: int):
 # ---------------------------------------------------------------------------
 # Checkouts / pagamentos (Stripe, AbacatePay)
 # ---------------------------------------------------------------------------
-def checkout_registrar(provider, external_id, user_id, plano, dias, valor, metodo):
-    args = (provider, external_id, user_id, plano, dias, valor, metodo, "pendente", time.time())
+def checkout_registrar(provider, external_id, user_id, plano, dias, valor, metodo, addon=None):
+    """`addon='valor'` = a pessoa marcou o order bump das Odds Erradas junto do plano
+    (o webhook libera os dois). `plano='valor'` = comprou SÓ o add-on, avulso."""
+    args = (provider, external_id, user_id, plano, dias, valor, metodo, "pendente",
+            time.time(), addon)
     with _db() as c:
         if PG:
             c.execute(_q("""INSERT INTO checkouts
-                (provider,external_id,user_id,plano,dias,valor,metodo,status,criado)
-                VALUES(?,?,?,?,?,?,?,?,?)
+                (provider,external_id,user_id,plano,dias,valor,metodo,status,criado,addon)
+                VALUES(?,?,?,?,?,?,?,?,?,?)
                 ON CONFLICT (provider,external_id) DO NOTHING"""), args)
         else:
             c.execute("""INSERT OR IGNORE INTO checkouts
-                (provider,external_id,user_id,plano,dias,valor,metodo,status,criado)
-                VALUES(?,?,?,?,?,?,?,?,?)""", args)
+                (provider,external_id,user_id,plano,dias,valor,metodo,status,criado,addon)
+                VALUES(?,?,?,?,?,?,?,?,?,?)""", args)
 
 
 def checkout_pagar(provider, external_id, pi=None):
@@ -931,9 +945,22 @@ def checkout_pagar(provider, external_id, pi=None):
             return dict(row)             # já processado
         c.execute(_q("UPDATE checkouts SET status='pago', pi=? WHERE id=? AND status='pendente'"),
                   (pi, row["id"]))
+    _liberar_compra(row)
+    return dict(row)
+
+
+def _liberar_compra(row):
+    """Entrega o que foi comprado: plano PRO, add-on avulso, ou plano + order bump."""
+    import config
+    addon = config.ADDON_VALOR
+    if row["plano"] == "valor":                       # comprou SÓ as Odds Erradas
+        ativar_valor(row["user_id"], int(row["dias"]), float(row["valor"]),
+                     metodo=row["metodo"])
+        return
     ativar_pro(row["user_id"], row["plano"], int(row["dias"]),
                float(row["valor"]), metodo=row["metodo"])
-    return dict(row)
+    if _col(row, "addon") == "valor":                 # marcou o bump no checkout
+        ativar_valor(row["user_id"], addon["dias"], addon["valor"], metodo=row["metodo"])
 
 
 def assinatura_set(user_id, provider, sub_id, customer_id, plano, dias, valor, status="ativa"):
@@ -986,9 +1013,19 @@ def checkout_revogar_por_pi(pi):
         if not row:
             return None
         c.execute(_q("UPDATE checkouts SET status='estornado' WHERE id=?"), (row["id"],))
-    voltar_free(row["user_id"])
-    print(f">> ESTORNO/chargeback: PRO revogado do user {row['user_id']}")
+    _revogar_compra(row)
+    print(f">> ESTORNO/chargeback: acesso revogado do user {row['user_id']}")
     return dict(row)
+
+
+def _revogar_compra(row):
+    """Desfaz o que a compra tinha liberado (plano PRO e/ou o add-on das odds erradas)."""
+    if row["plano"] == "valor":
+        revogar_valor(row["user_id"])
+        return
+    voltar_free(row["user_id"])
+    if _col(row, "addon") == "valor":
+        revogar_valor(row["user_id"])
 
 
 def checkout_revogar(provider, external_id):
@@ -1002,8 +1039,8 @@ def checkout_revogar(provider, external_id):
         if not row:
             return None
         c.execute(_q("UPDATE checkouts SET status='estornado' WHERE id=?"), (row["id"],))
-    voltar_free(row["user_id"])
-    print(f">> ESTORNO/chargeback ({provider}): PRO revogado do user {row['user_id']}")
+    _revogar_compra(row)
+    print(f">> ESTORNO/chargeback ({provider}): acesso revogado do user {row['user_id']}")
     return dict(row)
 
 
@@ -1425,7 +1462,7 @@ def usuario_da_sessao(token: str):
             return dict(ent[0])
     with _db() as c:
         row = c.execute(_q(
-            """SELECT u.id, u.nome, u.email, u.whatsapp, u.plano, u.plano_expira, s.criado AS s_criado
+            """SELECT u.*, s.criado AS s_criado
                FROM sessions s JOIN users u ON u.id = s.user_id
                WHERE s.token=?"""), (token,)).fetchone()
         if not row:
@@ -1435,7 +1472,8 @@ def usuario_da_sessao(token: str):
             return None
         plano, exp = _normalizar_plano(c, row)
     perfil = {"id": row["id"], "nome": row["nome"], "email": row["email"],
-              "whatsapp": row["whatsapp"], "plano": plano, "plano_expira": exp}
+              "whatsapp": row["whatsapp"], "plano": plano, "plano_expira": exp,
+              "valor_expira": _col(row, "valor_expira")}
     with _sess_lock:
         _sess_cache[token] = (dict(perfil), time.time())
     return perfil
@@ -1458,6 +1496,36 @@ def listar_pagamentos(user_id: int):
             "SELECT valor, plano, metodo, criado FROM pagamentos WHERE user_id=? ORDER BY criado DESC"),
             (user_id,)).fetchall()
     return [dict(r) for r in rows]
+
+
+def ativar_valor(user_id: int, dias: int, valor: float, metodo: str = "manual"):
+    """Libera o add-on 'Odds Erradas das Casas' por N dias. Igual ao PRO: SOMA nos
+    dias que a pessoa já tiver (renovar antes de vencer não perde nada)."""
+    agora = time.time()
+    with _db() as c:
+        atual = c.execute(_q("SELECT valor_expira FROM users WHERE id=?"), (user_id,)).fetchone()
+        base = max(agora, (_col(atual, "valor_expira") or 0)) if atual else agora
+        nova_exp = base + dias * 86400
+        c.execute(_q("UPDATE users SET valor_expira=? WHERE id=?"), (nova_exp, user_id))
+        c.execute(_q("INSERT INTO pagamentos(user_id,valor,plano,metodo,criado) VALUES(?,?,?,?,?)"),
+                  (user_id, valor, "addon-valor", metodo, agora))
+    limpar_cache_sessoes()
+    return nova_exp
+
+
+def revogar_valor(user_id: int):
+    """Tira o add-on (estorno/chargeback ou na mão pelo admin)."""
+    with _db() as c:
+        c.execute(_q("UPDATE users SET valor_expira=NULL WHERE id=?"), (user_id,))
+    limpar_cache_sessoes()
+
+
+def valor_dias_restantes(user):
+    """Dias que faltam do add-on de odds erradas (None = não tem)."""
+    exp = (user or {}).get("valor_expira")
+    if not exp or exp < time.time():
+        return None
+    return max(1, math.ceil((exp - time.time()) / 86400))
 
 
 def ativar_pro(user_id: int, plano: str, dias: int, valor: float, metodo: str = "manual"):

@@ -232,6 +232,11 @@ PLANOS = {
     "anual":      {"nome": "Pro Anual",      "dias": 365, "valor": 497.0},
 }
 
+# ADD-ON "Odds Erradas das Casas" (valuebets). Vendido À PARTE do plano: como
+# ORDER BUMP no checkout (caixinha marcável) ou avulso. Pagamento único que libera
+# N dias de acesso à aba — SOMA nos dias que já tiver, igual o PRO.
+ADDON_VALOR = {"nome": "Odds Erradas das Casas", "dias": 30, "valor": 47.0}
+
 STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "").strip()
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "").strip()
 

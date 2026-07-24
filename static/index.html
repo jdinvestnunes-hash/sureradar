@@ -38,7 +38,7 @@
 
     <nav class="tabs">
       <button class="tab active" data-view="ops" title="Surebets ao vivo">⚽ Surebets</button>
-      <button class="tab" id="tab-valor" data-view="valor" title="Odds erradas das casas (beta)" style="display:none">💎 Odds Erradas das Casas</button>
+      <button class="tab" id="tab-valor" data-view="valor" title="Odds erradas das casas">💎 Odds Erradas das Casas</button>
       <button class="tab" data-view="bank" title="Suas entradas e o lucro">💰 Minha Banca <span id="bank-count" class="tab-badge">0</span></button>
       <button class="tab" data-view="calc" title="Calculadora de surebet">🧮 Calculadora</button>
       <button class="tab" data-view="learn" title="Aprenda a fazer apostas seguras">🎓 Aprenda</button>
@@ -238,13 +238,93 @@
     <div id="view-alertas-body" style="max-width:640px;margin:22px auto 0;padding:0 6px"></div>
   </div>
 
-  <!-- VIEW: ODDS DE VALOR (valuebets) — BETA -->
-  <div class="bank-view hidden" id="view-valor">
-    <div class="bank-head" style="text-align:center">
-      <h1>💎 Odds Erradas das Casas</h1>
-      <p class="subtitle" style="max-width:600px;margin:8px auto 0">A casa <b>errou o preço</b> e está pagando <b>acima do justo</b> — 1 aposta, 1 casa. Não é lucro garantido como a surebet: aqui o lucro vem <b>no volume</b>, com disciplina.</p>
+  <!-- VIEW: ODDS ERRADAS DAS CASAS (valuebets) — mesmo esqueleto das Surebets -->
+  <div class="layout hidden" id="view-valor">
+    <button id="btn-filtros-valor" class="btn-filtros"
+      onclick="document.querySelector('#view-valor .sidebar').classList.toggle('open'); this.classList.toggle('aberto')">⚙ Filtros</button>
+    <aside class="sidebar">
+      <div class="filter-block">
+        <div class="filter-title">Acima do preço justo</div>
+        <label class="slider">
+          <div class="slider-head"><span>Mínimo</span><output id="valor-min-out">todas</output></div>
+          <input type="range" id="valor-min" min="0" max="20" step="0.5" value="0" />
+        </label>
+      </div>
+
+      <div class="filter-block">
+        <div class="filter-title-row">
+          <span class="filter-title">Casas de aposta</span>
+          <div class="filter-actions">
+            <button id="valor-all" class="mini">Todas</button>
+            <button id="valor-none" class="mini">Limpar</button>
+          </div>
+        </div>
+        <div id="valor-casas" class="checks"></div>
+      </div>
+    </aside>
+
+    <main class="content">
+      <div class="valor-top">
+        <div>
+          <h2>💎 Odds Erradas das Casas</h2>
+          <p>A casa <b>errou o preço</b> e está pagando <b>acima do justo</b> — 1 aposta, 1 casa. Não é lucro garantido como a surebet: aqui o lucro vem <b>no volume</b>, com disciplina.</p>
+        </div>
+        <button class="valor-help" id="valor-ajuda">💎 Como funciona?</button>
+      </div>
+
+      <div class="chips" id="valor-chips"></div>
+
+      <div class="list-head">
+        <span id="valor-count">0 odds erradas</span>
+        <span id="valor-fonte" class="muted"></span>
+      </div>
+
+      <div id="valor-cta" class="valor-cta hidden"></div>
+
+      <div id="valor-list" class="grid"></div>
+
+      <div id="valor-empty" class="empty hidden">
+        <div class="empty-icon">💎</div>
+        <h2>Nenhuma odd errada agora</h2>
+        <p>As casas corrigem rápido. Assim que uma errar o preço de novo, aparece aqui.</p>
+      </div>
+    </main>
+  </div>
+
+  <!-- MODAL: explicação das odds erradas (não empurra os cards pra baixo) -->
+  <div id="valor-modal" class="overlay hidden">
+    <div class="modal" style="max-width:600px">
+      <div class="modal-head">
+        <div>
+          <div class="modal-title">💎 O que é uma odd errada?</div>
+          <div class="modal-sub">Leia antes de usar — é diferente da surebet.</div>
+        </div>
+        <button class="icon-btn" id="valor-modal-x">✕</button>
+      </div>
+      <div style="padding:20px 22px 24px">
+        <p style="font-size:13.5px;color:var(--text-dim);line-height:1.65;margin:0 0 14px">É uma aposta <b style="color:var(--text)">normal</b> — 1 casa, 1 resultado. A diferença é que a casa <b style="color:var(--text)">errou o preço</b> e está <b style="color:#c9a2ff">pagando MAIS do que deveria</b>. Você só aproveita esse erro dela.</p>
+        <div style="background:var(--bg);border-radius:14px;padding:14px 16px;margin-bottom:14px">
+          <div style="font-size:12px;color:var(--text-mute);margin-bottom:10px">📊 Exemplo: <b style="color:var(--text)">Flamengo pra vencer</b></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div style="border:1px solid var(--border-soft);border-radius:11px;padding:11px 12px">
+              <div style="font-size:11px;color:var(--text-mute)">Chance real (pelos números)</div>
+              <div style="font-size:17px;font-weight:800;margin-top:2px">54%</div>
+              <div style="font-size:11.5px;color:var(--text-dim)">preço justo: odd 1.85</div>
+            </div>
+            <div style="border:1px solid rgba(169,139,255,.45);border-radius:11px;padding:11px 12px">
+              <div style="font-size:11px;color:#c9a2ff">A casa está pagando</div>
+              <div style="font-size:17px;font-weight:800;margin-top:2px;color:#c9a2ff">odd 2.10</div>
+              <div style="font-size:11.5px;color:#c9a2ff">+13% acima do justo = seu valor</div>
+            </div>
+          </div>
+          <p style="font-size:12.5px;color:var(--text-dim);line-height:1.55;margin:12px 0 0">A odd justa (1.85) vem das <b style="color:var(--text)">casas mais fortes do mundo</b>, que já calculam tudo: força dos times, retrospecto, desfalques, momento. Quando uma casa comum <b>demora pra ajustar</b> e paga 2.10, essa diferença é o <b style="color:#c9a2ff">seu valor</b>.</p>
+        </div>
+        <div style="background:rgba(255,201,77,.1);border:1px solid rgba(255,201,77,.4);border-radius:12px;padding:12px 14px">
+          <div style="font-weight:800;font-size:13.5px;color:#ffdb8a;margin-bottom:5px">⚠️ NÃO é surebet — não é lucro garantido nesta aposta</div>
+          <p style="font-size:12.5px;color:var(--text-dim);line-height:1.6;margin:0">Você <b>pode perder esta</b> (54% de chance ainda deixa 46% de dar errado). O lucro vem no <b style="color:var(--text)">longo prazo</b>: apostando <b>sempre que tem valor</b>, a matemática vira a seu favor — igual o <b>cassino</b>, que não ganha toda rodada, mas <b>sempre ganha no volume</b>. Por isso: aposte <b>a mesma % da banca</b> em cada uma e tenha <b>paciência</b>.</p>
+        </div>
+      </div>
     </div>
-    <div id="view-valor-body" style="max-width:1180px;margin:22px auto 0;padding:0 6px"></div>
   </div>
 
   <!-- MODAL CALCULADORA -->
@@ -309,7 +389,7 @@
     </div>
   </div>
 
-  <script src="/static/app.js?v=17"></script>
+  <script src="/static/app.js?v=18"></script>
 
   <style>
     #view-calc .cv-leg{background:var(--surface2,#121a2b);border:1px solid var(--border,#1b2740);border-radius:14px;padding:16px;margin-bottom:14px}

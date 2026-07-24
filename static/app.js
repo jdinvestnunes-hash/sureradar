@@ -644,7 +644,10 @@ function switchView(v) {
   if (v === "valor") renderValor();
 }
 
-// ---- Odds de Valor (valuebets) — BETA, dados de exemplo p/ ver o visual ----
+// ---- Odds Erradas das Casas (valuebets) ----
+// Usa o MESMO esqueleto das Surebets (.layout + .sidebar + .content + .grid + .op):
+// muda só o conteúdo do card (1 casa, 1 odd) e o sotaque de cor (roxo, pra não
+// confundir com o verde do "retorno certo" da surebet).
 const VALOR_SAMPLE = [
   { ico:"⚽", esporte:"Futebol", hora:"hoje 21:00", event:"Flamengo x Palmeiras", mercado:"Mais de 2.5 gols", casa:"Betano", odd:2.10, valor:13, justa:1.85, stake:2 },
   { ico:"🎾", esporte:"Tênis", hora:"hoje 16:30", event:"Alcaraz x Sinner", mercado:"Alcaraz vence", casa:"Superbet", odd:1.95, valor:9, justa:1.79, stake:1.5 },
@@ -653,7 +656,9 @@ const VALOR_SAMPLE = [
   { ico:"⚽", esporte:"Futebol", hora:"dom 13:30", event:"Man City x Arsenal", mercado:"Mais de 9.5 escanteios", casa:"Betnacional", odd:2.05, valor:8, justa:1.90, stake:1.5 },
   { ico:"🎾", esporte:"Tênis", hora:"seg 10:00", event:"Djokovic x Medvedev", mercado:"Djokovic -3.5 games", casa:"Pixbet", odd:2.20, valor:10, justa:2.00, stake:2 },
 ];
-const VALOR_FREE = 2;   // quantas aparecem liberadas; o resto vem borrado
+const VALOR_FREE = 2;   // quantas aparecem liberadas pra quem NÃO comprou; o resto vem borrado
+// add-on das Odds Erradas: comprado à parte do plano (/api/me manda os números)
+let VALOR_TEM = false, VALOR_PRECO = 47, VALOR_DIAS_ADDON = 30, VALOR_DIAS = null;
 
 // escapa texto que vem da raspagem antes de virar HTML (nome de time/casa pode ter & < >)
 function escH(s) {
@@ -661,12 +666,26 @@ function escH(s) {
     .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
-// Estado da aba (a lista fica guardada pra filtrar por esporte sem ir no servidor)
-let VALOR_ITENS = [], VALOR_REAL = false, VALOR_SPORT = "";
+
+// Estado da aba — a lista fica guardada pra filtrar na tela, sem ir no servidor
+let VALOR_ITENS = [], VALOR_REAL = false, VALOR_SPORT = "", VALOR_MIN = 0;
+let VALOR_OFF = new Set();   // casas DESmarcadas na lateral (casa nova entra marcada)
+let VALOR_BOUND = false;     // listeners da lateral já ligados (só uma vez)
+
+function valorSalvarFiltros() {
+  try { localStorage.setItem("sr_valor_filtros", JSON.stringify({ min: VALOR_MIN, off: [...VALOR_OFF] })); } catch {}
+}
+function valorCarregarFiltros() {
+  try {
+    const d = JSON.parse(localStorage.getItem("sr_valor_filtros") || "{}");
+    VALOR_MIN = Number(d.min) || 0;
+    VALOR_OFF = new Set(Array.isArray(d.off) ? d.off : []);
+  } catch {}
+}
 
 // Card no MESMO padrão das Surebets (.op) — muda só o conteúdo: 1 casa, 1 odd.
 function valorOpEl(v, locked) {
-  const op = el("div", "op");
+  const op = el("div", "op op-valor");
 
   const head = el("div", "op-head");
   const league = el("div", "op-league");
@@ -696,11 +715,9 @@ function valorOpEl(v, locked) {
   odds.appendChild(box);
 
   // referência de preço: o que a casa paga x o que valeria, e quanto arriscar
-  const ref = el("div", null,
-    `<span>Odd justa <b style="color:var(--text,#f2f6fc)">${Number(v.justa || 0).toFixed(2)}</b></span>` +
-    `<span>Sugerido <b style="color:var(--text,#f2f6fc)">${v.stake || 2}% da banca</b></span>`);
-  ref.style.cssText = "display:flex;justify-content:space-between;font-size:11.5px;color:var(--text-mute,#647388);margin-top:10px";
-  odds.appendChild(ref);
+  odds.appendChild(el("div", "op-ref",
+    `<span>Odd justa <b>${Number(v.justa || 0).toFixed(2)}</b></span>` +
+    `<span>Sugerido <b>${v.stake || 2}% da banca</b></span>`));
   body.appendChild(odds);
   op.appendChild(body);
 
@@ -722,7 +739,7 @@ function valorTeaserEl(v) {
   lock.appendChild(el("div", "tl-txt",
     `<span class="ci" style="width:14px;height:14px;margin-right:6px;vertical-align:-2px">${ICONS.lock}</span>Odd errada de <b>+${Number(v.valor || 0).toFixed(1)}%</b>`));
   const btn = el("button", "upgrade-btn", "Desbloquear");
-  btn.addEventListener("click", () => { if (typeof openUpgrade === "function") openUpgrade(); });
+  btn.addEventListener("click", () => { location.href = "/planos?addon=1"; });
   lock.appendChild(btn);
   wrap.appendChild(lock);
   return wrap;
@@ -736,7 +753,8 @@ function renderValorChips() {
   VALOR_ITENS.forEach((v) => { if (v.esporte && !vistos.has(v.esporte)) vistos.set(v.esporte, v.ico || "🎯"); });
   const chips = [{ key: "", label: "Todos", ico: "🌐" }]
     .concat([...vistos].map(([label, ico]) => ({ key: label, label, ico })));
-  if (chips.length <= 2) return;                 // um esporte só: não polui a tela
+  if (chips.length <= 2) { box.style.display = "none"; return; }   // um esporte só: não polui
+  box.style.display = "";
   chips.forEach((c) => {
     const chip = el("button", "chip" + (VALOR_SPORT === c.key ? " active" : ""), `${c.ico} ${escH(c.label)}`);
     chip.addEventListener("click", () => { VALOR_SPORT = c.key; renderValorChips(); renderValorLista(); });
@@ -744,72 +762,118 @@ function renderValorChips() {
   });
 }
 
+// Casas de aposta na lateral — iguais às das Surebets (desmarcar some da lista)
+function renderValorCasas() {
+  const box = document.getElementById("valor-casas"); if (!box) return;
+  const casas = [...new Set(VALOR_ITENS.map((v) => v.casa).filter(Boolean))].sort();
+  box.innerHTML = "";
+  if (!casas.length) { box.innerHTML = `<div class="muted">nenhuma casa no momento</div>`; return; }
+  casas.forEach((casa) => {
+    const lb = el("label", "check");
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = !VALOR_OFF.has(casa);
+    cb.addEventListener("change", () => {
+      if (cb.checked) VALOR_OFF.delete(casa); else VALOR_OFF.add(casa);
+      valorSalvarFiltros();
+      renderValorLista();
+    });
+    lb.appendChild(cb);
+    lb.appendChild(el("span", null, escH(casa)));
+    box.appendChild(lb);
+  });
+}
+
+function valorFiltradas() {
+  return VALOR_ITENS.filter((v) =>
+    (!VALOR_SPORT || v.esporte === VALOR_SPORT) &&
+    !VALOR_OFF.has(v.casa) &&
+    Number(v.valor || 0) >= VALOR_MIN);
+}
+
 function renderValorLista() {
   const list = document.getElementById("valor-list");
   const empty = document.getElementById("valor-empty");
   if (!list) return;
   list.innerHTML = "";
-  const visiveis = VALOR_SPORT ? VALOR_ITENS.filter((v) => v.esporte === VALOR_SPORT) : VALOR_ITENS;
+  const visiveis = valorFiltradas();
   const cont = document.getElementById("valor-count");
   if (cont) cont.textContent = visiveis.length + (visiveis.length === 1 ? " odd errada" : " odds erradas");
   if (empty) empty.classList.toggle("hidden", visiveis.length > 0);
+  const livres = VALOR_TEM ? visiveis.length : VALOR_FREE;   // comprou o add-on: tudo aberto
   visiveis.forEach((v, i) => {
     // se um item vier torto, pula ele em vez de derrubar a lista inteira
-    try { list.appendChild(i >= VALOR_FREE ? valorTeaserEl(v) : valorOpEl(v, false)); }
+    try { list.appendChild(i >= livres ? valorTeaserEl(v) : valorOpEl(v, false)); }
     catch (e) { console.error("odd errada:", e); }
   });
+  renderValorCTA(visiveis.length - livres);
 }
+
+// Faixa de venda do add-on — some pra quem já comprou
+function renderValorCTA(bloqueadas) {
+  const box = document.getElementById("valor-cta");
+  if (!box) return;
+  if (VALOR_TEM || bloqueadas <= 0) { box.classList.add("hidden"); box.innerHTML = ""; return; }
+  box.classList.remove("hidden");
+  box.innerHTML =
+    `<div><b>+${bloqueadas} ${bloqueadas === 1 ? "odd errada bloqueada" : "odds erradas bloqueadas"}</b>` +
+    `<span>Libere todas por R$ ${VALOR_PRECO.toFixed(2).replace(".", ",")} — ${VALOR_DIAS_ADDON} dias de acesso. É um extra, não mexe no seu plano.</span></div>` +
+    `<button class="valor-cta-btn">Desbloquear por R$ ${VALOR_PRECO.toFixed(0)}</button>`;
+  const b = box.querySelector(".valor-cta-btn");
+  if (b) b.addEventListener("click", () => { location.href = "/planos?addon=1"; });
+}
+
+// Liga a lateral e o modal de ajuda UMA vez (o esqueleto agora mora no HTML)
+function bindValorUI() {
+  if (VALOR_BOUND) return;
+  VALOR_BOUND = true;
+  valorCarregarFiltros();
+  const sl = document.getElementById("valor-min");
+  const out = document.getElementById("valor-min-out");
+  const pinta = () => { if (out) out.textContent = VALOR_MIN ? "+" + VALOR_MIN + "%" : "todas"; };
+  if (sl) {
+    sl.value = VALOR_MIN;
+    sl.addEventListener("input", () => {
+      VALOR_MIN = parseFloat(sl.value) || 0;
+      pinta(); valorSalvarFiltros(); renderValorLista();
+    });
+  }
+  pinta();
+  const all = document.getElementById("valor-all");
+  if (all) all.addEventListener("click", () => {
+    VALOR_OFF.clear(); valorSalvarFiltros(); renderValorCasas(); renderValorLista();
+  });
+  const none = document.getElementById("valor-none");
+  if (none) none.addEventListener("click", () => {
+    VALOR_ITENS.forEach((v) => { if (v.casa) VALOR_OFF.add(v.casa); });
+    valorSalvarFiltros(); renderValorCasas(); renderValorLista();
+  });
+  const modal = document.getElementById("valor-modal");
+  const fechar = () => modal && modal.classList.add("hidden");
+  const ajuda = document.getElementById("valor-ajuda");
+  if (ajuda && modal) ajuda.addEventListener("click", () => modal.classList.remove("hidden"));
+  const x = document.getElementById("valor-modal-x");
+  if (x) x.addEventListener("click", fechar);
+  if (modal) modal.addEventListener("click", (e) => { if (e.target === modal) fechar(); });
+}
+
 async function renderValor() {
-  const box = $("#view-valor-body"); if (!box) return;
-  box.innerHTML = `<div class="empty" style="text-align:center;color:var(--muted,#647388);padding:30px">Carregando odds erradas…</div>`;
+  const list = document.getElementById("valor-list"); if (!list) return;
+  bindValorUI();
+  list.innerHTML = `<div class="muted" style="padding:6px 2px">Carregando odds erradas…</div>`;
   let itens = [];
   try { const r = await fetch("/api/valuebets"); if (r.ok) itens = (await r.json()).itens || []; } catch {}
   VALOR_REAL = itens.length > 0;
   VALOR_ITENS = VALOR_REAL ? itens : VALOR_SAMPLE;
-  const aberto = (() => { try { return localStorage.getItem("sr_valor_explica") !== "0"; } catch { return true; } })();
-  const intro = `<details id="valor-explica" ${aberto ? "open" : ""} style="background:linear-gradient(160deg,rgba(169,139,255,.12),var(--surface2,#121a2b));border:1px solid rgba(169,139,255,.35);border-radius:16px;padding:16px 20px;margin-bottom:18px">
-    <summary style="cursor:pointer;font-weight:800;font-size:15px;list-style:none">💎 O que é uma odd errada? <span style="font-size:12px;color:var(--muted,#647388);font-weight:600">(leia antes de usar)</span></summary>
-    <div style="margin-top:12px">
-    <p style="font-size:13.5px;color:var(--dim,#a3b1c9);line-height:1.65;margin:0 0 14px">É uma aposta <b style="color:var(--text,#f2f6fc)">normal</b> — 1 casa, 1 resultado. A diferença é que a casa <b style="color:var(--text,#f2f6fc)">errou o preço</b> e está <b style="color:#c9a2ff">pagando MAIS do que deveria</b>. Você só aproveita esse erro dela.</p>
-    <div style="background:var(--bg,#05070d);border-radius:14px;padding:14px 16px;margin-bottom:14px">
-      <div style="font-size:12px;color:var(--muted,#647388);margin-bottom:10px">📊 Exemplo: <b style="color:var(--text,#f2f6fc)">Flamengo pra vencer</b></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        <div style="border:1px solid var(--border,#1b2740);border-radius:11px;padding:11px 12px">
-          <div style="font-size:11px;color:var(--muted,#647388)">Chance real (pelos números)</div>
-          <div style="font-size:17px;font-weight:800;margin-top:2px">54%</div>
-          <div style="font-size:11.5px;color:var(--dim,#a3b1c9)">preço justo: odd 1.85</div>
-        </div>
-        <div style="border:1px solid rgba(169,139,255,.45);border-radius:11px;padding:11px 12px">
-          <div style="font-size:11px;color:#c9a2ff">A casa está pagando</div>
-          <div style="font-size:17px;font-weight:800;margin-top:2px;color:#c9a2ff">odd 2.10</div>
-          <div style="font-size:11.5px;color:#c9a2ff">+13% acima do justo = seu valor</div>
-        </div>
-      </div>
-      <p style="font-size:12.5px;color:var(--dim,#a3b1c9);line-height:1.55;margin:12px 0 0">A odd justa (1.85) vem das <b style="color:var(--text,#f2f6fc)">casas mais fortes do mundo</b>, que já calculam tudo: força dos times, retrospecto, desfalques, momento. Quando uma casa comum <b>demora pra ajustar</b> e paga 2.10, essa diferença é o <b style="color:#c9a2ff">seu valor</b>.</p>
-    </div>
-    <div style="background:rgba(255,201,77,.1);border:1px solid rgba(255,201,77,.4);border-radius:12px;padding:12px 14px">
-      <div style="font-weight:800;font-size:13.5px;color:#ffdb8a;margin-bottom:5px">⚠️ NÃO é surebet — não é lucro garantido nesta aposta</div>
-      <p style="font-size:12.5px;color:var(--dim,#a3b1c9);line-height:1.6;margin:0">Você <b>pode perder esta</b> (54% de chance ainda deixa 46% de dar errado). O lucro vem no <b style="color:var(--text,#f2f6fc)">longo prazo</b>: apostando <b>sempre que tem valor</b>, a matemática vira a seu favor — igual o <b>cassino</b>, que não ganha toda rodada, mas <b>sempre ganha no volume</b>. Por isso: aposte <b>a mesma % da banca</b> em cada uma e tenha <b>paciência</b>.</p>
-    </div>
-    </div>
-  </details>`;
-  // mesma estrutura da aba Surebets: chips de esporte -> contador -> grade de cards
-  box.innerHTML = intro +
-    `<div class="chips" id="valor-chips"></div>
-     <div class="list-head">
-       <span id="valor-count">0 odds erradas</span>
-       <span class="muted">${VALOR_REAL ? "atualiza a cada 10 min" : "🧪 prévia com exemplos"}</span>
-     </div>
-     <div id="valor-list" class="grid"></div>
-     <div id="valor-empty" class="empty hidden">
-       <div class="empty-icon">💎</div>
-       <h2>Nenhuma odd errada agora</h2>
-       <p>As casas corrigem rápido. Assim que uma errar o preço de novo, aparece aqui.</p>
-     </div>`;
-  const det = document.getElementById("valor-explica");
-  if (det) det.addEventListener("toggle", () => {
-    try { localStorage.setItem("sr_valor_explica", det.open ? "1" : "0"); } catch {}
-  });
+  const fonte = document.getElementById("valor-fonte");
+  if (fonte) {
+    const base = VALOR_REAL ? "atualiza a cada 10 min" : "🧪 prévia com exemplos";
+    // quem comprou o add-on vê quanto tempo ainda tem de acesso
+    fonte.textContent = VALOR_TEM && VALOR_DIAS
+      ? base + " · acesso por mais " + VALOR_DIAS + (VALOR_DIAS === 1 ? " dia" : " dias")
+      : base;
+  }
+  renderValorCasas();
   renderValorChips();
   renderValorLista();
 }
@@ -1027,8 +1091,14 @@ async function initUser() {
   }
   // aba de Alertas: aparece pra todo mundo logado (FREE vê a tela de upgrade)
   if (me) { const ta = document.getElementById("tab-alertas"); if (ta) ta.style.display = ""; }
-  // aba Odds de Valor: BETA, só pros e-mails liberados (teste do visual)
-  if (me && me.valor_beta) { const tv = document.getElementById("tab-valor"); if (tv) tv.style.display = ""; }
+  // aba Odds Erradas: aparece pra TODO MUNDO (é o add-on de R$47). Quem não comprou
+  // vê uma amostra e o resto borrado, com o botão de desbloquear.
+  if (me) {
+    VALOR_TEM = !!me.valor_beta;
+    if (me.valor_preco) VALOR_PRECO = me.valor_preco;
+    if (me.valor_dias_addon) VALOR_DIAS_ADDON = me.valor_dias_addon;
+    VALOR_DIAS = me.valor_dias || null;
+  }
   // só agora sabemos quais abas existem pra este usuário -> reabre a última usada
   restaurarAba();
 

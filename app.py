@@ -512,8 +512,18 @@ def health(fb: int = 0, venda: int = 0):
 # PAGAMENTOS — Stripe (cartão) e AbacatePay (Pix)
 # ===========================================================================
 def _plano_valido(payload):
+    """Plano do payload. 'valor' = add-on das Odds Erradas comprado AVULSO (à parte
+    do plano) — tem nome/dias/valor próprios, então cai no mesmo fluxo de checkout."""
     plano = (payload or {}).get("plano", "mensal")
+    if plano == "valor":
+        return plano, dict(config.ADDON_VALOR)
     return plano, config.PLANOS.get(plano)
+
+
+def _quer_bump(payload, plano):
+    """Marcou a caixinha do order bump (Odds Erradas +R$47) junto do plano?
+    Só faz sentido junto de um PLANO — comprando o add-on avulso já é o produto."""
+    return bool((payload or {}).get("addon")) and plano != "valor"
 
 
 def _confirmar_compra_email(user_id):
@@ -703,16 +713,28 @@ def checkout_pix(request: Request, payload: dict = Body(...)):
         cel_fmt = f"({celular[:2]}) {celular[2:7]}-{celular[7:]}"
     else:
         cel_fmt = f"({celular[:2]}) {celular[2:6]}-{celular[6:]}"
+    bump = _quer_bump(payload, plano)
+    produtos = [{
+        "externalId": "pro-" + plano,
+        "name": "SureRadar " + p["nome"],
+        "description": "Assinatura " + p["nome"] + " (" + str(p["dias"]) + " dias)",
+        "quantity": 1,
+        "price": int(round(p["valor"] * 100)),
+    }]
+    if bump:                                   # order bump: entra como 2º item da cobrança
+        a = config.ADDON_VALOR
+        produtos.append({
+            "externalId": "addon-valor",
+            "name": "SureRadar " + a["nome"],
+            "description": a["nome"] + " (" + str(a["dias"]) + " dias)",
+            "quantity": 1,
+            "price": int(round(a["valor"] * 100)),
+        })
+    total = p["valor"] + (config.ADDON_VALOR["valor"] if bump else 0)
     body = {
         "frequency": "ONE_TIME",
         "methods": ["PIX"],
-        "products": [{
-            "externalId": "pro-" + plano,
-            "name": "SureRadar " + p["nome"],
-            "description": "Assinatura " + p["nome"] + " (" + str(p["dias"]) + " dias)",
-            "quantity": 1,
-            "price": int(round(p["valor"] * 100)),
-        }],
+        "products": produtos,
         "returnUrl": config.SITE_URL + "/planos",
         "completionUrl": config.SITE_URL + "/perfil?pago=1",
         "customer": {
@@ -734,7 +756,8 @@ def checkout_pix(request: Request, payload: dict = Body(...)):
     bid, url = d.get("id"), d.get("url")
     if not bid or not url:
         return JSONResponse({"erro": "resposta inesperada do AbacatePay"}, status_code=502)
-    auth.checkout_registrar("abacatepay", bid, user["id"], plano, p["dias"], p["valor"], "pix")
+    auth.checkout_registrar("abacatepay", bid, user["id"], plano, p["dias"], total, "pix",
+                            addon="valor" if bump else None)
     return {"url": url}
 
 
@@ -804,7 +827,8 @@ def _abacate_prewarm_produtos():
                     existentes[prod["externalId"]] = prod["id"]
     except requests.RequestException:
         pass
-    for plano, p in config.PLANOS.items():
+    # planos + o add-on das Odds Erradas (order bump) já prontos no boot
+    for plano, p in list(config.PLANOS.items()) + [("valor", config.ADDON_VALOR)]:
         ext = "pro-%s-%d" % (plano, int(round(p["valor"] * 100)))   # id carrega o preço
         if ext in existentes:
             _abacate_prod_cache[ext] = existentes[ext]
@@ -858,8 +882,17 @@ def checkout_cartao(request: Request, payload: dict = Body(...)):
         prod_id = _abacate_produto_id(plano, p)
     except Exception as e:
         return JSONResponse({"erro": "AbacatePay (produto)", "detalhe": str(e)[:200]}, status_code=502)
+    bump = _quer_bump(payload, plano)
+    items = [{"id": prod_id, "quantity": 1}]
+    if bump:                                   # order bump: 2º produto na mesma cobrança
+        try:
+            items.append({"id": _abacate_produto_id("valor", config.ADDON_VALOR), "quantity": 1})
+        except Exception as e:                 # add-on falhou: vende o plano do mesmo jeito
+            print("!! produto do add-on:", e)
+            bump = False
+    total = p["valor"] + (config.ADDON_VALOR["valor"] if bump else 0)
     body = {
-        "items": [{"id": prod_id, "quantity": 1}],
+        "items": items,
         "methods": ["CARD"],
         "returnUrl": config.SITE_URL + "/planos",
         "completionUrl": config.SITE_URL + "/perfil?pago=1",
@@ -881,7 +914,8 @@ def checkout_cartao(request: Request, payload: dict = Body(...)):
     bid, url = d.get("id"), d.get("url")
     if not bid or not url:
         return JSONResponse({"erro": "resposta inesperada do AbacatePay"}, status_code=502)
-    auth.checkout_registrar("abacatepay", bid, user["id"], plano, p["dias"], p["valor"], "cartao")
+    auth.checkout_registrar("abacatepay", bid, user["id"], plano, p["dias"], total, "cartao",
+                            addon="valor" if bump else None)
     return {"url": url}
 
 
@@ -969,13 +1003,20 @@ def me(request: Request):
             "whatsapp": user.get("whatsapp") or "",
             "admin": _admin_email(user),
             "alertas": _alerta_liberado(user),
-            "valor_beta": _valor_liberado(user)}
+            "valor_beta": _valor_liberado(user),
+            "valor_dias": auth.valor_dias_restantes(user),
+            "valor_preco": config.ADDON_VALOR["valor"],
+            "valor_dias_addon": config.ADDON_VALOR["dias"]}
 
 
 def _valor_liberado(user):
-    """Aba 'Odds de Valor' (valuebets, BETA): só pros e-mails em VALUEBET_BETA_EMAILS."""
+    """Aba 'Odds Erradas das Casas': quem comprou o add-on (avulso ou no order bump)
+    e os e-mails do beta em VALUEBET_BETA_EMAILS. A aba aparece pra todo mundo — quem
+    não comprou vê só uma amostra, o resto borrado."""
     if not user:
         return False
+    if auth.valor_dias_restantes(user):
+        return True
     emails = [e.strip().lower() for e in (config.VALUEBET_BETA_EMAILS or "").split(",") if e.strip()]
     return user.get("email", "").strip().lower() in emails
 
@@ -1046,6 +1087,10 @@ def perfil_dados(request: Request):
         "whatsapp": user.get("whatsapp") or "",
         "tem_assinatura": bool(auth.assinatura_do_user(user["id"])),
         "pagamentos": auth.listar_pagamentos(user["id"]),
+        # add-on das Odds Erradas (comprado à parte do plano)
+        "valor_dias": auth.valor_dias_restantes(user),
+        "valor_preco": config.ADDON_VALOR["valor"],
+        "valor_dias_addon": config.ADDON_VALOR["dias"],
     }
 
 
