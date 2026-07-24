@@ -648,14 +648,6 @@ function switchView(v) {
 // Usa o MESMO esqueleto das Surebets (.layout + .sidebar + .content + .grid + .op):
 // muda só o conteúdo do card (1 casa, 1 odd) e o sotaque de cor (roxo, pra não
 // confundir com o verde do "retorno certo" da surebet).
-const VALOR_SAMPLE = [
-  { ico:"⚽", esporte:"Futebol", hora:"hoje 21:00", event:"Flamengo x Palmeiras", mercado:"Mais de 2.5 gols", casa:"Betano", odd:2.10, valor:13, justa:1.85, stake:2 },
-  { ico:"🎾", esporte:"Tênis", hora:"hoje 16:30", event:"Alcaraz x Sinner", mercado:"Alcaraz vence", casa:"Superbet", odd:1.95, valor:9, justa:1.79, stake:1.5 },
-  { ico:"🏀", esporte:"Basquete", hora:"amanhã 02:00", event:"Lakers x Celtics", mercado:"Mais de 214.5 pts", casa:"Novibet", odd:1.90, valor:7, justa:1.78, stake:1.5 },
-  { ico:"⚽", esporte:"Futebol", hora:"dom 17:00", event:"Real Madrid x Barcelona", mercado:"Ambas marcam", casa:"Bet365", odd:1.80, valor:11, justa:1.62, stake:2 },
-  { ico:"⚽", esporte:"Futebol", hora:"dom 13:30", event:"Man City x Arsenal", mercado:"Mais de 9.5 escanteios", casa:"Betnacional", odd:2.05, valor:8, justa:1.90, stake:1.5 },
-  { ico:"🎾", esporte:"Tênis", hora:"seg 10:00", event:"Djokovic x Medvedev", mercado:"Djokovic -3.5 games", casa:"Pixbet", odd:2.20, valor:10, justa:2.00, stake:2 },
-];
 // Quem NÃO comprou vê a lista TODA, mas as MAIORES (melhores) vêm SEMPRE borradas —
 // é o prêmio que faz a pessoa querer assinar. Só as VALOR_ABERTAS menores ficam
 // abertas, como amostra real (prova que é de verdade). A lista chega por valor ↓,
@@ -956,11 +948,13 @@ async function renderValor() {
   list.innerHTML = `<div class="muted" style="padding:6px 2px">Carregando odds erradas…</div>`;
   let itens = [];
   try { const r = await fetch("/api/valuebets"); if (r.ok) itens = (await r.json()).itens || []; } catch {}
+  // SEMPRE odds reais. Sem dado = lista vazia + tela de espera (igual surebets).
+  // NUNCA exemplo/fictício.
   VALOR_REAL = itens.length > 0;
-  VALOR_ITENS = VALOR_REAL ? itens : VALOR_SAMPLE;
+  VALOR_ITENS = itens;
   const fonte = document.getElementById("valor-fonte");
   if (fonte) {
-    const base = VALOR_REAL ? "atualiza a cada 10 min" : "🧪 prévia com exemplos";
+    const base = "atualiza a cada 10 min";
     // quem comprou o add-on vê quanto tempo ainda tem de acesso
     fonte.textContent = VALOR_TEM && VALOR_DIAS
       ? base + " · acesso por mais " + VALOR_DIAS + (VALOR_DIAS === 1 ? " dia" : " dias")
