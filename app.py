@@ -2085,12 +2085,11 @@ def valuebets(request: Request):
     itens = valor_feed.get_valuebets()
     if tem:
         return {"itens": itens, "tem": True}
-    # Sem add-on: manda TODAS as odds reais — o painel mostra a lista inteira e borra
-    # as de MAIOR valor (o prêmio de quem paga), deixando as menores abertas de graça.
-    # Sem o link direto (o atalho da entrada é do pagante); a aberta ainda abre pelo
-    # site da casa ("IR PRA CASA"). Ordena por valor ↓ pro corte ser previsível.
+    # Sem add-on: manda TODAS as odds reais COM o link direto — o add-on pago é só pra
+    # DESBLOQUEAR as borradas (mais acesso), não pra ganhar o link. Nas abertas o cliente
+    # (free inclusive) vai direto na aposta; as borradas o próprio painel não expõe o link
+    # (o botão fica desligado no card locked). Ordena por valor ↓ pro corte ser previsível.
     todas = sorted(itens, key=lambda i: i.get("valor", 0), reverse=True)
-    todas = [{**i, "link": None} for i in todas]
     return {"itens": todas, "tem": False}
 
 
