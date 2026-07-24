@@ -37,12 +37,12 @@
     </a>
 
     <nav class="tabs">
-      <button class="tab active" data-view="ops" title="Surebets ao vivo">⚽ Oportunidades</button>
+      <button class="tab active" data-view="ops" title="Surebets ao vivo">⚽ Surebets</button>
+      <button class="tab" id="tab-valor" data-view="valor" title="Odds erradas das casas (beta)" style="display:none">💎 Odds Erradas das Casas</button>
       <button class="tab" data-view="bank" title="Suas entradas e o lucro">💰 Minha Banca <span id="bank-count" class="tab-badge">0</span></button>
       <button class="tab" data-view="calc" title="Calculadora de surebet">🧮 Calculadora</button>
       <button class="tab" data-view="learn" title="Aprenda a fazer apostas seguras">🎓 Aprenda</button>
       <button class="tab" id="tab-alertas" data-view="alertas" title="Alertas no Telegram" style="display:none">🔔 Alertas</button>
-      <button class="tab" id="tab-valor" data-view="valor" title="Odds de valor (beta)" style="display:none">💎 Odds de Valor</button>
     </nav>
 
     <div class="topbar-right">
@@ -241,8 +241,8 @@
   <!-- VIEW: ODDS DE VALOR (valuebets) — BETA -->
   <div class="bank-view hidden" id="view-valor">
     <div class="bank-head" style="text-align:center">
-      <h1>💎 Odds de Valor</h1>
-      <p class="subtitle" style="max-width:600px;margin:8px auto 0">Apostas onde a casa <b>pagou acima do justo</b> — 1 aposta, 1 casa. Não é lucro garantido como a surebet: é <b>valor esperado positivo</b>, dá lucro <b>no volume</b>, com disciplina.</p>
+      <h1>💎 Odds Erradas das Casas</h1>
+      <p class="subtitle" style="max-width:600px;margin:8px auto 0">A casa <b>errou o preço</b> e está pagando <b>acima do justo</b> — 1 aposta, 1 casa. Não é lucro garantido como a surebet: aqui o lucro vem <b>no volume</b>, com disciplina.</p>
     </div>
     <div id="view-valor-body" style="max-width:940px;margin:22px auto 0;padding:0 6px"></div>
   </div>
@@ -309,7 +309,7 @@
     </div>
   </div>
 
-  <script src="/static/app.js?v=15"></script>
+  <script src="/static/app.js?v=16"></script>
 
   <style>
     #view-calc .cv-leg{background:var(--surface2,#121a2b);border:1px solid var(--border,#1b2740);border-radius:14px;padding:16px;margin-bottom:14px}

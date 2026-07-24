@@ -685,7 +685,7 @@ function valorCard(v, locked) {
     </div>
     ${locked ? `<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:rgba(5,7,13,.35)">
       <div style="font-size:24px">🔒</div>
-      <button class="valor-unlock" style="background:var(--grad,linear-gradient(112deg,#2ee6a8,#38d4f5));color:#052015;font-weight:800;font-size:13px;padding:10px 16px;border:none;border-radius:11px;cursor:pointer;font-family:inherit">Desbloquear todas as odds de valor</button>
+      <button class="valor-unlock" style="background:var(--grad,linear-gradient(112deg,#2ee6a8,#38d4f5));color:#052015;font-weight:800;font-size:13px;padding:10px 16px;border:none;border-radius:11px;cursor:pointer;font-family:inherit">Desbloquear todas as odds erradas</button>
     </div>` : ""}
   </div>`;
 }
@@ -697,13 +697,13 @@ function valorMini(lbl, val, cor) {
 }
 async function renderValor() {
   const box = $("#view-valor-body"); if (!box) return;
-  box.innerHTML = `<div class="empty" style="text-align:center;color:var(--muted,#647388);padding:30px">Carregando odds de valor…</div>`;
+  box.innerHTML = `<div class="empty" style="text-align:center;color:var(--muted,#647388);padding:30px">Carregando odds erradas…</div>`;
   let itens = [];
   try { const r = await fetch("/api/valuebets"); if (r.ok) itens = (await r.json()).itens || []; } catch {}
   const usaReal = itens.length > 0;
   const dados = usaReal ? itens : VALOR_SAMPLE;
   const intro = `<div style="background:linear-gradient(160deg,rgba(169,139,255,.12),var(--surface2,#121a2b));border:1px solid rgba(169,139,255,.35);border-radius:16px;padding:18px 20px;margin-bottom:18px">
-    <div style="font-weight:800;font-size:16px;margin-bottom:10px">💎 O que é uma Odd de Valor? <span style="font-size:12px;color:var(--muted,#647388);font-weight:600">(leia antes de usar)</span></div>
+    <div style="font-weight:800;font-size:16px;margin-bottom:10px">💎 O que é uma odd errada? <span style="font-size:12px;color:var(--muted,#647388);font-weight:600">(leia antes de usar)</span></div>
     <p style="font-size:13.5px;color:var(--dim,#a3b1c9);line-height:1.65;margin:0 0 14px">É uma aposta <b style="color:var(--text,#f2f6fc)">normal</b> — 1 casa, 1 resultado. A diferença é que a casa <b style="color:var(--text,#f2f6fc)">errou o preço</b> e está <b style="color:#c9a2ff">pagando MAIS do que deveria</b>. Você só aproveita esse erro dela.</p>
     <div style="background:var(--bg,#05070d);border-radius:14px;padding:14px 16px;margin-bottom:14px">
       <div style="font-size:12px;color:var(--muted,#647388);margin-bottom:10px">📊 Exemplo: <b style="color:var(--text,#f2f6fc)">Flamengo pra vencer</b></div>
@@ -736,8 +736,8 @@ async function renderValor() {
   }
   const grid = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px">${cards}</div>`;
   const nota = usaReal
-    ? `<p style="text-align:center;font-size:12px;color:var(--muted,#647388);margin-top:18px">Odds de valor ao vivo. As primeiras estão liberadas — desbloqueie o resto.</p>`
-    : `<p style="text-align:center;font-size:12px;color:var(--muted,#647388);margin-top:18px">🧪 Prévia com exemplos. Em breve: odds de valor reais atualizadas ao vivo.</p>`;
+    ? `<p style="text-align:center;font-size:12px;color:var(--muted,#647388);margin-top:18px">Odds erradas ao vivo. As primeiras estão liberadas — desbloqueie o resto.</p>`
+    : `<p style="text-align:center;font-size:12px;color:var(--muted,#647388);margin-top:18px">🧪 Prévia com exemplos. Em breve: odds erradas reais atualizadas ao vivo.</p>`;
   box.innerHTML = intro + grid + nota;
   box.querySelectorAll(".valor-unlock").forEach(b => b.addEventListener("click", () => {
     if (typeof openUpgrade === "function") openUpgrade();
