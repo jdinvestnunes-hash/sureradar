@@ -656,11 +656,11 @@ const VALOR_SAMPLE = [
   { ico:"⚽", esporte:"Futebol", hora:"dom 13:30", event:"Man City x Arsenal", mercado:"Mais de 9.5 escanteios", casa:"Betnacional", odd:2.05, valor:8, justa:1.90, stake:1.5 },
   { ico:"🎾", esporte:"Tênis", hora:"seg 10:00", event:"Djokovic x Medvedev", mercado:"Djokovic -3.5 games", casa:"Pixbet", odd:2.20, valor:10, justa:2.00, stake:2 },
 ];
-// Quem NÃO comprou vê a lista TODA em "sanduíche": as VALOR_ABERTAS_TOPO primeiras
-// (maiores, o gancho) abertas, o MEIO borrado (o prêmio de quem paga) e as
-// VALOR_ABERTAS_FIM últimas (menores) abertas de graça. A lista chega por valor ↓.
-const VALOR_ABERTAS_TOPO = 3;
-const VALOR_ABERTAS_FIM = 5;
+// Quem NÃO comprou vê a lista TODA, mas as MAIORES (melhores) vêm SEMPRE borradas —
+// é o prêmio que faz a pessoa querer assinar. Só as VALOR_ABERTAS menores ficam
+// abertas, como amostra real (prova que é de verdade). A lista chega por valor ↓,
+// então as abertas são as últimas VALOR_ABERTAS.
+const VALOR_ABERTAS = 2;
 // add-on das Odds Erradas: comprado à parte do plano (/api/me manda os números)
 let VALOR_TEM = false, VALOR_PRECO = 47, VALOR_DIAS_ADDON = 30, VALOR_DIAS = null;
 
@@ -863,21 +863,19 @@ function renderValorLista() {
   const cont = document.getElementById("valor-count");
   if (cont) cont.textContent = visiveis.length + (visiveis.length === 1 ? " odd errada" : " odds erradas");
   if (empty) empty.classList.toggle("hidden", visiveis.length > 0);
-  // add-on: tudo aberto. Sem add-on: "sanduíche" — as VALOR_ABERTAS_TOPO primeiras
-  // (maiores, o gancho) e as VALOR_ABERTAS_FIM últimas (menores) abertas; o MEIO
-  // borrado (o prêmio de quem paga). A lista chega por valor ↓.
+  // add-on: tudo aberto. Sem add-on: as MAIORES (melhores) borradas — o prêmio de
+  // quem paga — e só as VALOR_ABERTAS menores abertas, como amostra. A lista chega
+  // por valor ↓, então o corte borra do topo pra baixo.
   const total = visiveis.length;
-  const topo = VALOR_TEM ? total : Math.min(VALOR_ABERTAS_TOPO, total);
-  const fimIni = VALOR_TEM ? total : Math.max(topo, total - VALOR_ABERTAS_FIM);
-  let bloqueadas = 0;
+  const abertas = VALOR_TEM ? total : Math.min(VALOR_ABERTAS, total);
+  const corte = total - abertas; // quantas borrar no topo (as de maior valor)
   visiveis.forEach((v, i) => {
-    const locked = i >= topo && i < fimIni; // só o miolo borra
-    if (locked) bloqueadas++;
+    const locked = i < corte;
     // se um item vier torto, pula ele em vez de derrubar a lista inteira
     try { list.appendChild(locked ? valorTeaserEl(v) : valorOpEl(v, false)); }
     catch (e) { console.error("odd errada:", e); }
   });
-  renderValorCTA(bloqueadas);
+  renderValorCTA(corte);
 }
 
 // Faixa de venda do add-on — some pra quem já comprou
