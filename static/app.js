@@ -615,7 +615,18 @@ function renderBanca() {
 })();
 
 // ---------- Abas ----------
+// lembra a aba aberta: ao dar F5 você continua onde estava (e não volta pra Oportunidades)
+function lembrarAba(v) { try { localStorage.setItem("sr_aba", v); } catch {} }
+function abaSalva() { try { return localStorage.getItem("sr_aba") || ""; } catch { return ""; } }
+function restaurarAba() {
+  const v = abaSalva();
+  if (!v || v === "ops") return;
+  const btn = document.querySelector(`.tab[data-view="${v}"]`);
+  if (!btn || btn.style.display === "none") return;   // aba escondida (beta/logout) -> fica em Oportunidades
+  switchView(v);
+}
 function switchView(v) {
+  lembrarAba(v);
   document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("active", t.dataset.view === v));
   $("#view-ops").classList.toggle("hidden", v !== "ops");
   $("#view-bank").classList.toggle("hidden", v !== "bank");
@@ -948,6 +959,8 @@ async function initUser() {
   if (me) { const ta = document.getElementById("tab-alertas"); if (ta) ta.style.display = ""; }
   // aba Odds de Valor: BETA, só pros e-mails liberados (teste do visual)
   if (me && me.valor_beta) { const tv = document.getElementById("tab-valor"); if (tv) tv.style.display = ""; }
+  // só agora sabemos quais abas existem pra este usuário -> reabre a última usada
+  restaurarAba();
 
   // banner do plano (só aparece no mobile) — deixa claro se é grátis e o que o PRO libera
   const pb = document.getElementById("plano-banner");
