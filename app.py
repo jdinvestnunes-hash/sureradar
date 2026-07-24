@@ -1013,6 +1013,10 @@ def _valor_liberado(user):
     """Aba 'Odds Erradas das Casas': quem comprou o add-on (avulso ou no order bump)
     e os e-mails do beta em VALUEBET_BETA_EMAILS. A aba aparece pra todo mundo — quem
     não comprou vê só uma amostra, o resto borrado."""
+    # Modo vitrine de lançamento: NINGUÉM tem acesso total (nem PRO, nem quem comprou).
+    # Todo mundo cai na amostra borrada. Desliga com a env VALOR_TEASER_GERAL=0.
+    if config.VALOR_TEASER_GERAL:
+        return False
     if not user:
         return False
     if auth.valor_dias_restantes(user):

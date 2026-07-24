@@ -217,6 +217,12 @@ ALERTA_BETA_EMAILS = os.getenv("ALERTA_BETA_EMAILS", "").strip()
 # testar o visual antes de liberar geral. Env VALUEBET_BETA_EMAILS (vírgula).
 VALUEBET_BETA_EMAILS = os.getenv("VALUEBET_BETA_EMAILS", "").strip()
 
+# MODO VITRINE das Odds Erradas: enquanto ligado, NINGUÉM tem acesso total — todo
+# mundo (inclusive quem comprou o add-on, PRO e você) vê só a AMOSTRA real borrada,
+# pra criar desejo de desbloquear. É o estado de LANÇAMENTO. Pra liberar de verdade
+# quem paga, põe a env VALOR_TEASER_GERAL=0 no Railway (não precisa mexer no código).
+VALOR_TEASER_GERAL = os.getenv("VALOR_TEASER_GERAL", "1").strip().lower() not in ("0", "false", "nao", "não", "off", "")
+
 # Grupo FREE do Telegram: recebe as surebets até este lucro (%), no máximo N por
 # ciclo (evita flood). As de maior lucro ficam pro PRO (funil).
 TELEGRAM_LUCRO_MAX = float(os.getenv("TELEGRAM_LUCRO_MAX", "1.0"))
