@@ -145,10 +145,10 @@ FREE_LUCRO_MAX = 2.0
 FREE_MAX_ENTRADAS = 25     # FREE vê as 25 primeiras de 0 a 1%
 PRO_LUCRO_MIN = 1.0001     # PRO vê TUDO acima de 1% (até o teto são de 25%)
 
-# Odds Erradas (add-on avulso): quem NÃO comprou vê uma amostra REAL desse tamanho
-# (as de maior % acima do justo). O painel deixa 2 abertas e borra o resto — é o
-# gancho pra pagar. Quem tem o add-on recebe todas.
-VALOR_AMOSTRA_FREE = 6
+# Odds Erradas (add-on avulso): o não-pagante vê a lista TODA, mas só as N de MENOR
+# valor abertas (valor real de graça) — as maiores vêm borradas, o prêmio de quem
+# paga. Esse número mora no front (VALOR_ABERTAS em app.js), aqui fica só de
+# referência. Quem tem o add-on recebe todas abertas com os links.
 
 # Ligas a monitorar (keys da The Odds API). Ajustadas para o que está EM
 # TEMPORADA agora (jul/2026).

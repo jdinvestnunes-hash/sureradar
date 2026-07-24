@@ -687,6 +687,22 @@ async def webhook_stripe(request: Request):
     return {"ok": True}
 
 
+def _cpf_valido(cpf):
+    """Valida os dígitos verificadores do CPF (11 números). A AbacatePay recusa CPF
+    com dígito errado ('Invalid taxId'); a gente pega isso ANTES de chamar ela, pra
+    devolver uma mensagem clara em vez do erro cru do processador."""
+    if len(cpf) != 11 or cpf == cpf[0] * 11:      # 11 dígitos e não é tudo igual
+        return False
+    for tam in (9, 10):                           # calcula os 2 dígitos verificadores
+        soma = sum(int(cpf[i]) * (tam + 1 - i) for i in range(tam))
+        resto = (soma * 10) % 11
+        if resto == 10:
+            resto = 0
+        if resto != int(cpf[tam]):
+            return False
+    return True
+
+
 @app.post("/api/checkout/pix")
 def checkout_pix(request: Request, payload: dict = Body(...)):
     """Cria uma cobrança Pix no AbacatePay e devolve a URL de pagamento."""
@@ -706,6 +722,8 @@ def checkout_pix(request: Request, payload: dict = Body(...)):
         celular = "".join(ch for ch in str(user.get("whatsapp") or "") if ch.isdigit())
     if len(cpf) != 11:
         return JSONResponse({"erro": "CPF inválido — informe os 11 dígitos."}, status_code=400)
+    if not _cpf_valido(cpf):
+        return JSONResponse({"erro": "CPF inválido — confira os números e tente de novo."}, status_code=400)
     if len(celular) not in (10, 11):
         return JSONResponse({"erro": "Celular inválido — informe com DDD."}, status_code=400)
     cpf_fmt = f"{cpf[:3]}.{cpf[3:6]}.{cpf[6:9]}-{cpf[9:]}"
@@ -2067,12 +2085,13 @@ def valuebets(request: Request):
     itens = valor_feed.get_valuebets()
     if tem:
         return {"itens": itens, "tem": True}
-    # Sem add-on: manda só uma amostra real (as de maior % acima do justo), pra não
-    # entregar o feed inteiro de graça. Sem o link direto — o atalho da entrada é do
-    # pagante; a amostra ainda funciona pelo botão "IR PRA CASA" (site da casa).
-    amostra = sorted(itens, key=lambda i: i.get("valor", 0), reverse=True)[:config.VALOR_AMOSTRA_FREE]
-    amostra = [{**i, "link": None} for i in amostra]
-    return {"itens": amostra, "tem": False}
+    # Sem add-on: manda TODAS as odds reais — o painel mostra a lista inteira e borra
+    # as de MAIOR valor (o prêmio de quem paga), deixando as menores abertas de graça.
+    # Sem o link direto (o atalho da entrada é do pagante); a aberta ainda abre pelo
+    # site da casa ("IR PRA CASA"). Ordena por valor ↓ pro corte ser previsível.
+    todas = sorted(itens, key=lambda i: i.get("valor", 0), reverse=True)
+    todas = [{**i, "link": None} for i in todas]
+    return {"itens": todas, "tem": False}
 
 
 @app.post("/api/ingest-valor")

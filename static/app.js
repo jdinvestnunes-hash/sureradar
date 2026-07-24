@@ -656,7 +656,10 @@ const VALOR_SAMPLE = [
   { ico:"⚽", esporte:"Futebol", hora:"dom 13:30", event:"Man City x Arsenal", mercado:"Mais de 9.5 escanteios", casa:"Betnacional", odd:2.05, valor:8, justa:1.90, stake:1.5 },
   { ico:"🎾", esporte:"Tênis", hora:"seg 10:00", event:"Djokovic x Medvedev", mercado:"Djokovic -3.5 games", casa:"Pixbet", odd:2.20, valor:10, justa:2.00, stake:2 },
 ];
-const VALOR_FREE = 2;   // quantas aparecem liberadas pra quem NÃO comprou; o resto vem borrado
+// Quem NÃO comprou vê a lista TODA, mas só as N de MENOR valor abertas (valor real
+// de graça) — as MAIORES vêm borradas, o prêmio de quem paga. A lista chega por
+// valor ↓, então as abertas são as últimas N.
+const VALOR_ABERTAS = 5;
 // add-on das Odds Erradas: comprado à parte do plano (/api/me manda os números)
 let VALOR_TEM = false, VALOR_PRECO = 47, VALOR_DIAS_ADDON = 30, VALOR_DIAS = null;
 
@@ -711,16 +714,19 @@ function escH(s) {
 
 // Estado da aba — a lista fica guardada pra filtrar na tela, sem ir no servidor
 let VALOR_ITENS = [], VALOR_REAL = false, VALOR_SPORT = "", VALOR_MIN = 0;
+let VALOR_PROB = 0, VALOR_ODD = 1;   // chance real mínima (%) e odd mínima
 let VALOR_OFF = new Set();   // casas DESmarcadas na lateral (casa nova entra marcada)
 let VALOR_BOUND = false;     // listeners da lateral já ligados (só uma vez)
 
 function valorSalvarFiltros() {
-  try { localStorage.setItem("sr_valor_filtros", JSON.stringify({ min: VALOR_MIN, off: [...VALOR_OFF] })); } catch {}
+  try { localStorage.setItem("sr_valor_filtros", JSON.stringify({ min: VALOR_MIN, prob: VALOR_PROB, odd: VALOR_ODD, off: [...VALOR_OFF] })); } catch {}
 }
 function valorCarregarFiltros() {
   try {
     const d = JSON.parse(localStorage.getItem("sr_valor_filtros") || "{}");
     VALOR_MIN = Number(d.min) || 0;
+    VALOR_PROB = Number(d.prob) || 0;
+    VALOR_ODD = Number(d.odd) || 1;
     VALOR_OFF = new Set(Array.isArray(d.off) ? d.off : []);
   } catch {}
 }
@@ -837,10 +843,14 @@ function renderValorCasas() {
 }
 
 function valorFiltradas() {
-  return VALOR_ITENS.filter((v) =>
-    (!VALOR_SPORT || v.esporte === VALOR_SPORT) &&
-    !VALOR_OFF.has(v.casa) &&
-    Number(v.valor || 0) >= VALOR_MIN);
+  return VALOR_ITENS.filter((v) => {
+    const prob = Number(v.prob || (v.justa > 0 ? 100 / v.justa : 0));
+    return (!VALOR_SPORT || v.esporte === VALOR_SPORT) &&
+      !VALOR_OFF.has(v.casa) &&
+      Number(v.valor || 0) >= VALOR_MIN &&
+      prob >= VALOR_PROB &&
+      Number(v.odd || 0) >= VALOR_ODD;
+  });
 }
 
 function renderValorLista() {
@@ -852,13 +862,16 @@ function renderValorLista() {
   const cont = document.getElementById("valor-count");
   if (cont) cont.textContent = visiveis.length + (visiveis.length === 1 ? " odd errada" : " odds erradas");
   if (empty) empty.classList.toggle("hidden", visiveis.length > 0);
-  const livres = VALOR_TEM ? visiveis.length : VALOR_FREE;   // comprou o add-on: tudo aberto
+  // add-on: tudo aberto. Sem add-on: as MENORES abertas (últimas da lista, que vem
+  // por valor ↓) e as MAIORES borradas. corte = quantas borrar no topo.
+  const abertas = VALOR_TEM ? visiveis.length : Math.min(VALOR_ABERTAS, visiveis.length);
+  const corte = visiveis.length - abertas;
   visiveis.forEach((v, i) => {
     // se um item vier torto, pula ele em vez de derrubar a lista inteira
-    try { list.appendChild(i >= livres ? valorTeaserEl(v) : valorOpEl(v, false)); }
+    try { list.appendChild(i < corte ? valorTeaserEl(v) : valorOpEl(v, false)); }
     catch (e) { console.error("odd errada:", e); }
   });
-  renderValorCTA(visiveis.length - livres);
+  renderValorCTA(corte);
 }
 
 // Faixa de venda do add-on — some pra quem já comprou
@@ -891,6 +904,30 @@ function bindValorUI() {
     });
   }
   pinta();
+  // chance real mínima (%)
+  const slP = document.getElementById("valor-prob");
+  const outP = document.getElementById("valor-prob-out");
+  const pintaP = () => { if (outP) outP.textContent = VALOR_PROB ? VALOR_PROB + "%+" : "qualquer"; };
+  if (slP) {
+    slP.value = VALOR_PROB;
+    slP.addEventListener("input", () => {
+      VALOR_PROB = parseFloat(slP.value) || 0;
+      pintaP(); valorSalvarFiltros(); renderValorLista();
+    });
+  }
+  pintaP();
+  // odd mínima
+  const slO = document.getElementById("valor-odd");
+  const outO = document.getElementById("valor-odd-out");
+  const pintaO = () => { if (outO) outO.textContent = VALOR_ODD > 1 ? VALOR_ODD.toFixed(2) + "+" : "qualquer"; };
+  if (slO) {
+    slO.value = VALOR_ODD;
+    slO.addEventListener("input", () => {
+      VALOR_ODD = parseFloat(slO.value) || 1;
+      pintaO(); valorSalvarFiltros(); renderValorLista();
+    });
+  }
+  pintaO();
   const all = document.getElementById("valor-all");
   if (all) all.addEventListener("click", () => {
     VALOR_OFF.clear(); valorSalvarFiltros(); renderValorCasas(); renderValorLista();

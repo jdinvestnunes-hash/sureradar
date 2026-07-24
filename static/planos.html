@@ -314,10 +314,23 @@ $id('pix-cel').addEventListener('input', e=>{
   else if (v.length > 2) v = v.replace(/(\d{2})(\d{0,5})/,'($1) $2');
   e.target.value = v;
 });
+// valida os 2 dígitos verificadores do CPF (mesma conta do servidor) — sem isso um
+// CPF de 11 dígitos porém errado só era barrado lá na AbacatePay ("Invalid taxId")
+function cpfValido(cpf){
+  if (cpf.length !== 11 || /^(\d)\1{10}$/.test(cpf)) return false;
+  for (const tam of [9,10]){
+    let soma = 0;
+    for (let i=0;i<tam;i++) soma += parseInt(cpf[i]) * (tam + 1 - i);
+    let resto = (soma * 10) % 11; if (resto === 10) resto = 0;
+    if (resto !== parseInt(cpf[tam])) return false;
+  }
+  return true;
+}
 $id('pix-go').onclick = ()=>{
   const cpf = $id('pix-cpf').value.replace(/\D/g,'');
   const cel = $id('pix-cel').value.replace(/\D/g,'');
   if (cpf.length !== 11){ $id('pix-err').textContent = 'CPF inválido — 11 dígitos.'; return; }
+  if (!cpfValido(cpf)){ $id('pix-err').textContent = 'CPF inválido — confira os números.'; return; }
   if (cel.length < 10 || cel.length > 11){ $id('pix-err').textContent = 'Celular inválido — inclua o DDD.'; return; }
   fecharPix();
   // leva junto o que o card mandou (ex.: addon=true do order bump)
