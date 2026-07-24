@@ -644,6 +644,12 @@ const VALOR_SAMPLE = [
 ];
 const VALOR_FREE = 2;   // quantas aparecem liberadas; o resto vem borrado
 
+// escapa texto que vem da raspagem antes de virar HTML (nome de time/casa pode ter & < >)
+function escH(s) {
+  return String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
 function valorCard(v, locked) {
   const blur = locked ? "filter:blur(6px);user-select:none;pointer-events:none" : "";
   return `<div style="position:relative;background:var(--surface2,#121a2b);border:1px solid ${locked?'var(--border,#1b2740)':'rgba(46,230,168,.35)'};border-radius:16px;padding:16px 18px;overflow:hidden">
@@ -709,8 +715,15 @@ async function renderValor() {
       <p style="font-size:12.5px;color:var(--dim,#a3b1c9);line-height:1.6;margin:0">Você <b>pode perder esta</b> (54% de chance ainda deixa 46% de dar errado). O lucro vem no <b style="color:var(--text,#f2f6fc)">longo prazo</b>: apostando <b>sempre que tem valor</b>, a matemática vira a seu favor — igual o <b>cassino</b>, que não ganha toda rodada, mas <b>sempre ganha no volume</b>. Por isso: aposte <b>a mesma % da banca</b> em cada uma e tenha <b>paciência</b>.</p>
     </div>
   </div>`;
-  const grid = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px">${
-    dados.map((v, i) => valorCard(v, i >= VALOR_FREE)).join("")}</div>`;
+  // se um item vier torto, mostra o resto em vez de travar a tela no "Carregando…"
+  let cards = "";
+  try {
+    cards = dados.map((v, i) => valorCard(v, i >= VALOR_FREE)).join("");
+  } catch (e) {
+    console.error("odds de valor:", e);
+    cards = `<div class="empty" style="grid-column:1/-1;text-align:center;color:var(--muted,#647388);padding:20px">Não deu pra montar as odds agora. Tente recarregar.</div>`;
+  }
+  const grid = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px">${cards}</div>`;
   const nota = usaReal
     ? `<p style="text-align:center;font-size:12px;color:var(--muted,#647388);margin-top:18px">Odds de valor ao vivo. As primeiras estão liberadas — desbloqueie o resto.</p>`
     : `<p style="text-align:center;font-size:12px;color:var(--muted,#647388);margin-top:18px">🧪 Prévia com exemplos. Em breve: odds de valor reais atualizadas ao vivo.</p>`;

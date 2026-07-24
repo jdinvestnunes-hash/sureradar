@@ -43,7 +43,7 @@ MAX_PAG_VALOR = 6              # valuebets já vêm filtradas nas suas casas —
 MAX_VALOR = 150               # teto de segurança
 PERFIL = "pw_profile"          # sessão do Chrome fica salva aqui (login persiste)
 CICLO_MIN = 10                 # minutos entre varreduras
-VALOR_ATIVO = False            # liga/desliga a passada de ODDS DE VALOR (deixe True p/ raspar valuebets)
+VALOR_ATIVO = True             # liga/desliga a passada de ODDS DE VALOR (deixe True p/ raspar valuebets)
 MAX_PAGINAS = 40
 MIN_PROFIT = 0.70              # PARA quando o lucro chega aqui (lista é decrescente).
                               # FREE = 0,70–1% · PRO = 1–25% · abaixo de 0,70 ignora.
