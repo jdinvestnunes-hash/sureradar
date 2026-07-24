@@ -746,7 +746,9 @@ def listar_usuarios():
     """Todos os usuários (para o painel admin), do mais novo ao mais antigo."""
     with _db() as c:
         rows = c.execute(
-            "SELECT id, nome, email, plano, plano_expira, origem, criado FROM users ORDER BY criado DESC"
+            # valor_expira = add-on das Odds Erradas (o painel mostra o selo 💎)
+            "SELECT id, nome, email, plano, plano_expira, valor_expira, origem, criado"
+            " FROM users ORDER BY criado DESC"
         ).fetchall()
     return [dict(r) for r in rows]
 

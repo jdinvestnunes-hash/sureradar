@@ -1709,14 +1709,18 @@ def admin_usuarios(request: Request):
     lista = []
     for u in auth.listar_usuarios():
         lista.append({**u, "dias": auth.dias_restantes(u),
-                      "aviso_renovar": _aviso_renovar(auth.dias_restantes(u))})
+                      "aviso_renovar": _aviso_renovar(auth.dias_restantes(u)),
+                      "valor_dias": auth.valor_dias_restantes(u)})   # add-on Odds Erradas
     return {"usuarios": lista}
 
 
 @app.post("/api/admin/plano")
 def admin_plano(request: Request, payload: dict = Body(...)):
     """Admin ativa/renova PRO (com a duração escolhida — SOMA nos dias restantes)
-    ou volta pra Free. Body: {email, acao:'pro'|'free', dias:int}."""
+    ou volta pra Free. Body: {email, acao:'pro'|'free'|'valor'|'valor-off', dias:int}.
+
+    'valor' libera SÓ o add-on das Odds Erradas — é independente do plano, então dá
+    pra deixar a pessoa no FREE e mesmo assim com a aba liberada."""
     user = _usuario(request)
     erro = _guard_admin(request, user)
     if erro:
@@ -1728,6 +1732,19 @@ def admin_plano(request: Request, payload: dict = Body(...)):
     if acao == "free":
         auth.voltar_free(alvo["id"])
         return {"ok": True, "email": alvo["email"], "plano": "free"}
+    if acao == "valor-off":
+        auth.revogar_valor(alvo["id"])
+        return {"ok": True, "email": alvo["email"], "valor_dias": None}
+    if acao == "valor":
+        try:
+            dias_v = int(payload.get("dias", config.ADDON_VALOR["dias"]))
+        except (TypeError, ValueError):
+            dias_v = config.ADDON_VALOR["dias"]
+        dias_v = max(1, min(dias_v, 3650))
+        auth.ativar_valor(alvo["id"], dias_v, 0.0, metodo="admin")   # cortesia: R$ 0
+        atual = auth.pegar_por_email(alvo["email"])
+        return {"ok": True, "email": alvo["email"],
+                "valor_dias": auth.valor_dias_restantes(atual)}
     try:
         dias = int(payload.get("dias", 30))
     except (TypeError, ValueError):

@@ -660,6 +660,48 @@ const VALOR_FREE = 2;   // quantas aparecem liberadas pra quem NÃO comprou; o r
 // add-on das Odds Erradas: comprado à parte do plano (/api/me manda os números)
 let VALOR_TEM = false, VALOR_PRECO = 47, VALOR_DIAS_ADDON = 30, VALOR_DIAS = null;
 
+// Site oficial (.bet.br) das casas que a gente monitora. Serve de PLANO B do botão
+// "ABRIR NA CASA": o link direto da entrada só existe quando o robô conseguiu resolver
+// o redirect; sem ele o botão ficava morto. Casa fora da lista cai numa busca.
+const CASAS_SITE = {
+  bet365: "https://www.bet365.bet.br",
+  betano: "https://www.betano.bet.br",
+  superbet: "https://superbet.bet.br",
+  novibet: "https://www.novibet.bet.br",
+  betnacional: "https://betnacional.bet.br",
+  pixbet: "https://pixbet.bet.br",
+  betsson: "https://www.betsson.bet.br",
+  betsul: "https://betsul.bet.br",
+  esportesdasorte: "https://esportesdasorte.bet.br",
+  kto: "https://www.kto.bet.br",
+  sportingbet: "https://www.sportingbet.bet.br",
+  betfair: "https://www.betfair.bet.br",
+  estrelabet: "https://estrelabet.bet.br",
+  bet7k: "https://bet7k.bet.br",
+  vaidebet: "https://vaidebet.bet.br",
+  stake: "https://stake.bet.br",
+  blaze: "https://blaze.bet.br",
+  brazino777: "https://brazino777.bet.br",
+  apostaganha: "https://apostaganha.bet.br",
+  lotogreen: "https://lotogreen.bet.br",
+  betfast: "https://betfast.bet.br",
+  verabet: "https://verabet.bet.br",
+  rivalo: "https://rivalo.bet.br",
+  betmotion: "https://betmotion.bet.br",
+  mcgames: "https://mcgames.bet.br",
+};
+function siteDaCasa(casa) {
+  const k = String(casa || "").toLowerCase()
+    .replace(/\(.*?\)/g, "")     // "Betano (BR)" -> "betano"
+    .normalize("NFD")            // separa o acento da letra...
+    .replace(/[^a-z0-9]/g, "");  // ...e o [^a-z0-9] leva o acento junto ("Esportes da Sorte" -> esportesdasorte)
+  if (!k) return null;
+  if (CASAS_SITE[k]) return CASAS_SITE[k];
+  const achou = Object.keys(CASAS_SITE).find((n) => k.startsWith(n));   // "betanobr" -> "betano"
+  if (achou) return CASAS_SITE[achou];
+  return "https://www.google.com/search?q=" + encodeURIComponent(casa + " apostas site oficial");
+}
+
 // escapa texto que vem da raspagem antes de virar HTML (nome de time/casa pode ter & < >)
 function escH(s) {
   return String(s == null ? "" : s)
@@ -706,7 +748,9 @@ function valorOpEl(v, locked) {
   main.appendChild(el("div", "op-box-label", escH(v.mercado)));
   const book = el("div", "op-box-book");
   book.appendChild(el("span", null, escH(v.casa)));
-  const link = (v.link && !/surebet\.com/i.test(v.link)) ? v.link : null;
+  // link direto da entrada; se o robô ainda não resolveu, cai no site da casa
+  const direto = (v.link && !/surebet\.com/i.test(v.link)) ? v.link : null;
+  const link = direto || siteDaCasa(v.casa);
   if (link && !locked) book.appendChild(el("span", "ext", "↗ ir para a casa"));
   main.appendChild(book);
   box.appendChild(main);
@@ -724,8 +768,13 @@ function valorOpEl(v, locked) {
   const bar = el("div", "op-bar");
   bar.appendChild(el("div", "op-return",
     `<span class="ci" style="width:15px;height:15px;margin-right:7px">${ICONS.chart}</span>+${Number(v.valor || 0).toFixed(1)}% ACIMA DO JUSTO`));
-  const btn = el("button", "op-calc", "ABRIR NA CASA");
-  if (link && !locked) btn.addEventListener("click", () => window.open(link, "_blank", "noopener"));
+  const btn = el("button", "op-calc", direto ? "ABRIR NA CASA" : "IR PRA CASA");
+  if (link && !locked) {
+    btn.title = direto ? "Abre a entrada na casa" : "Abre o site da " + (v.casa || "casa") + " — procure o jogo lá";
+    btn.addEventListener("click", () => window.open(link, "_blank", "noopener"));
+  } else {
+    btn.disabled = true;                       // sem link nenhum: não finge que clica
+  }
   bar.appendChild(btn);
   op.appendChild(bar);
   return op;

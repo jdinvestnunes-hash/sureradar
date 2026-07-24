@@ -92,6 +92,8 @@
     .b-pro{background:var(--grad);color:#052015}
     .b-pre{background:rgba(255,255,255,.05);color:var(--text);border:1px solid var(--line2)}
     .b-free{background:transparent;color:var(--red);border:1px solid rgba(255,107,107,.4)}
+    .b-valor{background:rgba(169,139,255,.16);color:#c9a2ff;border:1px solid rgba(169,139,255,.45)}
+    .b-valor-off{background:transparent;color:#c9a2ff;border:1px dashed rgba(169,139,255,.45)}
     .b-del{background:rgba(255,107,107,.14);color:var(--red);border:1px solid rgba(255,107,107,.4)}
     .b-del:hover{background:var(--red);color:#fff}
     .tk-tab.on{background:var(--grad);color:#052015;border-color:transparent}
@@ -389,15 +391,19 @@ function renderUsuarios(){
     const pro=u.plano==="pro";
     const badge=pro?(u.aviso_renovar?'<span class="tag t-warn">PRO · vence</span>':'<span class="tag t-pro">PRO</span>'):'<span class="tag t-free">FREE</span>';
     const dias=pro&&u.dias!=null?`<div class="u-dias">${u.dias} dia(s) restante(s)</div>`:"";
+    // add-on das Odds Erradas — vale mesmo pra quem está no FREE
+    const vb=u.valor_dias?`<span class="tag" style="background:rgba(169,139,255,.16);color:#c9a2ff;border:1px solid rgba(169,139,255,.45)">💎 ${u.valor_dias}d</span>`:"";
     const origem=u.origem?`<span style="display:inline-block;margin-left:6px;background:rgba(56,212,245,.14);color:var(--cyan);font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:99px">📍 ${escH(u.origem)}</span>`:`<span style="display:inline-block;margin-left:6px;color:var(--mute);font-size:10.5px">📍 direto/orgânico</span>`;
     return `<div class="u" data-email="${u.email}">
-      <div class="u-info"><div class="u-nome">${u.nome} ${badge}</div><div class="u-email">${u.email}${origem}</div>${dias}</div>
+      <div class="u-info"><div class="u-nome">${u.nome} ${badge} ${vb}</div><div class="u-email">${u.email}${origem}</div>${dias}</div>
       <div class="ctrl">
         <button class="btn b-pre" data-dias="30">+30d</button>
         <button class="btn b-pre" data-dias="365">+365d</button>
         <input type="number" min="1" max="3650" value="30" class="dias-in" />
         <button class="btn b-pro" data-acao="pro">Ativar/Renovar</button>
         <button class="btn b-free" data-acao="free">Free</button>
+        <button class="btn b-valor" data-acao="valor" title="Libera as Odds Erradas pelos dias do campo — não mexe no plano">💎 Odds Erradas</button>
+        ${u.valor_dias?'<button class="btn b-valor-off" data-acao="valor-off" title="Tira o add-on das Odds Erradas">💎 off</button>':""}
         <button class="btn b-del" data-acao="excluir" title="Excluir conta">🗑 Excluir</button>
       </div></div>`;
   }).join("") : '<div class="empty">Nenhum usuário.</div>';
@@ -407,7 +413,10 @@ async function acao(email,acao,dias){
   const r=await fetch("/api/admin/plano",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,acao,dias})});
   const j=await r.json();
   if(!r.ok){toast("❌ "+(j.erro||"erro"));return;}
-  toast(acao==="free"?`✅ <b>${email}</b> → Free`:`✅ <b>${email}</b> PRO · ${j.dias_totais} dias`);
+  if(acao==="free") toast(`✅ <b>${email}</b> → Free`);
+  else if(acao==="valor") toast(`💎 <b>${email}</b> → Odds Erradas por ${j.valor_dias} dia(s)`);
+  else if(acao==="valor-off") toast(`💎 <b>${email}</b> → Odds Erradas removidas`);
+  else toast(`✅ <b>${email}</b> PRO · ${j.dias_totais} dias`);
   carregar();
 }
 async function excluir(email){
@@ -423,6 +432,8 @@ document.addEventListener("click",(e)=>{
   if(e.target.dataset.dias){card.querySelector(".dias-in").value=e.target.dataset.dias;return;}
   if(e.target.dataset.acao==="pro"){acao(email,"pro",parseInt(card.querySelector(".dias-in").value)||30);}
   if(e.target.dataset.acao==="free"){if(confirm(`Tirar o PRO de ${email}?`))acao(email,"free");}
+  if(e.target.dataset.acao==="valor"){acao(email,"valor",parseInt(card.querySelector(".dias-in").value)||30);}
+  if(e.target.dataset.acao==="valor-off"){if(confirm(`Tirar as Odds Erradas de ${email}?`))acao(email,"valor-off");}
   if(e.target.dataset.acao==="excluir"){
     if(!confirm(`EXCLUIR a conta de ${email}?\n\nIsso apaga TODOS os dados (banca, pagamentos, assinatura) e cancela a assinatura no cartão, se houver. NÃO dá pra desfazer.`))return;
     if(prompt(`Confirme digitando EXCLUIR para apagar ${email}:`)!=="EXCLUIR"){toast("Cancelado.");return;}

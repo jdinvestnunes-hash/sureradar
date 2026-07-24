@@ -187,7 +187,26 @@ def enviar_valor(records):
         print("   !! erro ao enviar valuebets:", str(e)[:100])
 
 
-def uma_varredura_valor(page):
+def resolver_todos_valor(ctx, recs):
+    """Igual ao resolver_todos das surebets, mas pra 1 link por registro. Sem isso o
+    link continua sendo do surebet.com e o painel joga fora (_link_casa), deixando o
+    botão 'ABRIR NA CASA' morto."""
+    faltam = [r for r in recs if _e_surebet(r.get("link")) and r["link"] not in LINK_CACHE]
+    if faltam:
+        print(f"   valuebets: resolvendo {len(faltam)} link(s) novo(s) das casas…")
+    pg = ctx.new_page()
+    try:
+        for r in recs:
+            if r.get("link"):
+                final = resolver_link(ctx, pg, r["link"])
+                r["link"] = final if (final and not _e_surebet(final)) else None
+    finally:
+        pg.close()
+    if faltam:
+        _salvar_cache()
+
+
+def uma_varredura_valor(page, ctx):
     """Passada das ODDS DE VALOR — roda DEPOIS da surebet e é TOTALMENTE isolada:
     qualquer erro aqui não afeta a surebet (que já foi enviada). Usa o filtro que
     você salvou na página de valuebets (mesmas casas)."""
@@ -227,7 +246,13 @@ def uma_varredura_valor(page):
                 arg=id_antes, timeout=20000)
         except Exception:
             break
-    print(f">> Valuebets: {len(todos)} odds de valor em {pag} pág. — enviando.")
+    try:                       # link da casa: se falhar, manda sem link (não perde a odd)
+        resolver_todos_valor(ctx, todos)
+    except Exception as e:
+        print("   !! valuebets: falha ao resolver links:", str(e)[:100])
+    com_link = sum(1 for r in todos if r.get("link"))
+    print(f">> Valuebets: {len(todos)} odds de valor em {pag} pág. "
+          f"({com_link} com link da casa) — enviando.")
     enviar_valor(todos)
 
 
@@ -338,7 +363,7 @@ def main():
                 print("!! erro na varredura:", str(e)[:150])
             if VALOR_ATIVO:                              # EXTRA: odds de valor (isolada, opcional)
                 try:
-                    uma_varredura_valor(page)
+                    uma_varredura_valor(page, ctx)
                 except Exception as e:
                     print("!! erro nas valuebets (surebet NÃO afetada):", str(e)[:150])
             print(f">> Próxima varredura em {CICLO_MIN} min.\n")
