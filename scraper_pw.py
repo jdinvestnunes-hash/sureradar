@@ -345,18 +345,62 @@ def uma_varredura(page, ctx):
         pass
 
 
+def _limpar_lock():
+    """Remove os locks do perfil (SingletonLock etc.). Se o Chromium travou/caiu,
+    esses arquivos ficam presos e impedem reabrir com o mesmo perfil."""
+    for nome in ("SingletonLock", "SingletonCookie", "SingletonSocket"):
+        try:
+            os.remove(os.path.join(PERFIL, nome))
+        except OSError:
+            pass
+
+
+def _abrir_ctx(p):
+    """Abre (ou reabre) o navegador persistente e devolve (ctx, page)."""
+    _limpar_lock()
+    ctx = p.chromium.launch_persistent_context(
+        PERFIL, headless=HEADLESS,
+        viewport={"width": 1280, "height": 900},
+        args=["--disable-blink-features=AutomationControlled"],
+    )
+    page = ctx.pages[0] if ctx.pages else ctx.new_page()
+    return ctx, page
+
+
+def _ctx_vivo(page):
+    """True se o navegador ainda responde. Janela fechada/travada -> False,
+    e aí o loop reabre sozinho (blindagem contra a janela ser fechada sem querer)."""
+    try:
+        if page is None or page.is_closed():
+            return False
+        page.evaluate("1")   # navegador morto lança aqui
+        return True
+    except Exception:
+        return False
+
+
 def main():
     with sync_playwright() as p:
-        ctx = p.chromium.launch_persistent_context(
-            PERFIL, headless=HEADLESS,
-            viewport={"width": 1280, "height": 900},
-            args=["--disable-blink-features=AutomationControlled"],
-        )
-        page = ctx.pages[0] if ctx.pages else ctx.new_page()
+        ctx, page = _abrir_ctx(p)
         print("=" * 60)
         print(" ROBÔ SUREBET (Playwright) — deixe a janela aberta.")
         print("=" * 60)
         while True:
+            # BLINDAGEM: se a janela foi fechada / o navegador travou, reabre sozinho
+            # em vez de ficar errando pra sempre ou derrubar o processo.
+            if not _ctx_vivo(page):
+                print("!! navegador caiu (janela fechada/travou) — reabrindo sozinho...")
+                try:
+                    ctx.close()
+                except Exception:
+                    pass
+                try:
+                    ctx, page = _abrir_ctx(p)
+                    print(">> navegador reaberto.")
+                except Exception as e:
+                    print("!! não consegui reabrir agora:", str(e)[:150], "— tento em 30s.")
+                    time.sleep(30)
+                    continue
             try:
                 uma_varredura(page, ctx)                 # PRINCIPAL: surebet
             except Exception as e:
@@ -366,6 +410,10 @@ def main():
                     uma_varredura_valor(page, ctx)
                 except Exception as e:
                     print("!! erro nas valuebets (surebet NÃO afetada):", str(e)[:150])
+            # Se o navegador morreu no meio da varredura, reabre JÁ (não espera 10 min).
+            if not _ctx_vivo(page):
+                print("!! navegador morreu durante a varredura — reabrindo já.")
+                continue
             print(f">> Próxima varredura em {CICLO_MIN} min.\n")
             time.sleep(CICLO_MIN * 60)
 
