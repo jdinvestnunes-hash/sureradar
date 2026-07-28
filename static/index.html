@@ -239,13 +239,54 @@
     <div id="view-alertas-body" style="max-width:640px;margin:22px auto 0;padding:0 6px"></div>
   </div>
 
-  <!-- VIEW: APOSTAS DE INTERVALO (middles) — BETA fechado, só p/ e-mails liberados -->
-  <div class="bank-view hidden" id="view-middle">
-    <div class="bank-head" style="text-align:center">
-      <h1>🎯 Apostas de Intervalo</h1>
-      <p class="subtitle" style="max-width:640px;margin:8px auto 0">Você aposta <b>Acima X</b> numa casa e <b>Abaixo Y</b> em outra (com Y &gt; X), criando um <b>intervalo</b>. Se o placar cair <b>dentro</b> do intervalo, as <b>duas</b> ganham (lucrão). Se cair fora, uma ganha e a outra perde — de propósito montado pra dar <b>lucro pequeno ou empate</b>. Não é garantida como surebet: é aposta de valor com risco controlado.</p>
-    </div>
-    <div id="view-middle-body" style="max-width:760px;margin:22px auto 0;padding:0 6px"></div>
+  <!-- VIEW: APOSTAS DE INTERVALO (middles) — mesmo esqueleto das Surebets. BETA fechado. -->
+  <div class="layout hidden" id="view-middle">
+    <button id="btn-filtros-middle" class="btn-filtros"
+      onclick="document.querySelector('#view-middle .sidebar').classList.toggle('open'); this.classList.toggle('aberto')">⚙ Filtros</button>
+    <aside class="sidebar">
+      <div class="filter-block">
+        <div class="filter-title">Lucro máx (se cair no meio)</div>
+        <label class="slider">
+          <div class="slider-head"><span>Mínimo</span><output id="middle-min-out">todas</output></div>
+          <input type="range" id="middle-min" min="0" max="15" step="0.5" value="0" />
+        </label>
+      </div>
+
+      <div class="filter-block">
+        <div class="filter-title-row">
+          <span class="filter-title">Casas de aposta</span>
+          <div class="filter-actions">
+            <button id="middle-all" class="mini">Todas</button>
+            <button id="middle-none" class="mini">Limpar</button>
+          </div>
+        </div>
+        <div id="middle-casas" class="checks"></div>
+      </div>
+    </aside>
+
+    <main class="content">
+      <div class="valor-top">
+        <div>
+          <h2>🎯 Apostas de Intervalo</h2>
+          <p>Você aposta <b>Acima X</b> numa casa e <b>Abaixo Y</b> em outra (Y &gt; X), criando um <b>intervalo</b>. Se o placar cair <b>dentro</b>, as <b>duas</b> ganham (lucrão). Se cair fora, é montado pra dar <b>perda pequena ou empate</b>. Não é garantida como a surebet — é risco controlado.</p>
+        </div>
+      </div>
+
+      <div class="chips" id="middle-chips"></div>
+
+      <div class="list-head">
+        <span id="middle-count">0 apostas de intervalo</span>
+        <span id="middle-fonte" class="muted"></span>
+      </div>
+
+      <div id="middle-list" class="grid"></div>
+
+      <div id="middle-empty" class="empty hidden">
+        <div class="empty-icon">🎯</div>
+        <h2>Nenhuma aposta de intervalo agora</h2>
+        <p>O robô atualiza a cada 10 min — e o filtro precisa estar salvo (💾) na página de middles do surebet.com.</p>
+      </div>
+    </main>
   </div>
 
   <!-- VIEW: ODDS ERRADAS DAS CASAS (valuebets) — mesmo esqueleto das Surebets -->
@@ -478,22 +519,9 @@
     #view-calc .cv-launch:disabled,#view-alertas .cv-launch:disabled{opacity:.6;cursor:default}
     .btn-manual{background:rgba(46,230,168,.1);border:1px solid rgba(46,230,168,.4);color:var(--green,#2ee6a8);font-weight:800;font-size:14px;padding:11px 18px;border-radius:11px;cursor:pointer;font-family:inherit}
     .btn-manual:hover{background:rgba(46,230,168,.16)}
-    /* Apostas de Intervalo (middles) */
-    .mid-card{background:var(--surface2,#121a2b);border:1px solid var(--border2,#27395c);border-radius:15px;padding:15px 16px;margin-bottom:14px}
-    .mid-top{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:12px}
-    .mid-ev{font-weight:800;font-size:15px;color:var(--text,#f2f6fc)}
-    .mid-meta{font-size:12.5px;color:var(--muted,#647388);white-space:nowrap}
-    .mid-lucro{color:var(--green,#2ee6a8)}
-    .mid-leg{display:flex;justify-content:space-between;align-items:center;gap:12px;background:var(--bg,#05070d);border:1px solid var(--border2,#27395c);border-radius:11px;padding:11px 13px}
-    .mid-leg-main{min-width:0}
-    .mid-casa{font-weight:800;font-size:14px;color:var(--cyan,#38d4f5)}
-    .mid-mkt{font-size:12.5px;color:var(--dim,#a3b1c9);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:340px}
-    .mid-leg-r{display:flex;align-items:center;gap:12px;flex-shrink:0}
-    .mid-odd{font-weight:800;font-size:17px;color:var(--text,#f2f6fc)}
-    .mid-go{background:var(--grad,linear-gradient(112deg,#2ee6a8,#38d4f5));color:#052015;font-weight:800;font-size:11.5px;letter-spacing:.03em;padding:8px 12px;border-radius:9px;text-decoration:none;white-space:nowrap}
-    .mid-go:hover{filter:brightness(1.06)}
-    .mid-nogo{font-size:11.5px;color:var(--muted,#647388)}
-    .mid-vs{text-align:center;font-size:10.5px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--muted,#647388);padding:6px 0}
+    /* Apostas de intervalo: destaque do intervalo Acima/Abaixo entre as 2 pernas */
+    .op-mid .op-market{color:var(--cyan,#38d4f5);font-weight:700}
+    .op-mid-gap{text-align:center;font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--muted,#647388);margin:2px 0}
   </style>
   <script>
   (function(){

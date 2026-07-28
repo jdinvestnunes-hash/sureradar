@@ -968,41 +968,168 @@ async function renderValor() {
   renderValorLista();
 }
 
-// ---------- Apostas de Intervalo (middles) — BETA fechado, só p/ e-mails liberados ----------
+// ---------- Apostas de Intervalo (middles) — mesmo dashboard das Surebets, BETA fechado ----------
+let MIDDLE_ITENS = [], MIDDLE_SPORT = "", MIDDLE_MIN = 0;
+let MIDDLE_OFF = new Set();   // casas DESmarcadas na lateral (casa nova entra marcada)
+let MIDDLE_BOUND = false;     // listeners da lateral já ligados (só uma vez)
+
+// Card no MESMO padrão das Surebets (.op) — 2 pernas: Acima numa casa, Abaixo em outra.
+function middleOpEl(m) {
+  const op = el("div", "op op-mid");
+
+  const head = el("div", "op-head");
+  const league = el("div", "op-league");
+  league.appendChild(el("span", null, m.ico || "🎯"));
+  league.appendChild(el("span", null, escH(m.esporte || "Esporte")));
+  head.appendChild(league);
+  head.appendChild(el("div", "op-time", escH(m.hora || "")));
+  op.appendChild(head);
+
+  const body = el("div", "op-body");
+  body.appendChild(el("div", "op-event", escH(m.event || "Evento")));
+  body.appendChild(el("div", "op-market", "aposta de intervalo — 2 casas"));
+
+  const odds = el("div", "op-odds");
+  (m.legs || []).forEach((g, i) => {
+    if (i === 1) odds.appendChild(el("div", "op-mid-gap", "↕ intervalo"));
+    const box = el("div", "op-box");
+    const main = el("div", "op-box-main");
+    main.appendChild(el("div", "op-box-label", escH(g.desc || g.mercado || "")));
+    if (g.desc && g.mercado && g.desc !== g.mercado) {
+      const codeEl = el("div", null, escH(g.mercado));
+      codeEl.style.cssText = "font-size:11px;color:var(--muted,#647388);margin-top:2px";
+      main.appendChild(codeEl);
+    }
+    const book = el("div", "op-box-book");
+    book.appendChild(el("span", null, escH(g.casa)));
+    const link = (g.link && !/surebet\.com/i.test(g.link)) ? g.link : null;
+    if (link) book.appendChild(el("span", "ext", "↗ ir para a casa"));
+    main.appendChild(book);
+    box.appendChild(main);
+    box.appendChild(el("div", "op-box-odd", Number(g.odd || 0).toFixed(2)));
+    if (link) box.addEventListener("click", () => window.open(link, "_blank", "noopener"));
+    odds.appendChild(box);
+  });
+  body.appendChild(odds);
+  op.appendChild(body);
+
+  const bar = el("div", "op-bar");
+  bar.appendChild(el("div", "op-return",
+    `<span class="ci" style="width:15px;height:15px;margin-right:7px">${ICONS.chart}</span>` +
+    (Number(m.profit) ? `LUCRO MÁX +${Number(m.profit).toFixed(2)}%` : "APOSTA DE INTERVALO")));
+  const calc = el("button", "op-calc", "CALCULAR " + ICON_CALC);
+  // reusa a calculadora das surebets (2 pernas, mesma estrutura)
+  calc.addEventListener("click", () => openCalc({
+    event: m.event, market_label: "aposta de intervalo", profit_pct: m.profit || 0,
+    legs: (m.legs || []).map((g) => ({
+      bookmaker: g.casa, bookmaker_label: g.casa, desc: g.desc || g.mercado,
+      outcome: g.mercado, odd: g.odd, link: g.link,
+    })),
+  }));
+  bar.appendChild(calc);
+  op.appendChild(bar);
+  return op;
+}
+
+// Chips de esporte (filtra na tela, igual às Surebets)
+function renderMiddleChips() {
+  const box = document.getElementById("middle-chips"); if (!box) return;
+  box.innerHTML = "";
+  const vistos = new Map();
+  MIDDLE_ITENS.forEach((m) => { if (m.esporte && !vistos.has(m.esporte)) vistos.set(m.esporte, m.ico || "🎯"); });
+  const chips = [{ key: "", label: "Todos", ico: "🌐" }]
+    .concat([...vistos].map(([label, ico]) => ({ key: label, label, ico })));
+  if (chips.length <= 2) { box.style.display = "none"; return; }
+  box.style.display = "";
+  chips.forEach((c) => {
+    const chip = el("button", "chip" + (MIDDLE_SPORT === c.key ? " active" : ""), `${c.ico} ${escH(c.label)}`);
+    chip.addEventListener("click", () => { MIDDLE_SPORT = c.key; renderMiddleChips(); renderMiddleLista(); });
+    box.appendChild(chip);
+  });
+}
+
+// Casas na lateral — desmarcar some da lista
+function renderMiddleCasas() {
+  const box = document.getElementById("middle-casas"); if (!box) return;
+  const casas = [...new Set(MIDDLE_ITENS.flatMap((m) => (m.legs || []).map((g) => g.casa)).filter(Boolean))].sort();
+  box.innerHTML = "";
+  if (!casas.length) { box.innerHTML = `<div class="muted">nenhuma casa no momento</div>`; return; }
+  casas.forEach((casa) => {
+    const lb = el("label", "check");
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = !MIDDLE_OFF.has(casa);
+    cb.addEventListener("change", () => {
+      if (cb.checked) MIDDLE_OFF.delete(casa); else MIDDLE_OFF.add(casa);
+      renderMiddleLista();
+    });
+    lb.appendChild(cb);
+    lb.appendChild(el("span", null, escH(casa)));
+    box.appendChild(lb);
+  });
+}
+
+// esconde a aposta se QUALQUER uma das casas dela estiver desmarcada
+function middleFiltradas() {
+  return MIDDLE_ITENS.filter((m) => {
+    const casas = (m.legs || []).map((g) => g.casa);
+    return (!MIDDLE_SPORT || m.esporte === MIDDLE_SPORT) &&
+      !casas.some((c) => MIDDLE_OFF.has(c)) &&
+      Number(m.profit || 0) >= MIDDLE_MIN;
+  });
+}
+
+function renderMiddleLista() {
+  const list = document.getElementById("middle-list");
+  const empty = document.getElementById("middle-empty");
+  if (!list) return;
+  list.innerHTML = "";
+  const visiveis = middleFiltradas();
+  const cont = document.getElementById("middle-count");
+  if (cont) cont.textContent = visiveis.length + (visiveis.length === 1 ? " aposta de intervalo" : " apostas de intervalo");
+  if (empty) empty.classList.toggle("hidden", visiveis.length > 0);
+  visiveis.forEach((m) => {
+    try { list.appendChild(middleOpEl(m)); }
+    catch (e) { console.error("middle:", e); }
+  });
+}
+
+// Liga a lateral UMA vez (o esqueleto mora no HTML)
+function bindMiddleUI() {
+  if (MIDDLE_BOUND) return;
+  MIDDLE_BOUND = true;
+  const sl = document.getElementById("middle-min");
+  const out = document.getElementById("middle-min-out");
+  const pinta = () => { if (out) out.textContent = MIDDLE_MIN ? "+" + MIDDLE_MIN + "%" : "todas"; };
+  if (sl) {
+    sl.value = MIDDLE_MIN;
+    sl.addEventListener("input", () => {
+      MIDDLE_MIN = parseFloat(sl.value) || 0;
+      pinta(); renderMiddleLista();
+    });
+  }
+  pinta();
+  const all = document.getElementById("middle-all");
+  if (all) all.addEventListener("click", () => { MIDDLE_OFF.clear(); renderMiddleCasas(); renderMiddleLista(); });
+  const none = document.getElementById("middle-none");
+  if (none) none.addEventListener("click", () => {
+    MIDDLE_ITENS.forEach((m) => (m.legs || []).forEach((g) => { if (g.casa) MIDDLE_OFF.add(g.casa); }));
+    renderMiddleCasas(); renderMiddleLista();
+  });
+}
+
 async function renderMiddle() {
-  const box = document.getElementById("view-middle-body");
-  if (!box) return;
-  box.innerHTML = '<div class="muted" style="padding:6px 2px">Carregando apostas de intervalo…</div>';
+  const list = document.getElementById("middle-list"); if (!list) return;
+  bindMiddleUI();
+  list.innerHTML = `<div class="muted" style="padding:6px 2px">Carregando apostas de intervalo…</div>`;
   let itens = [];
   try { const r = await fetch("/api/middles"); if (r.ok) itens = (await r.json()).itens || []; } catch {}
-  if (!itens.length) {
-    box.innerHTML = '<div class="empty" style="text-align:center;padding:40px 16px;color:var(--text-dim,#9aa7bd)">Nenhuma aposta de intervalo no momento.<br><span style="font-size:12.5px">O robô atualiza a cada 10 min — e o filtro precisa estar salvo (💾) na página de middles do surebet.com.</span></div>';
-    return;
-  }
-  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-  box.innerHTML = itens.map((m) => {
-    const legs = (m.legs || []).map((g) => {
-      const btn = g.link
-        ? `<a href="${esc(g.link)}" target="_blank" rel="noopener" class="mid-go">ABRIR NA CASA ↗</a>`
-        : `<span class="mid-nogo">ir na casa</span>`;
-      const mkt = g.desc || g.mercado || "";
-      return `<div class="mid-leg">
-        <div class="mid-leg-main">
-          <div class="mid-casa">${esc(g.casa)}</div>
-          <div class="mid-mkt" title="${esc(mkt)}">${esc(mkt)}</div>
-        </div>
-        <div class="mid-leg-r"><div class="mid-odd">${(Number(g.odd) || 0).toFixed(2)}</div>${btn}</div>
-      </div>`;
-    }).join('<div class="mid-vs">intervalo</div>');
-    const lucro = (Number(m.profit) || 0).toFixed(2).replace(".", ",");
-    return `<div class="mid-card">
-      <div class="mid-top">
-        <div class="mid-ev">${esc(m.ico || "🎯")} ${esc(m.event || "Evento")}</div>
-        <div class="mid-meta">${m.hora ? esc(m.hora) : ""}${Number(m.profit) ? ` · <b class="mid-lucro">lucro máx ${lucro}%</b>` : ""}</div>
-      </div>
-      ${legs}
-    </div>`;
-  }).join("");
+  MIDDLE_ITENS = itens;
+  const fonte = document.getElementById("middle-fonte");
+  if (fonte) fonte.textContent = "atualiza a cada 10 min";
+  renderMiddleCasas();
+  renderMiddleChips();
+  renderMiddleLista();
 }
 
 // ---------- Alertas no Telegram (aba própria, beta) ----------
