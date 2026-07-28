@@ -13,7 +13,7 @@
     gtag('js', new Date());
     gtag('config', 'AW-17915571478');
   </script>
-  <link rel="stylesheet" href="/static/style.css?v=12" />
+  <link rel="stylesheet" href="/static/style.css?v=13" />
   <link rel="stylesheet"
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
         media="print" onload="this.media='all'" />
@@ -64,6 +64,12 @@
       </div>
     </div>
   </header>
+
+  <!-- AVISO GLOBAL: robô offline (aparece só quando a raspagem para) -->
+  <div id="robo-offline" class="robo-offline hidden" role="status">
+    <span class="ro-spin" aria-hidden="true">🔄</span>
+    <span class="ro-txt">Estamos <b>reconferindo as apostas</b> nas casas — as odds ficam fora do ar por alguns minutos. <b>Já já volta ao normal.</b></span>
+  </div>
 
   <!-- VIEW: OPORTUNIDADES -->
   <div class="layout" id="view-ops">
@@ -268,8 +274,9 @@
       <div class="valor-top">
         <div>
           <h2>🎯 Apostas de Intervalo</h2>
-          <p>Você aposta <b>Acima X</b> numa casa e <b>Abaixo Y</b> em outra (Y &gt; X), criando um <b>intervalo</b>. Se o placar cair <b>dentro</b>, as <b>duas</b> ganham (lucrão). Se cair fora, é montado pra dar <b>perda pequena ou empate</b>. Não é garantida como a surebet — é risco controlado.</p>
+          <p>Dois mundos: se o placar cair <b>no intervalo</b> você ganha alto; se cair fora, é <b>perda pequena</b>. Risco controlado.</p>
         </div>
+        <button class="valor-help" id="middle-ajuda">🎯 Como funciona?</button>
       </div>
 
       <div class="chips" id="middle-chips"></div>
@@ -334,7 +341,7 @@
       <div class="valor-top">
         <div>
           <h2>💎 Odds Erradas das Casas</h2>
-          <p>A casa <b>errou o preço</b> e está pagando <b>acima do justo</b> — 1 aposta, 1 casa. Não é lucro garantido como a surebet: aqui o lucro vem <b>no volume</b>, com disciplina.</p>
+          <p>A casa <b>errou o preço</b> e paga <b>acima do justo</b>. Não é garantida — o lucro vem <b>no volume</b>.</p>
         </div>
         <button class="valor-help" id="valor-ajuda">💎 Como funciona?</button>
       </div>
@@ -389,6 +396,45 @@
         <div style="background:rgba(255,201,77,.1);border:1px solid rgba(255,201,77,.4);border-radius:12px;padding:12px 14px">
           <div style="font-weight:800;font-size:13.5px;color:#ffdb8a;margin-bottom:5px">⚠️ NÃO é surebet — não é lucro garantido nesta aposta</div>
           <p style="font-size:12.5px;color:var(--text-dim);line-height:1.6;margin:0">Você <b>pode perder esta</b> (54% de chance ainda deixa 46% de dar errado). O lucro vem no <b style="color:var(--text)">longo prazo</b>: apostando <b>sempre que tem valor</b>, a matemática vira a seu favor — igual o <b>cassino</b>, que não ganha toda rodada, mas <b>sempre ganha no volume</b>. Por isso: aposte <b>a mesma % da banca</b> em cada uma e tenha <b>paciência</b>.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: explicação das apostas de intervalo (mesmo padrão do valor) -->
+  <div id="middle-modal" class="overlay hidden">
+    <div class="modal" style="max-width:600px">
+      <div class="modal-head">
+        <div>
+          <div class="modal-title">🎯 O que é uma aposta de intervalo?</div>
+          <div class="modal-sub">Leia antes de usar — tem dois cenários possíveis.</div>
+        </div>
+        <button class="icon-btn" id="middle-modal-x">✕</button>
+      </div>
+      <div style="padding:20px 22px 24px">
+        <p style="font-size:13.5px;color:var(--text-dim);line-height:1.65;margin:0 0 14px">Você faz <b style="color:var(--text)">duas apostas</b>: <b style="color:var(--text)">Acima X</b> numa casa e <b style="color:var(--text)">Abaixo Y</b> em outra, com <b style="color:var(--text)">Y &gt; X</b>. Isso cria um <b style="color:#38d4f5">intervalo</b> entre os dois números.</p>
+        <div style="background:var(--bg);border-radius:14px;padding:14px 16px;margin-bottom:14px">
+          <div style="font-size:12px;color:var(--text-mute);margin-bottom:10px">📊 Exemplo: <b style="color:var(--text)">total de gols</b> — Acima 1.5 (casa A) + Abaixo 3.5 (casa B)</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div style="border:1px solid rgba(46,230,168,.45);border-radius:11px;padding:11px 12px">
+              <div style="font-size:11px;color:var(--green,#2ee6a8)">✅ Placar caiu DENTRO (2 ou 3 gols)</div>
+              <div style="font-size:15px;font-weight:800;margin-top:3px;color:var(--green,#2ee6a8)">as DUAS ganham</div>
+              <div style="font-size:11.5px;color:var(--text-dim);margin-top:2px">é o lucro grande — o "mundo bom"</div>
+            </div>
+            <div style="border:1px solid rgba(255,107,107,.4);border-radius:11px;padding:11px 12px">
+              <div style="font-size:11px;color:#ff6b6b">↔ Placar caiu FORA (0,1 ou 4+ gols)</div>
+              <div style="font-size:15px;font-weight:800;margin-top:3px;color:#ff6b6b">1 ganha, 1 perde</div>
+              <div style="font-size:11.5px;color:var(--text-dim);margin-top:2px">perda pequena — o "mundo ruim"</div>
+            </div>
+          </div>
+        </div>
+        <div style="background:rgba(56,212,245,.08);border:1px solid rgba(56,212,245,.35);border-radius:12px;padding:12px 14px;margin-bottom:12px">
+          <div style="font-weight:800;font-size:13.5px;color:#8fe3f7;margin-bottom:5px">💡 Por que vale a pena?</div>
+          <p style="font-size:12.5px;color:var(--text-dim);line-height:1.6;margin:0">A perda do "mundo ruim" é <b style="color:var(--text)">pequena e conhecida antes</b> (você vê na calculadora). O ganho do "mundo bom" é <b style="color:var(--text)">bem maior</b>. Quando o intervalo é largo, cair dentro é comum — e a matemática compensa no longo prazo.</p>
+        </div>
+        <div style="background:rgba(255,201,77,.1);border:1px solid rgba(255,201,77,.4);border-radius:12px;padding:12px 14px">
+          <div style="font-weight:800;font-size:13.5px;color:#ffdb8a;margin-bottom:5px">⚠️ NÃO é surebet — não é lucro garantido</div>
+          <p style="font-size:12.5px;color:var(--text-dim);line-height:1.6;margin:0">Diferente da surebet, aqui <b>você pode ter a perda pequena</b> se o placar cair fora do intervalo. Use a <b style="color:var(--text)">calculadora</b> pra ver exatamente <b style="color:var(--green,#2ee6a8)">quanto ganha</b> e <b style="color:#ff6b6b">quanto perde</b> em cada cenário antes de apostar.</p>
         </div>
       </div>
     </div>
@@ -466,6 +512,47 @@
     </div>
   </div>
 
+  <!-- MODAL CALCULADORA — APOSTAS DE INTERVALO (dois mundos: ganha dentro / perde fora) -->
+  <div id="midcalc-overlay" class="overlay hidden">
+    <div class="modal" role="dialog" aria-modal="true">
+      <div class="modal-head">
+        <div>
+          <div class="modal-title" id="midcalc-event">—</div>
+          <div class="modal-sub" id="midcalc-market">aposta de intervalo · 2 casas</div>
+        </div>
+        <button id="midcalc-close" class="icon-btn" aria-label="Fechar">✕</button>
+      </div>
+
+      <div class="calc-input">
+        <label for="midcalc-total">Valor total a apostar</label>
+        <div class="money-field">
+          <span>R$</span>
+          <input type="number" id="midcalc-total" value="1000" min="1" step="10" />
+        </div>
+      </div>
+
+      <div class="calc-hint">💡 O valor é dividido pra <b>equilibrar</b> os dois lados. Dá pra editar a odd e o valor de cada casa — os dois cenários recalculam sozinhos.</div>
+
+      <div id="midcalc-legs" class="calc-legs"></div>
+
+      <!-- OS DOIS MUNDOS -->
+      <div class="mid-worlds">
+        <div class="mid-world win">
+          <div class="mid-world-lb">✅ Cair NO intervalo</div>
+          <div class="mid-world-val" id="midcalc-win">R$ 0,00</div>
+          <div class="mid-world-sub" id="midcalc-win-sub">as duas ganham</div>
+        </div>
+        <div class="mid-world lose">
+          <div class="mid-world-lb">↔ Cair FORA</div>
+          <div class="mid-world-val" id="midcalc-lose">R$ 0,00</div>
+          <div class="mid-world-sub" id="midcalc-lose-sub">perda pequena</div>
+        </div>
+      </div>
+
+      <button id="midcalc-launch" class="btn-primary">＋ Lançar na banca</button>
+    </div>
+  </div>
+
   <!-- MODAL UPGRADE -->
   <div id="up-overlay" class="overlay hidden">
     <div class="modal up-modal" role="dialog" aria-modal="true">
@@ -492,7 +579,7 @@
     <span class="tg-bubble-txt">Grupo grátis</span>
   </a>
 
-  <script src="/static/app.js?v=26"></script>
+  <script src="/static/app.js?v=27"></script>
 
   <style>
     #view-calc .cv-leg{background:var(--surface2,#121a2b);border:1px solid var(--border,#1b2740);border-radius:14px;padding:16px;margin-bottom:14px}

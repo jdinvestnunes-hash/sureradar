@@ -192,6 +192,12 @@ POLL_INTERVAL_SEG = 60
 # sozinha (tira as que sumiram, adiciona as novas). Independe do polling acima.
 DASHBOARD_REFRESH_SEG = 600   # 10 minutos
 
+# ROBÔ OFFLINE: se a última raspagem chegou há MAIS que isto, o painel entende
+# que o robô parou e mostra o aviso "reconferindo as apostas". O ciclo real do
+# robô é ~13-14 min (raspagem + envio), então 20 min dá folga pra não dar
+# falso-alarme entre ciclos, e ainda avisa ANTES do feed expirar (25 min).
+ROBO_OFFLINE_SEG = 1200        # 20 minutos sem raspagem -> avisa que está offline
+
 # Guarda de segurança: se os créditos restantes na API caírem abaixo disto,
 # o agendador PARA sozinho para não zerar sua conta.
 MIN_CREDITOS_PARAR = 40

@@ -99,17 +99,28 @@ def get_surebets(min_profit=0.0, max_profit=None, bookmakers=None, sports=None):
 
 
 def status():
-    """Metadados do feed para o dashboard (contagem, se está conectado, etc.)."""
+    """Metadados do feed para o dashboard (contagem, se está conectado, etc.).
+
+    `online` (= `conectado`) agora reflete o ROBÔ DE VERDADE, não só a presença
+    do token: é True só se houve raspagem nos últimos ROBO_OFFLINE_SEG segundos.
+    Se o robô parar, o painel usa isso pra mostrar o aviso "reconferindo apostas".
+    """
     with _lock:
+        now = time.time()
         if config.FONTE_DADOS == "surebet":
-            conectado = bool(config.SUREBET_API_TOKEN)
+            tem_token = bool(config.SUREBET_API_TOKEN)
         else:
-            conectado = bool(config.ODDS_API_KEY)
+            tem_token = bool(config.ODDS_API_KEY)
+        idade = (now - _ultima_ts) if _ultima_ts else None
+        fresco = idade is not None and idade < config.ROBO_OFFLINE_SEG
+        online = bool(tem_token and fresco)
         return {
             "total": len(_validos()),
             "ultima_atualizacao": _ultima_atualizacao,
             "updated_ts": _ultima_ts,
-            "conectado": conectado,
+            "conectado": online,
+            "online": online,
+            "idade_seg": round(idade) if idade is not None else None,
         }
 
 

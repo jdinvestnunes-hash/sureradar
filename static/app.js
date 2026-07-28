@@ -179,8 +179,13 @@ async function carregar() {
 
 function setStatus(status) {
   const dot = $("#status-dot"), txt = $("#status-text");
-  if (status.conectado) { dot.className = "dot on"; txt.textContent = "Ao vivo"; }
+  // `online` reflete o robô DE VERDADE (raspagem recente); cai pro legado se faltar.
+  const online = (status.online !== undefined) ? status.online : status.conectado;
+  if (online) { dot.className = "dot on"; txt.textContent = "Ao vivo"; }
   else { dot.className = "dot off"; txt.textContent = "Offline"; }
+  // Aviso global: só aparece quando o robô parou de mandar raspagem.
+  const off = document.getElementById("robo-offline");
+  if (off) off.classList.toggle("hidden", !!online);
   if (status.ultima_atualizacao) $("#updated-at").textContent = "fonte: " + status.ultima_atualizacao;
   if (status.updated_ts) {
     if (LAST_TS && status.updated_ts > LAST_TS) flashNovas();   // chegou raspagem nova
@@ -1018,14 +1023,8 @@ function middleOpEl(m) {
     `<span class="ci" style="width:15px;height:15px;margin-right:7px">${ICONS.chart}</span>` +
     (Number(m.profit) ? `LUCRO MÁX +${Number(m.profit).toFixed(2)}%` : "APOSTA DE INTERVALO")));
   const calc = el("button", "op-calc", "CALCULAR " + ICON_CALC);
-  // reusa a calculadora das surebets (2 pernas, mesma estrutura)
-  calc.addEventListener("click", () => openCalc({
-    event: m.event, market_label: "aposta de intervalo", profit_pct: m.profit || 0,
-    legs: (m.legs || []).map((g) => ({
-      bookmaker: g.casa, bookmaker_label: g.casa, desc: g.desc || g.mercado,
-      outcome: g.mercado, odd: g.odd, link: g.link,
-    })),
-  }));
+  // calculadora PRÓPRIA da aposta de intervalo (mostra os dois mundos)
+  calc.addEventListener("click", () => openMidCalc(m));
   bar.appendChild(calc);
   op.appendChild(bar);
   return op;
@@ -1116,6 +1115,14 @@ function bindMiddleUI() {
     MIDDLE_ITENS.forEach((m) => (m.legs || []).forEach((g) => { if (g.casa) MIDDLE_OFF.add(g.casa); }));
     renderMiddleCasas(); renderMiddleLista();
   });
+  // Modal "Como funciona?" (mesmo padrão do valor)
+  const modal = document.getElementById("middle-modal");
+  const fechar = () => modal && modal.classList.add("hidden");
+  const ajuda = document.getElementById("middle-ajuda");
+  if (ajuda && modal) ajuda.addEventListener("click", () => modal.classList.remove("hidden"));
+  const x = document.getElementById("middle-modal-x");
+  if (x) x.addEventListener("click", fechar);
+  if (modal) modal.addEventListener("click", (e) => { if (e.target === modal) fechar(); });
 }
 
 async function renderMiddle() {
@@ -1131,6 +1138,175 @@ async function renderMiddle() {
   renderMiddleChips();
   renderMiddleLista();
 }
+
+// ---------- Calculadora das Apostas de Intervalo (DOIS MUNDOS) ----------
+// Diferente da surebet: aqui não há lucro garantido. Há dois cenários:
+//   • DENTRO do intervalo -> as DUAS pernas ganham (lucro grande).
+//   • FORA do intervalo    -> só UMA ganha (perda pequena, conhecida antes).
+let MIDC = null;          // { event, market, profit, legs:[{casa, desc, odd, link}] }
+let MIDC_ODDS = [];       // odds editáveis
+let MIDC_STAKES = [];     // valor por casa (editável)
+
+// Divide o total pra EQUILIBRAR os lados de fora (mesmo retorno caia pra onde cair
+// fora do intervalo): s_i = R / o_i, com R = total / Σ(1/o_i).
+function midSplit(total, odds) {
+  const inv = odds.reduce((s, o) => s + (o > 0 ? 1 / o : 0), 0);
+  const R = inv > 0 ? total / inv : 0;
+  return odds.map((o) => (o > 0 ? R / o : 0));
+}
+
+function openMidCalc(m) {
+  MIDC = {
+    event: m.event, market: "aposta de intervalo",
+    profit: Number(m.profit) || 0,
+    legs: (m.legs || []).map((g) => ({
+      casa: g.casa, desc: g.desc || g.mercado || "", mercado: g.mercado || "",
+      odd: Number(g.odd) || 0, link: g.link,
+    })),
+  };
+  document.getElementById("midcalc-event").textContent = MIDC.event || "—";
+  document.getElementById("midcalc-market").textContent =
+    "aposta de intervalo" + (MIDC.profit ? "  ·  lucro máx +" + MIDC.profit.toFixed(2) + "%" : "");
+  MIDC_ODDS = MIDC.legs.map((l) => l.odd);
+  const total = 1000;
+  document.getElementById("midcalc-total").value = total;
+  MIDC_STAKES = midSplit(total, MIDC_ODDS);
+  renderMidCalc();
+  document.getElementById("midcalc-launch").textContent = "＋ Lançar na banca";
+  document.getElementById("midcalc-overlay").classList.remove("hidden");
+}
+function closeMidCalc() {
+  const ov = document.getElementById("midcalc-overlay");
+  if (ov) ov.classList.add("hidden");
+  MIDC = null;
+}
+
+function renderMidCalc() {
+  if (!MIDC) return;
+  const box = document.getElementById("midcalc-legs");
+  box.innerHTML = "";
+  MIDC.legs.forEach((leg, i) => {
+    const item = el("div", "calc-leg");
+    const t = el("div", "calc-leg-top");
+    const name = el("div");
+    name.appendChild(el("div", "calc-leg-name", escH(leg.desc || leg.mercado || "aposta")));
+    name.appendChild(el("div", "calc-leg-book", escH(leg.casa || "—")));
+    t.appendChild(name);
+    // odd editável (pode ter mudado na casa)
+    const oddWrap = el("div", "calc-odd-edit");
+    oddWrap.appendChild(el("span", "calc-odd-at", "@"));
+    const oddInp = el("input");
+    oddInp.type = "number"; oddInp.min = "1.01"; oddInp.step = "0.01"; oddInp.className = "calc-odd-input";
+    oddInp.value = (MIDC_ODDS[i] || leg.odd).toFixed(2);
+    oddInp.addEventListener("input", () => {
+      MIDC_ODDS[i] = parseFloat(oddInp.value) || 0;
+      // mudou a odd -> reequilibra os lados mantendo o total
+      const total = MIDC_STAKES.reduce((s, v) => s + (Number(v) || 0), 0);
+      MIDC_STAKES = midSplit(total, MIDC_ODDS);
+      const its = box.children;
+      MIDC.legs.forEach((lg, j) => {
+        const si = its[j] && its[j].querySelector(".calc-stake-input");
+        if (si) si.value = Math.round((Number(MIDC_STAKES[j]) || 0) * 100) / 100;
+      });
+      updateMidCalc();
+    });
+    oddWrap.appendChild(oddInp);
+    t.appendChild(oddWrap);
+    item.appendChild(t);
+
+    const st = el("div", "calc-stake");
+    st.appendChild(el("div", "calc-stake-label", "Apostar na " + escH(leg.casa || "—")));
+    const edit = el("div", "calc-stake-edit");
+    edit.appendChild(el("span", "calc-stake-cur", "R$"));
+    const inp = el("input");
+    inp.type = "number"; inp.min = "0"; inp.step = "1"; inp.className = "calc-stake-input";
+    inp.value = Math.round((Number(MIDC_STAKES[i]) || 0) * 100) / 100;
+    inp.addEventListener("input", () => {
+      MIDC_STAKES[i] = parseFloat(inp.value) || 0;   // edição livre por casa
+      updateMidCalc();
+    });
+    edit.appendChild(inp);
+    st.appendChild(edit);
+    item.appendChild(st);
+
+    const info = el("div", "calc-leg-info");
+    info.appendChild(el("div", "calc-leg-ret", ""));
+    item.appendChild(info);
+    box.appendChild(item);
+  });
+  updateMidCalc();
+}
+
+// Recalcula os dois mundos a partir dos valores ATUAIS (odds + stakes editados).
+function updateMidCalc() {
+  if (!MIDC) return;
+  const stakes = MIDC_STAKES.map((v) => Number(v) || 0);
+  const odds = MIDC.legs.map((l, i) => MIDC_ODDS[i] || Number(l.odd));
+  const total = stakes.reduce((s, v) => s + v, 0);
+  const retornos = stakes.map((s, i) => s * odds[i]);
+
+  // DENTRO: as duas ganham -> recebe os dois retornos.
+  const dentro = retornos.reduce((s, r) => s + r, 0) - total;
+  // FORA: só uma perna ganha -> pior caso = a que devolve MENOS.
+  const foraCasos = retornos.map((r) => r - total);
+  const fora = foraCasos.length ? Math.min(...foraCasos) : 0;
+
+  const box = document.getElementById("midcalc-legs");
+  MIDC.legs.forEach((leg, i) => {
+    const info = box.children[i] && box.children[i].querySelector(".calc-leg-info");
+    if (info && info.children[0]) info.children[0].textContent = "retorno se ganhar: " + brl(retornos[i]);
+  });
+
+  document.getElementById("midcalc-total").value = Math.round(total * 100) / 100;
+  const pctD = total > 0 ? (dentro / total * 100) : 0;
+  const pctF = total > 0 ? (fora / total * 100) : 0;
+  const w = document.getElementById("midcalc-win");
+  w.textContent = (dentro >= 0 ? "+" : "") + brl(dentro);
+  document.getElementById("midcalc-win-sub").textContent =
+    "as duas ganham  ·  " + (dentro >= 0 ? "+" : "") + pctD.toFixed(1) + "%";
+  const l = document.getElementById("midcalc-lose");
+  l.textContent = (fora >= 0 ? "+" : "") + brl(fora);
+  document.getElementById("midcalc-lose-sub").textContent =
+    (fora >= 0 ? "empata/lucra pouco" : "perda pequena") + "  ·  " + (fora >= 0 ? "+" : "") + pctF.toFixed(1) + "%";
+}
+
+function launchMidToBank() {
+  if (!MIDC) return;
+  const stakes = MIDC_STAKES.map((v) => Number(v) || 0);
+  const odds = MIDC.legs.map((l, i) => MIDC_ODDS[i] || Number(l.odd));
+  const total = stakes.reduce((s, v) => s + v, 0);
+  const retornos = stakes.map((s, i) => s * odds[i]);
+  const fora = retornos.length ? Math.min(...retornos.map((r) => r - total)) : 0;
+  // Guarda o PIOR caso (fora) como "expected" -> a banca não infla o lucro previsto.
+  banca.push({
+    id: "mid-" + Date.now(),
+    event: MIDC.event, market: "🎯 aposta de intervalo", sport: "",
+    profit_pct: MIDC.profit, total, expected: fora, status: "pendente", tipo: "middle",
+    legs: MIDC.legs.map((l, i) => ({ outcome: l.desc || l.mercado, odd: odds[i], book: l.casa, stake: stakes[i] })),
+    jogo: "",
+    created: new Date().toLocaleDateString("pt-BR"),
+  });
+  saveBanca();
+  const btn = document.getElementById("midcalc-launch");
+  btn.textContent = "✓ Lançado na banca!";
+  renderBankBadge();
+  setTimeout(closeMidCalc, 700);
+}
+
+// listeners do modal (uma vez)
+(function bindMidCalc() {
+  const total = document.getElementById("midcalc-total");
+  if (total) total.addEventListener("input", () => {
+    MIDC_STAKES = midSplit(parseFloat(total.value) || 0, MIDC_ODDS);
+    renderMidCalc();
+  });
+  const x = document.getElementById("midcalc-close");
+  if (x) x.addEventListener("click", closeMidCalc);
+  const ov = document.getElementById("midcalc-overlay");
+  if (ov) ov.addEventListener("click", (e) => { if (e.target === ov) closeMidCalc(); });
+  const lc = document.getElementById("midcalc-launch");
+  if (lc) lc.addEventListener("click", launchMidToBank);
+})();
 
 // ---------- Alertas no Telegram (aba própria, beta) ----------
 async function renderAlertas() {
