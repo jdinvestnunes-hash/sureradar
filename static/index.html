@@ -13,7 +13,7 @@
     gtag('js', new Date());
     gtag('config', 'AW-17915571478');
   </script>
-  <link rel="stylesheet" href="/static/style.css?v=13" />
+  <link rel="stylesheet" href="/static/style.css?v=14" />
   <link rel="stylesheet"
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
         media="print" onload="this.media='all'" />
@@ -271,19 +271,14 @@
     </aside>
 
     <main class="content">
-      <div class="valor-top">
-        <div>
-          <h2>🎯 Apostas de Intervalo</h2>
-          <p>Dois mundos: se o placar cair <b>no intervalo</b> você ganha alto; se cair fora, é <b>perda pequena</b>. Risco controlado.</p>
-        </div>
-        <button class="valor-help" id="middle-ajuda">🎯 Como funciona?</button>
-      </div>
-
       <div class="chips" id="middle-chips"></div>
 
       <div class="list-head">
         <span id="middle-count">0 apostas de intervalo</span>
-        <span id="middle-fonte" class="muted"></span>
+        <div class="list-head-right">
+          <span id="middle-fonte" class="muted"></span>
+          <button class="valor-help" id="middle-ajuda">🎯 Como funciona?</button>
+        </div>
       </div>
 
       <div id="middle-list" class="grid"></div>
@@ -338,19 +333,14 @@
     </aside>
 
     <main class="content">
-      <div class="valor-top">
-        <div>
-          <h2>💎 Odds Erradas das Casas</h2>
-          <p>A casa <b>errou o preço</b> e paga <b>acima do justo</b>. Não é garantida — o lucro vem <b>no volume</b>.</p>
-        </div>
-        <button class="valor-help" id="valor-ajuda">💎 Como funciona?</button>
-      </div>
-
       <div class="chips" id="valor-chips"></div>
 
       <div class="list-head">
         <span id="valor-count">0 odds erradas</span>
-        <span id="valor-fonte" class="muted"></span>
+        <div class="list-head-right">
+          <span id="valor-fonte" class="muted"></span>
+          <button class="valor-help" id="valor-ajuda">💎 Como funciona?</button>
+        </div>
       </div>
 
       <div id="valor-cta" class="valor-cta hidden"></div>
