@@ -79,8 +79,8 @@ JS_RASPAR = r"""
       teams: ev?((ev.querySelector("a")||ev).textContent||"").trim():"", sport,
       link: vl?vl.href:null };
   }).filter(Boolean);
-  return { id: rec.dataset.id, profit: parseFloat(rec.dataset.profit),
-    start: parseInt(rec.dataset.startAt), legs };
+  return { id: rec.dataset.id, profit: parseFloat(rec.dataset.profit) || 0,
+    start: parseInt(rec.dataset.startAt) || 0, legs };
 }).filter(r => r.legs.length === 2)
 """
 
@@ -138,8 +138,8 @@ JS_RASPAR_MIDDLE = r"""
       teams: ev?((ev.querySelector("a")||ev).textContent||"").trim():"", sport,
       link: vl?vl.href:null };
   }).filter(Boolean);
-  return { id: rec.dataset.id, profit: parseFloat(rec.dataset.profit),
-    start: parseInt(rec.dataset.startAt), legs };
+  return { id: rec.dataset.id, profit: parseFloat(rec.dataset.profit) || 0,
+    start: parseInt(rec.dataset.startAt) || 0, legs };
 }).filter(r => r.legs.length === 2)
 """
 
@@ -293,11 +293,24 @@ def uma_varredura_valor(page, ctx):
     enviar_valor(todos)
 
 
+def _sem_nan(o):
+    """Troca qualquer NaN/Infinity por 0.0 (recursivo). JSON não aceita NaN e um único
+    valor quebrado (ex.: data-profit vazio) derrubava o envio de TODAS as apostas."""
+    if isinstance(o, float):
+        return o if (o == o and o not in (float("inf"), float("-inf"))) else 0.0
+    if isinstance(o, dict):
+        return {k: _sem_nan(v) for k, v in o.items()}
+    if isinstance(o, list):
+        return [_sem_nan(v) for v in o]
+    return o
+
+
 def enviar_middle(records):
     """Manda as APOSTAS DE INTERVALO pro endpoint SEPARADO (/api/ingest-middle)."""
     if not records:
         print("   middles: nada pra enviar.")
         return
+    records = _sem_nan(records)
     headers = {"X-Ingest-Token": INGEST_TOKEN} if INGEST_TOKEN else {}
     try:
         r = requests.post(SAAS_MIDDLE, json={"records": records}, headers=headers, timeout=25)
