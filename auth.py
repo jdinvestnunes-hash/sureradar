@@ -1346,7 +1346,7 @@ def criar_usuario(nome: str, email: str, senha: str, whatsapp: str = "",
     email = (email or "").strip().lower()
     whats = "".join(ch for ch in (whatsapp or "") if ch.isdigit())
     origem = (origem or "").strip()[:40] or None
-    campanha = (campanha or "").strip()[:40] or None
+    campanha = (campanha or "").strip()[:120] or None
     if len(nome) < 2:
         return None, "Digite seu nome."
     if "@" not in email or "." not in email.split("@")[-1]:
@@ -1371,7 +1371,7 @@ def pegar_ou_criar_google(email: str, nome: str, origem: str = "", campanha: str
     email = (email or "").strip().lower()
     nome = (nome or "").strip() or email.split("@")[0]
     origem = (origem or "").strip()[:40] or None
-    campanha = (campanha or "").strip()[:40] or None
+    campanha = (campanha or "").strip()[:120] or None
     with _db() as c:
         row = c.execute(_q("SELECT * FROM users WHERE email=?"), (email,)).fetchone()
         if row:

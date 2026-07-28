@@ -393,7 +393,8 @@ function origemBadge(u,pro){
   if(!u.origem)
     return `<span style="display:inline-block;margin-left:6px;color:var(--mute);font-size:10.5px">📍 direto/orgânico${mark}</span>`;
   const raw=(""+u.origem).toLowerCase();
-  const camp=u.campanha?escH(u.campanha):"";
+  // o FB manda "nome|id" (utm_campaign={{campaign.name}}|{{campaign.id}}); mostra só o nome
+  const camp=u.campanha?escH((""+u.campanha).split("|")[0].trim()):"";
   let ico="📍",label=escH(u.origem),bg="rgba(56,212,245,.14)",fg="var(--cyan)",bd="1px solid rgba(56,212,245,.4)";
   if(/you|yt/.test(raw)){        ico="▶️"; label="YouTube"; bg="rgba(255,60,60,.15)";  fg="#ff6b6b"; bd="1px solid rgba(255,60,60,.5)"; }
   else if(/tele|^tg/.test(raw)){ ico="✈️"; label="Telegram"; bg="rgba(56,166,232,.16)"; fg="#5cc0f5"; bd="1px solid rgba(56,166,232,.55)"; }
