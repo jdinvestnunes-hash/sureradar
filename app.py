@@ -53,6 +53,7 @@ import promo
 import recuperacao
 import tg_tracker
 import valor_feed
+import middle_feed
 
 BASE_DIR = Path(__file__).parent
 STATIC_DIR = BASE_DIR / "static"
@@ -105,6 +106,11 @@ async def lifespan(app):
         if cache_valor:
             valor_feed.merge_valuebets(cache_valor)
             print(f">> Odds erradas restauradas do cache: {len(cache_valor)}.")
+        # E pras APOSTAS DE INTERVALO (middles) — mesma coisa.
+        cache_middle = auth.middle_cache_get()
+        if cache_middle:
+            middle_feed.merge_middles(cache_middle)
+            print(f">> Apostas de intervalo restauradas do cache: {len(cache_middle)}.")
         _recalcular_filtros()          # filtro = catálogo inteiro (mesmo sem cache)
     except Exception as e:
         print(f"!! Falha ao restaurar feed do cache: {e}")
@@ -1029,7 +1035,9 @@ def me(request: Request):
             "valor_beta": _valor_liberado(user),
             "valor_dias": auth.valor_dias_restantes(user),
             "valor_preco": config.ADDON_VALOR["valor"],
-            "valor_dias_addon": config.ADDON_VALOR["dias"]}
+            "valor_dias_addon": config.ADDON_VALOR["dias"],
+            # aba "Apostas de Intervalo" (middles) — beta fechado, só p/ e-mails liberados
+            "middle_beta": _middle_liberado(user)}
 
 
 def _valor_liberado(user):
@@ -1050,6 +1058,15 @@ def _valor_liberado(user):
     if auth.valor_dias_restantes(user):
         return True
     return False
+
+
+def _middle_liberado(user):
+    """Aba 'Apostas de Intervalo' (middles): BETA FECHADO. Só existe pros e-mails em
+    MIDDLE_BETA_EMAILS (o Leo, pra estudar o produto). Ninguém mais vê a aba."""
+    if not user:
+        return False
+    emails = [e.strip().lower() for e in (config.MIDDLE_BETA_EMAILS or "").split(",") if e.strip()]
+    return user.get("email", "").strip().lower() in emails
 
 
 def _alerta_liberado(user):
@@ -2150,6 +2167,73 @@ def ingest_valor(request: Request, payload: dict = Body(...)):
     # persiste as odds vivas pra sobreviver a redeploys (igual às surebets)
     try:
         auth.valor_cache_set(valor_feed.get_valuebets())
+    except Exception:
+        pass
+    return {"ok": True, "recebidos": len(itens)}
+
+
+@app.get("/api/middles")
+def middles(request: Request):
+    """Apostas de intervalo (middles) pro painel. BETA FECHADO: só responde pros e-mails
+    liberados (o Leo). Quem não está na lista recebe 403 e nem vê a aba no front."""
+    user = _usuario(request)
+    if not _middle_liberado(user):
+        return JSONResponse({"erro": "indisponível"}, status_code=403)
+    itens = sorted(middle_feed.get_middles(), key=lambda i: i.get("profit", 0), reverse=True)
+    return {"itens": itens, "tem": True}
+
+
+@app.post("/api/ingest-middle")
+def ingest_middle(request: Request, payload: dict = Body(...)):
+    """Recebe as APOSTAS DE INTERVALO raspadas (via robô) e guarda no armazém próprio
+    (middle_feed). TOTALMENTE separado da surebet e das valuebets — se der erro aqui, o
+    resto continua intacto. Mesma proteção de token do ingest."""
+    if config.INGEST_TOKEN:
+        enviado = request.headers.get("x-ingest-token") or payload.get("token", "")
+        if enviado != config.INGEST_TOKEN:
+            return JSONResponse({"erro": "não autorizado"}, status_code=401)
+    itens = []
+    for r in (payload.get("records") or []):
+        try:
+            legs_in = r.get("legs") or []
+            if len(legs_in) != 2:
+                continue
+            legs, esporte = [], ""
+            for g in legs_in:
+                odd = round(float(g.get("odd") or 0), 2)
+                if odd <= 1:
+                    raise ValueError("odd inválida")
+                sp = (g.get("sport") or "").strip()
+                esporte = esporte or sp
+                legs.append({
+                    "casa": (g.get("bookmaker") or "").strip(),
+                    "mercado": (g.get("market") or "").strip(),
+                    "desc": (g.get("desc") or "").strip(),
+                    "odd": odd,
+                    "link": _link_casa(g.get("link")),
+                })
+            event = ""
+            for g in legs_in:                       # nome do jogo = o teams mais completo
+                t = (g.get("teams") or "").strip()
+                if len(t) > len(event):
+                    event = t
+            # id estável: o do surebet quando existe, senão evento+casas+mercados
+            iid = (r.get("id") or "").strip() or (
+                event + "|" + "|".join(f"{g['casa']}:{g['mercado']}" for g in legs)).lower()
+            itens.append({
+                "id": iid,
+                "ico": _sport_ico(esporte),
+                "esporte": esporte,
+                "hora": _hora_br(r.get("start")),
+                "event": event,
+                "profit": round(float(r.get("profit") or 0), 2),
+                "legs": legs,
+            })
+        except (TypeError, ValueError):
+            continue
+    middle_feed.merge_middles(itens)
+    try:
+        auth.middle_cache_set(middle_feed.get_middles())
     except Exception:
         pass
     return {"ok": True, "recebidos": len(itens)}

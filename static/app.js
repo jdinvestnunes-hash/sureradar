@@ -638,10 +638,13 @@ function switchView(v) {
   if (va) va.classList.toggle("hidden", v !== "alertas");
   const vv = document.getElementById("view-valor");
   if (vv) vv.classList.toggle("hidden", v !== "valor");
+  const vm = document.getElementById("view-middle");
+  if (vm) vm.classList.toggle("hidden", v !== "middle");
   if (v === "bank") renderBanca();
   if (v === "learn") renderLearn();
   if (v === "alertas") renderAlertas();
   if (v === "valor") renderValor();
+  if (v === "middle") renderMiddle();
 }
 
 // ---- Odds Erradas das Casas (valuebets) ----
@@ -965,6 +968,43 @@ async function renderValor() {
   renderValorLista();
 }
 
+// ---------- Apostas de Intervalo (middles) — BETA fechado, só p/ e-mails liberados ----------
+async function renderMiddle() {
+  const box = document.getElementById("view-middle-body");
+  if (!box) return;
+  box.innerHTML = '<div class="muted" style="padding:6px 2px">Carregando apostas de intervalo…</div>';
+  let itens = [];
+  try { const r = await fetch("/api/middles"); if (r.ok) itens = (await r.json()).itens || []; } catch {}
+  if (!itens.length) {
+    box.innerHTML = '<div class="empty" style="text-align:center;padding:40px 16px;color:var(--text-dim,#9aa7bd)">Nenhuma aposta de intervalo no momento.<br><span style="font-size:12.5px">O robô atualiza a cada 10 min — e o filtro precisa estar salvo (💾) na página de middles do surebet.com.</span></div>';
+    return;
+  }
+  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  box.innerHTML = itens.map((m) => {
+    const legs = (m.legs || []).map((g) => {
+      const btn = g.link
+        ? `<a href="${esc(g.link)}" target="_blank" rel="noopener" class="mid-go">ABRIR NA CASA ↗</a>`
+        : `<span class="mid-nogo">ir na casa</span>`;
+      const mkt = g.desc || g.mercado || "";
+      return `<div class="mid-leg">
+        <div class="mid-leg-main">
+          <div class="mid-casa">${esc(g.casa)}</div>
+          <div class="mid-mkt" title="${esc(mkt)}">${esc(mkt)}</div>
+        </div>
+        <div class="mid-leg-r"><div class="mid-odd">${(Number(g.odd) || 0).toFixed(2)}</div>${btn}</div>
+      </div>`;
+    }).join('<div class="mid-vs">intervalo</div>');
+    const lucro = (Number(m.profit) || 0).toFixed(2).replace(".", ",");
+    return `<div class="mid-card">
+      <div class="mid-top">
+        <div class="mid-ev">${esc(m.ico || "🎯")} ${esc(m.event || "Evento")}</div>
+        <div class="mid-meta">${m.hora ? esc(m.hora) : ""}${Number(m.profit) ? ` · <b class="mid-lucro">lucro máx ${lucro}%</b>` : ""}</div>
+      </div>
+      ${legs}
+    </div>`;
+  }).join("");
+}
+
 // ---------- Alertas no Telegram (aba própria, beta) ----------
 async function renderAlertas() {
   const box = document.getElementById("view-alertas-body");
@@ -1197,6 +1237,11 @@ async function initUser() {
     if (me.valor_preco) VALOR_PRECO = me.valor_preco;
     if (me.valor_dias_addon) VALOR_DIAS_ADDON = me.valor_dias_addon;
     VALOR_DIAS = me.valor_dias || null;
+  }
+  // aba Apostas de Intervalo (middles): BETA FECHADO — só aparece pros e-mails liberados
+  if (me && me.middle_beta) {
+    const tm = document.getElementById("tab-middle");
+    if (tm) tm.style.display = "";
   }
   // só agora sabemos quais abas existem pra este usuário -> reabre a última usada
   restaurarAba();

@@ -217,6 +217,11 @@ ALERTA_BETA_EMAILS = os.getenv("ALERTA_BETA_EMAILS", "").strip()
 # testar o visual antes de liberar geral. Env VALUEBET_BETA_EMAILS (vírgula).
 VALUEBET_BETA_EMAILS = os.getenv("VALUEBET_BETA_EMAILS", "").strip()
 
+# Aba "Apostas de Intervalo" (middles) em BETA FECHADO: a aba SÓ existe pros e-mails
+# desta lista (é onde o Leo vê pra entender o produto). Ninguém mais vê a aba. Env
+# MIDDLE_BETA_EMAILS (vírgula). Pôr leosapper12@gmail.com no Railway.
+MIDDLE_BETA_EMAILS = os.getenv("MIDDLE_BETA_EMAILS", "").strip()
+
 # MODO VITRINE das Odds Erradas: enquanto ligado, NINGUÉM tem acesso total — todo
 # mundo (inclusive quem comprou o add-on, PRO e você) vê só a AMOSTRA real borrada,
 # pra criar desejo de desbloquear. É o estado de LANÇAMENTO. Pra liberar de verdade

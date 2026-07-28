@@ -37,13 +37,18 @@ def _salvar_cache():
 
 SAAS = "https://web-production-a41df.up.railway.app/api/ingest"
 SAAS_VALOR = SAAS.replace("/api/ingest", "/api/ingest-valor")   # ODDS DE VALOR (separado)
+SAAS_MIDDLE = SAAS.replace("/api/ingest", "/api/ingest-middle") # APOSTAS DE INTERVALO (separado)
 URL_LISTA = "https://pt.surebet.com/surebets"
 URL_VALOR = "https://pt.surebet.com/valuebets"                  # aba "Apostas de valor"
+URL_MIDDLE = "https://pt.surebet.com/middles"                   # aba "Apostas de intervalo"
 MAX_PAG_VALOR = 6              # valuebets já vêm filtradas nas suas casas — poucas págs
 MAX_VALOR = 150               # teto de segurança
+MAX_PAG_MIDDLE = 6            # middles já vêm filtradas nas suas casas — poucas págs
+MAX_MIDDLE = 150              # teto de segurança
 PERFIL = "pw_profile"          # sessão do Chrome fica salva aqui (login persiste)
 CICLO_MIN = 10                 # minutos entre varreduras
 VALOR_ATIVO = True             # liga/desliga a passada de ODDS DE VALOR (deixe True p/ raspar valuebets)
+MIDDLE_ATIVO = True            # liga/desliga a passada de APOSTAS DE INTERVALO (middles)
 MAX_PAGINAS = 40
 MIN_PROFIT = 0.70              # PARA quando o lucro chega aqui (lista é decrescente).
                               # FREE = 0,70–1% · PRO = 1–25% · abaixo de 0,70 ignora.
@@ -104,6 +109,38 @@ JS_RASPAR_VALOR = r"""
     link: vl ? vl.href : null,
   };
 }).filter(r => r.odd > 1 && r.valor > 0)
+"""
+
+
+# Raspagem das APOSTAS DE INTERVALO (middles). Estrutura IGUAL à surebet: 2 pernas por
+# registro (ex.: "Acima 80.5" numa casa + "Abaixo 81.5" na outra), cada uma com casa,
+# mercado, odd e link. Só muda o tbody: middle_record em vez de surebet_record.
+# data-profit = lucro MÁXIMO se o placar cair no intervalo (o "meio").
+JS_RASPAR_MIDDLE = r"""
+() => [...document.querySelectorAll("tbody.middle_record")].map((rec) => {
+  const legs = [...rec.querySelectorAll("tr")].map((tr) => {
+    const book = tr.querySelector(".bookmaker-name");
+    const bk = tr.querySelector(".booker");
+    const co = tr.querySelector(".coeff");
+    const va = tr.querySelector(".value");
+    const ev = tr.querySelector(".event");
+    const vl = tr.querySelector(".value_link");
+    if (!book || !va) return null;
+    const odd = parseFloat(va.textContent.trim());
+    if (!(odd > 0)) return null;
+    const nome = book.textContent.trim();
+    let sport = "";
+    if (bk) { const p = bk.textContent.split("\n").map(s=>s.trim()).filter(s=>s&&s!==nome); sport = p.length?p[p.length-1]:""; }
+    const ab = co ? co.querySelector("abbr") : null;
+    const tip = (e)=> e ? (e.getAttribute("data-bs-original-title")||e.getAttribute("title")||e.getAttribute("aria-label")||"") : "";
+    let desc = tip(ab) || tip(co);
+    return { bookmaker: nome, market: co?co.textContent.trim():"", odd, desc: (desc||"").trim(),
+      teams: ev?((ev.querySelector("a")||ev).textContent||"").trim():"", sport,
+      link: vl?vl.href:null };
+  }).filter(Boolean);
+  return { id: rec.dataset.id, profit: parseFloat(rec.dataset.profit),
+    start: parseInt(rec.dataset.startAt), legs };
+}).filter(r => r.legs.length === 2)
 """
 
 
@@ -254,6 +291,90 @@ def uma_varredura_valor(page, ctx):
     print(f">> Valuebets: {len(todos)} odds de valor em {pag} pág. "
           f"({com_link} com link da casa) — enviando.")
     enviar_valor(todos)
+
+
+def enviar_middle(records):
+    """Manda as APOSTAS DE INTERVALO pro endpoint SEPARADO (/api/ingest-middle)."""
+    if not records:
+        print("   middles: nada pra enviar.")
+        return
+    headers = {"X-Ingest-Token": INGEST_TOKEN} if INGEST_TOKEN else {}
+    try:
+        r = requests.post(SAAS_MIDDLE, json={"records": records}, headers=headers, timeout=25)
+        print(f"   -> {len(records)} apostas de intervalo enviadas (HTTP {r.status_code})")
+    except Exception as e:
+        print("   !! erro ao enviar middles:", str(e)[:100])
+
+
+def resolver_todos_middle(ctx, recs):
+    """Resolve o link da casa das DUAS pernas de cada middle (mesmo cache das surebets).
+    Sem isso o link continua sendo do surebet.com e o painel joga fora."""
+    faltam = [g for r in recs for g in r.get("legs", [])
+              if _e_surebet(g.get("link")) and g["link"] not in LINK_CACHE]
+    if faltam:
+        print(f"   middles: resolvendo {len(faltam)} link(s) novo(s) das casas…")
+    pg = ctx.new_page()
+    try:
+        for r in recs:
+            for g in r.get("legs", []):
+                if g.get("link"):
+                    final = resolver_link(ctx, pg, g["link"])
+                    g["link"] = final if (final and not _e_surebet(final)) else None
+    finally:
+        pg.close()
+    if faltam:
+        _salvar_cache()
+
+
+def uma_varredura_middle(page, ctx):
+    """Passada das APOSTAS DE INTERVALO — roda DEPOIS da surebet e das valuebets, e é
+    TOTALMENTE isolada: qualquer erro aqui não afeta as outras. Usa o filtro que você
+    salvou na página de middles (mesmas casas)."""
+    page.goto(URL_MIDDLE, wait_until="domcontentloaded", timeout=60000)
+    try:
+        page.wait_for_selector("tbody.middle_record", timeout=20000)
+    except Exception:
+        print("   middles: sem registros (filtro vazio, sem acesso ou seletor mudou).")
+        return
+    page.wait_for_timeout(1000)
+    vistos, todos, pag = set(), [], 0
+    while pag < MAX_PAG_MIDDLE and len(todos) < MAX_MIDDLE:
+        try:
+            page.wait_for_selector("tbody.middle_record", timeout=15000)
+        except Exception:
+            break
+        recs = page.evaluate(JS_RASPAR_MIDDLE)
+        novos = 0
+        for r in recs:
+            key = r.get("id") or tuple(sorted((g.get("bookmaker", ""), g.get("market", ""))
+                                              for g in r.get("legs", [])))
+            if key not in vistos:
+                vistos.add(key); todos.append(r); novos += 1
+        pag += 1
+        print(f"   middles pág {pag}: {len(recs)} na tela, {novos} novas (acum {len(todos)})")
+        if pag > 1 and novos == 0:
+            break
+        link = page.query_selector("a:has-text('próximo'), a:has-text('Próximo'), a:has-text('next')")
+        if not link:
+            break
+        id_antes = page.evaluate(
+            "() => { const r=document.querySelector('tbody.middle_record'); return r?r.dataset.id:''; }")
+        time.sleep(2.0 + random.random() * 2)
+        try:
+            link.click()
+            page.wait_for_function(
+                "(a) => { const r=document.querySelector('tbody.middle_record'); return r && r.dataset.id !== a; }",
+                arg=id_antes, timeout=20000)
+        except Exception:
+            break
+    try:                       # link das casas: se falhar, manda sem link (não perde a aposta)
+        resolver_todos_middle(ctx, todos)
+    except Exception as e:
+        print("   !! middles: falha ao resolver links:", str(e)[:100])
+    com_link = sum(1 for r in todos for g in r.get("legs", []) if g.get("link"))
+    print(f">> Middles: {len(todos)} apostas de intervalo em {pag} pág. "
+          f"({com_link} pernas com link da casa) — enviando.")
+    enviar_middle(todos)
 
 
 def esperar_login(page):
@@ -410,6 +531,11 @@ def main():
                     uma_varredura_valor(page, ctx)
                 except Exception as e:
                     print("!! erro nas valuebets (surebet NÃO afetada):", str(e)[:150])
+            if MIDDLE_ATIVO and _ctx_vivo(page):         # EXTRA: apostas de intervalo (isolada)
+                try:
+                    uma_varredura_middle(page, ctx)
+                except Exception as e:
+                    print("!! erro nas middles (surebet NÃO afetada):", str(e)[:150])
             # Se o navegador morreu no meio da varredura, reabre JÁ (não espera 10 min).
             if not _ctx_vivo(page):
                 print("!! navegador morreu durante a varredura — reabrindo já.")
