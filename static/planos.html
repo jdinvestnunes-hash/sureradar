@@ -72,6 +72,9 @@
     .bump input:checked::after{content:"✓";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#0b0b12;font-size:13px;font-weight:900}
     .bump-txt{font-size:12.5px;color:var(--dim);line-height:1.5}
     .bump-txt b{display:block;color:#c9a2ff;font-size:13px;margin-bottom:2px}
+    /* Anual: as Odds Erradas já vêm de brinde (sem caixinha de cobrança) */
+    .bump-free{display:flex;gap:10px;align-items:flex-start;margin-bottom:12px;padding:13px 14px;border-radius:14px;background:rgba(64,220,140,.10);border:1px solid rgba(64,220,140,.5);font-size:12.5px;color:var(--dim);line-height:1.5}
+    .bump-free b{color:#5fe0a0}
 
     /* ---- Add-on avulso (quem já é PRO compra só as Odds Erradas) ---- */
     .addon{max-width:720px;margin:34px auto 8px;background:linear-gradient(150deg,rgba(169,139,255,.13),var(--card) 62%);border:1.5px solid rgba(169,139,255,.45);border-radius:22px;padding:28px 26px}
@@ -171,6 +174,7 @@
         <span class="bump-txt"><b>💎 Adicionar Odds Erradas das Casas — R$ 47</b>
           30 dias de acesso à aba onde a casa <b style="display:inline">errou o preço</b> e paga acima do justo. Vai junto no mesmo pagamento.</span>
       </label>
+      <div class="bump-free" data-bumpfree style="display:none">💎&nbsp;<span><b>Odds Erradas das Casas incluídas — GRÁTIS por 1 ano</b> no plano Anual. A aba onde a casa errou o preço e paga acima do justo, liberada junto, sem pagar nada a mais.</span></div>
       <div class="pay-row">
         <button class="btn btn-primary" data-pay="cartao">💳 Cartão</button>
         <button class="btn btn-pix" data-pay="pix">⚡ Pix</button>
@@ -352,10 +356,23 @@ function setPlano(card, key){
   const badge = card.querySelector('[data-badge]');
   if (p.badge){ badge.innerHTML = p.badge; badge.style.display=''; } else { badge.style.display='none'; }
   card.querySelectorAll('.seg-opt').forEach(o=> o.classList.toggle('on', o.dataset.plan===key));
+  // Anual já vem com as Odds Erradas de brinde: esconde a caixinha paga, mostra o
+  // aviso de "incluído" e DESMARCA o add-on (senão cobraria R$ 47 por algo grátis).
+  const anual = key === 'anual';
+  const bumpL = card.querySelector('.bump');
+  const bumpF = card.querySelector('[data-bumpfree]');
+  if (bumpL && bumpF){
+    bumpL.style.display = anual ? 'none' : '';
+    bumpF.style.display = anual ? '' : 'none';
+    const cb = bumpL.querySelector('[data-bump]');
+    if (cb && anual) cb.checked = false;
+  }
 }
 document.querySelectorAll('.seg-opt').forEach(opt=>{
   opt.addEventListener('click', ()=> setPlano(opt.closest('.plan'), opt.dataset.plan));
 });
+// Sincroniza o estado inicial (o card longo abre no Anual → já mostra "incluído").
+document.querySelectorAll('.plan[data-plano]').forEach(c=> setPlano(c, c.dataset.plano));
 
 // ---- Upgrade (vem do /perfil com ?plano=X&upgrade=1): pré-seleciona e avisa ----
 (function(){

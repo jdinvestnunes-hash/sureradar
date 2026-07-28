@@ -961,6 +961,13 @@ def _liberar_compra(row):
         return
     ativar_pro(row["user_id"], row["plano"], int(row["dias"]),
                float(row["valor"]), metodo=row["metodo"])
+    # BRINDE DO ANUAL: quem assina/renova o Pro Anual ganha as Odds Erradas pelo
+    # MESMO período do plano (365 dias), de graça — sem pagar o add-on. SOMA nos
+    # dias que já tiver (renovar antes de vencer não perde nada). Vale pro Pix
+    # avulso e pro cartão (1ª cobrança e cada renovação anual passam por aqui).
+    if row["plano"] == "anual":
+        ativar_valor(row["user_id"], int(row["dias"]), 0.0, metodo="brinde-anual")
+        return
     if _col(row, "addon") == "valor":                 # marcou o bump no checkout
         ativar_valor(row["user_id"], addon["dias"], addon["valor"], metodo=row["metodo"])
 
