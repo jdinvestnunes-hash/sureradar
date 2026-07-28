@@ -13,7 +13,7 @@
     gtag('js', new Date());
     gtag('config', 'AW-17915571478');
   </script>
-  <link rel="stylesheet" href="/static/style.css?v=9" />
+  <link rel="stylesheet" href="/static/style.css?v=10" />
   <link rel="stylesheet"
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
         media="print" onload="this.media='all'" />
@@ -43,6 +43,7 @@
       <button class="tab" data-view="calc" title="Calculadora de surebet">🧮 Calculadora</button>
       <button class="tab" data-view="learn" title="Aprenda a fazer apostas seguras">🎓 Aprenda</button>
       <button class="tab" id="tab-alertas" data-view="alertas" title="Alertas no Telegram" style="display:none">🔔 Alertas</button>
+      <a class="tab-grupo" href="https://t.me/+tVGChSqLuqBmNGIx" target="_blank" rel="noopener" title="Grupo grátis de surebets no Telegram">✈️ Entrar no grupo grátis</a>
     </nav>
 
     <div class="topbar-right">
@@ -343,6 +344,33 @@
     </div>
   </div>
 
+  <!-- POPUP: convite pro grupo grátis do Telegram (aparece 1x, logo após entrar na conta) -->
+  <div id="grupo-modal" class="overlay hidden">
+    <div class="modal" style="max-width:440px">
+      <div class="modal-head">
+        <div>
+          <div class="modal-title">🎁 Entre no grupo grátis do Telegram</div>
+          <div class="modal-sub">+30 surebets por dia, de graça, na sua DM</div>
+        </div>
+        <button class="icon-btn" data-grupo-fechar>✕</button>
+      </div>
+      <div style="padding:20px 22px 24px">
+        <p style="font-size:13.5px;color:var(--text-dim);line-height:1.65;margin:0 0 16px">
+          Enquanto você explora o painel, entra no nosso grupo: todo dia a gente solta
+          <b style="color:var(--text)">surebets reais, completas e com os links</b> — é a amostra
+          que prova que funciona. <b style="color:var(--text)">100% grátis, pra sempre.</b>
+        </p>
+        <a href="https://t.me/+tVGChSqLuqBmNGIx" target="_blank" rel="noopener" data-grupo-fechar
+           style="display:block;text-align:center;background:linear-gradient(112deg,#2ee6a8,#38d4f5);color:#052015;font-weight:800;font-size:15px;padding:14px;border-radius:12px;text-decoration:none">
+          ✈️ Entrar no grupo grátis
+        </a>
+        <button data-grupo-fechar style="display:block;width:100%;margin-top:10px;background:none;border:none;color:var(--text-mute);font-family:inherit;font-size:13px;cursor:pointer;padding:8px">
+          Agora não
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- MODAL CALCULADORA -->
   <div id="calc-overlay" class="overlay hidden">
     <div class="modal" role="dialog" aria-modal="true">
@@ -405,7 +433,7 @@
     </div>
   </div>
 
-  <script src="/static/app.js?v=24"></script>
+  <script src="/static/app.js?v=25"></script>
 
   <style>
     #view-calc .cv-leg{background:var(--surface2,#121a2b);border:1px solid var(--border,#1b2740);border-radius:14px;padding:16px;margin-bottom:14px}

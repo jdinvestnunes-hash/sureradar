@@ -1146,6 +1146,18 @@ $("#up-overlay").addEventListener("click", (e) => { if (e.target.id === "up-over
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") { closeCalc(); closeUpgrade(); } });
 document.querySelectorAll(".tab").forEach((t) => t.addEventListener("click", () => switchView(t.dataset.view)));
 
+// ---------- Popup do grupo grátis (aparece 1x, logo após entrar na conta) ----------
+(function () {
+  const modal = document.getElementById("grupo-modal");
+  if (!modal) return;
+  const KEY = "sr_grupo_pop_v1";
+  const fechar = () => { modal.classList.add("hidden"); try { localStorage.setItem(KEY, "1"); } catch {} };
+  modal.querySelectorAll("[data-grupo-fechar]").forEach((b) => b.addEventListener("click", fechar));
+  modal.addEventListener("click", (e) => { if (e.target === modal) fechar(); });
+  let visto = false; try { visto = localStorage.getItem(KEY) === "1"; } catch {}
+  if (!visto) setTimeout(() => modal.classList.remove("hidden"), 1000);
+})();
+
 // ---------- Sessão do usuário ----------
 async function initUser() {
   let me;
