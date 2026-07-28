@@ -56,12 +56,6 @@ body {
 .tab:hover { color: var(--text); background: var(--surface); }
 .tab.active { color: var(--text); background: var(--surface-2); }
 .tab-badge { background: var(--grad); color: #04240f; font-size: 11px; font-weight: 800; min-width: 18px; text-align: center; padding: 1px 6px; border-radius: 999px; }
-/* CTA "Entrar no grupo grátis" — vive na barra de abas, sempre visível (funil de venda) */
-.tab-grupo { text-decoration: none; background: rgba(56,166,232,.14); border: 1px solid rgba(56,166,232,.5);
-  color: #7cc6f2; font-family: inherit; font-size: 13.5px; font-weight: 700; padding: 7px 13px;
-  border-radius: var(--radius-sm); cursor: pointer; transition: .15s; display: flex; align-items: center; gap: 7px; }
-.tab-grupo:hover { background: rgba(56,166,232,.24); color: #bfe4fb; }
-
 /* Balão flutuante do Telegram — canto inferior direito, sempre visível (funil de venda) */
 .tg-bubble { position: fixed; right: 20px; bottom: 20px; z-index: 900; display: flex; align-items: center;
   gap: 0; text-decoration: none; height: 56px; padding: 0 14px; border-radius: 999px;
