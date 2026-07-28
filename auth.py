@@ -747,7 +747,7 @@ def listar_usuarios():
     with _db() as c:
         rows = c.execute(
             # valor_expira = add-on das Odds Erradas (o painel mostra o selo 💎)
-            "SELECT id, nome, email, plano, plano_expira, valor_expira, origem, criado"
+            "SELECT id, nome, email, plano, plano_expira, valor_expira, origem, campanha, criado"
             " FROM users ORDER BY criado DESC"
         ).fetchall()
     return [dict(r) for r in rows]

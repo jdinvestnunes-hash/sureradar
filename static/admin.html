@@ -384,6 +384,23 @@ function renderMetricas(m){
     : '<div class="empty">Ninguém vencendo nos próximos 5 dias. 🎉</div>';
 }
 
+// Selo de ORIGEM do lead: cor por canal (YouTube vermelho, Telegram azul, Facebook
+// com a campanha) + marcador 💰 quando a pessoa COMPROU (PRO ou add-on). É assim que
+// se vê no admin de onde veio o lead E se aquela campanha converteu em venda.
+function origemBadge(u,pro){
+  const comprou = pro || !!u.valor_dias;   // virou cliente pagante
+  const mark = comprou?' <b title="Comprou — essa origem converteu em venda">💰</b>':'';
+  if(!u.origem)
+    return `<span style="display:inline-block;margin-left:6px;color:var(--mute);font-size:10.5px">📍 direto/orgânico${mark}</span>`;
+  const raw=(""+u.origem).toLowerCase();
+  const camp=u.campanha?escH(u.campanha):"";
+  let ico="📍",label=escH(u.origem),bg="rgba(56,212,245,.14)",fg="var(--cyan)",bd="1px solid rgba(56,212,245,.4)";
+  if(/you|yt/.test(raw)){        ico="▶️"; label="YouTube"; bg="rgba(255,60,60,.15)";  fg="#ff6b6b"; bd="1px solid rgba(255,60,60,.5)"; }
+  else if(/tele|^tg/.test(raw)){ ico="✈️"; label="Telegram"; bg="rgba(56,166,232,.16)"; fg="#5cc0f5"; bd="1px solid rgba(56,166,232,.55)"; }
+  else if(/face|^fb|meta/.test(raw)){ ico="ⓕ"; label="FB"; bg="rgba(24,119,242,.18)"; fg="#7db2ff"; bd="1px solid rgba(24,119,242,.6)"; }
+  if(camp) label+=` · ${camp}`;   // mostra a campanha (o "campanha tal") quando existir
+  return `<span title="Origem do lead" style="display:inline-block;margin-left:6px;background:${bg};color:${fg};border:${bd};font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:99px">${ico} ${label}${mark}</span>`;
+}
 function renderUsuarios(){
   const q=($("#busca").value||"").toLowerCase();
   const f=USERS.filter(u=>(u.nome+" "+u.email).toLowerCase().includes(q));
@@ -393,7 +410,7 @@ function renderUsuarios(){
     const dias=pro&&u.dias!=null?`<div class="u-dias">${u.dias} dia(s) restante(s)</div>`:"";
     // add-on das Odds Erradas — vale mesmo pra quem está no FREE
     const vb=u.valor_dias?`<span class="tag" style="background:rgba(169,139,255,.16);color:#c9a2ff;border:1px solid rgba(169,139,255,.45)">💎 ${u.valor_dias}d</span>`:"";
-    const origem=u.origem?`<span style="display:inline-block;margin-left:6px;background:rgba(56,212,245,.14);color:var(--cyan);font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:99px">📍 ${escH(u.origem)}</span>`:`<span style="display:inline-block;margin-left:6px;color:var(--mute);font-size:10.5px">📍 direto/orgânico</span>`;
+    const origem=origemBadge(u,pro);
     return `<div class="u" data-email="${u.email}">
       <div class="u-info"><div class="u-nome">${u.nome} ${badge} ${vb}</div><div class="u-email">${u.email}${origem}</div>${dias}</div>
       <div class="ctrl">
