@@ -1135,6 +1135,7 @@ def alerta_config(request: Request):
             connect_url = f"https://t.me/{bot}?start={auth.alerta_token(user['id'])}"
     return {"liberado": True, "conectado": bool(cfg.get("conectado")),
             "ativo": bool(cfg.get("ativo", True)), "casas": cfg.get("casas", []),
+            "esportes": cfg.get("esportes", []),
             "min_pct": cfg.get("min_pct", 5), "connect_url": connect_url}
 
 
@@ -1146,6 +1147,7 @@ def alerta_salvar_api(request: Request, payload: dict = Body(...)):
     if not _alerta_liberado(user):
         return JSONResponse({"erro": "indisponível"}, status_code=403)
     auth.alerta_salvar(user["id"], payload.get("casas") or [],
+                       payload.get("esportes") or [],
                        payload.get("min_pct", 5), bool(payload.get("ativo", True)))
     return {"ok": True}
 

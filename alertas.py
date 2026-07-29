@@ -34,8 +34,9 @@ def _uma_rodada():
             uid = cfg["user_id"]
             minp = float(cfg.get("min_pct") or 0)
             casas = set(cfg.get("casas") or [])
+            esportes = cfg.get("esportes") or []   # vazio = todos
             enviados = 0
-            for sb in feed.get_surebets(min_profit=minp):
+            for sb in feed.get_surebets(min_profit=minp, sports=esportes or None):
                 if enviados >= MAX_POR_CICLO:
                     break
                 if not _casas_batem(sb, casas):

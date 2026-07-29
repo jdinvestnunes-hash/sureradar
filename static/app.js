@@ -1483,6 +1483,13 @@ async function renderAlertas() {
        <input type="checkbox" class="al-casa" value="${b.key}" ${sel.has(b.key) ? "checked" : ""} style="flex:0 0 auto"/>
        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${b.label}</span>
      </label>`).join("");
+  const esportes = (META && META.sports) || [];
+  const selEsp = new Set(d.esportes || []);
+  const checksEsp = esportes.map((s) =>
+    `<label style="display:flex;align-items:center;gap:9px;font-size:13.5px;padding:9px 12px;border:1px solid var(--border,#1b2740);border-radius:10px;cursor:pointer;background:var(--bg,#05070d);min-width:0">
+       <input type="checkbox" class="al-esp" value="${s.key}" ${selEsp.has(s.key) ? "checked" : ""} style="flex:0 0 auto"/>
+       <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.label}</span>
+     </label>`).join("");
   // ---- topo: conectar (passo a passo) OU status conectado ----
   const passo = (n, txt) =>
     `<div style="display:flex;gap:13px;align-items:flex-start;text-align:left;margin-bottom:13px">
@@ -1520,6 +1527,10 @@ async function renderAlertas() {
        <div style="color:var(--muted,#647388);font-size:12.5px;margin-bottom:12px">Deixe todas desmarcadas pra receber de qualquer casa.</div>
        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:9px;align-items:stretch">${checks}</div>
 
+       <div style="font-weight:800;font-size:14px;margin:26px 0 4px">🎯 Só nesses esportes</div>
+       <div style="color:var(--muted,#647388);font-size:12.5px;margin-bottom:12px">Deixe todos desmarcados pra receber de qualquer esporte.</div>
+       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:9px;align-items:stretch">${checksEsp}</div>
+
        <label style="display:flex;align-items:center;gap:10px;margin-top:26px;font-size:15px;cursor:pointer;font-weight:600">
          <input id="al-ativo" type="checkbox" ${d.ativo ? "checked" : ""} style="width:18px;height:18px"/> Alertas ativos
        </label>
@@ -1531,11 +1542,12 @@ async function renderAlertas() {
   const ds = document.getElementById("al-desc"); if (ds) ds.onclick = async () => { await fetch("/api/alerta/desconectar", { method: "POST" }); renderAlertas(); };
   document.getElementById("al-save").onclick = async () => {
     const cs = [...document.querySelectorAll(".al-casa:checked")].map((c) => c.value);
+    const es = [...document.querySelectorAll(".al-esp:checked")].map((c) => c.value);
     const min_pct = parseFloat(document.getElementById("al-min").value) || 0;
     const ativo = document.getElementById("al-ativo").checked;
     const msg = document.getElementById("al-msg"); msg.style.color = "var(--dim,#a3b1c9)"; msg.textContent = "Salvando…";
     try {
-      const r = await fetch("/api/alerta", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ casas: cs, min_pct, ativo }) });
+      const r = await fetch("/api/alerta", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ casas: cs, esportes: es, min_pct, ativo }) });
       if (r.ok) { msg.style.color = "var(--green,#2ee6a8)"; msg.textContent = "✓ Preferências salvas!"; }
       else { msg.style.color = "#ff6b6b"; msg.textContent = "Não deu pra salvar."; }
     } catch { msg.style.color = "#ff6b6b"; msg.textContent = "Erro de conexão."; }

@@ -256,6 +256,7 @@ def init():
             chat_id TEXT,
             token TEXT,
             casas TEXT,
+            esportes TEXT,
             min_pct REAL DEFAULT 5,
             ativo INTEGER NOT NULL DEFAULT 1,
             criado TEXT)""")
@@ -277,6 +278,7 @@ def init():
     # Postgres, um erro aborta a transação inteira). Erro = coluna já existe.
     for tabela, coluna in [("checkouts", "pi TEXT"),
                            ("checkouts", "addon TEXT"),
+                           ("alertas_tg", "esportes TEXT"),
                            ("users", f"valor_expira {_NUM}"),
                            ("users", f"middle_expira {_NUM}"),
                            ("users", f"plano_expira {_NUM}"),
@@ -833,22 +835,24 @@ def alerta_get(user_id):
     d["conectado"] = bool(d.get("chat_id"))
     d["ativo"] = bool(d.get("ativo"))
     d["casas"] = [x for x in (d.get("casas") or "").split(",") if x]
+    d["esportes"] = [x for x in (d.get("esportes") or "").split(",") if x]
     return d
 
 
-def alerta_salvar(user_id, casas, min_pct, ativo):
+def alerta_salvar(user_id, casas, esportes, min_pct, ativo):
     """Cria/atualiza as preferências (mantém chat_id/token se já existir)."""
     casas_str = ",".join([str(x).strip() for x in (casas or []) if str(x).strip()])[:2000]
+    esportes_str = ",".join([str(x).strip() for x in (esportes or []) if str(x).strip()])[:2000]
     try:
         min_pct = max(0.0, float(min_pct))
     except (TypeError, ValueError):
         min_pct = 5.0
     with _db() as c:
-        c.execute(_q("""INSERT INTO alertas_tg(user_id,casas,min_pct,ativo,criado)
-            VALUES(?,?,?,?,?)
+        c.execute(_q("""INSERT INTO alertas_tg(user_id,casas,esportes,min_pct,ativo,criado)
+            VALUES(?,?,?,?,?,?)
             ON CONFLICT(user_id) DO UPDATE SET casas=excluded.casas,
-                min_pct=excluded.min_pct, ativo=excluded.ativo"""),
-            (user_id, casas_str, min_pct, 1 if ativo else 0, _dia_br()))
+                esportes=excluded.esportes, min_pct=excluded.min_pct, ativo=excluded.ativo"""),
+            (user_id, casas_str, esportes_str, min_pct, 1 if ativo else 0, _dia_br()))
 
 
 def alerta_token(user_id):
@@ -887,6 +891,7 @@ def alerta_ativos():
     for r in rows:
         d = dict(r)
         d["casas"] = [x for x in (d.get("casas") or "").split(",") if x]
+        d["esportes"] = [x for x in (d.get("esportes") or "").split(",") if x]
         out.append(d)
     return out
 
