@@ -1058,9 +1058,9 @@ let MIDDLE_ITENS = [], MIDDLE_SPORT = "", MIDDLE_MIN = 0;
 let MIDDLE_DATE = "";         // filtro de data ("dd/mm" ou "" = todas)
 let MIDDLE_OFF = new Set();   // casas DESmarcadas na lateral (casa nova entra marcada)
 let MIDDLE_BOUND = false;     // listeners da lateral já ligados (só uma vez)
-// Sem acesso: vê a lista TODA, mas as MIDDLE_BORRADAS de MAIOR lucro vêm borradas
-// (o prêmio de quem paga); o resto fica aberto como amostra real.
-const MIDDLE_BORRADAS = 15;
+// Sem acesso: só a 1ª (a de MAIOR lucro) fica aberta como amostra; todo o resto
+// vem borrado. Quem quer mais apostas de intervalo desbloqueia.
+const MIDDLE_ABERTAS = 1;
 // add-on "Apostas de Intervalo": comprado à parte OU no combo (/api/me manda os números)
 let MIDDLE_TEM = false, MIDDLE_PRECO = 97, MIDDLE_DIAS_ADDON = 30, MIDDLE_DIAS = null;
 
@@ -1217,16 +1217,16 @@ function renderMiddleLista() {
   const cont = document.getElementById("middle-count");
   if (cont) cont.textContent = visiveis.length + (visiveis.length === 1 ? " aposta de intervalo" : " apostas de intervalo");
   if (empty) empty.classList.toggle("hidden", visiveis.length > 0);
-  // Com acesso: tudo aberto. Sem acesso: as MIDDLE_BORRADAS de MAIOR lucro borradas
-  // (o prêmio) e o RESTO aberto como amostra.
+  // Com acesso: tudo aberto. Sem acesso: só a 1ª (maior lucro) aberta como amostra
+  // e TODO o resto borrado — incentiva a assinar pra ver as demais.
   const total = visiveis.length;
-  const corte = MIDDLE_TEM ? 0 : Math.min(MIDDLE_BORRADAS, total);
+  const abertas = MIDDLE_TEM ? total : Math.min(MIDDLE_ABERTAS, total);
   visiveis.forEach((m, i) => {
-    const locked = i < corte;
+    const locked = i >= abertas;
     try { list.appendChild(locked ? middleTeaserEl(m) : middleOpEl(m, false)); }
     catch (e) { console.error("middle:", e); }
   });
-  renderMiddleCTA(corte);
+  renderMiddleCTA(total - abertas);
 }
 
 // Liga a lateral UMA vez (o esqueleto mora no HTML)
