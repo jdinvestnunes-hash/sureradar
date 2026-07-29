@@ -716,6 +716,7 @@ function escH(s) {
 // Estado da aba — a lista fica guardada pra filtrar na tela, sem ir no servidor
 let VALOR_ITENS = [], VALOR_REAL = false, VALOR_SPORT = "", VALOR_MIN = 0;
 let VALOR_PROB = 0, VALOR_ODD = 1;   // chance real mínima (%) e odd mínima
+let VALOR_DATE = "";         // filtro de data ("dd/mm" ou "" = todas)
 let VALOR_OFF = new Set();   // casas DESmarcadas na lateral (casa nova entra marcada)
 let VALOR_BOUND = false;     // listeners da lateral já ligados (só uma vez)
 
@@ -843,10 +844,35 @@ function renderValorCasas() {
   });
 }
 
+// Barra de datas genérica (valor + middle). getData extrai "dd/mm" de cada item;
+// esconde a barra quando só há uma data (nada pra filtrar). Reusa .date-chip.
+function montarDateBar(barId, itens, getData, atual, onPick) {
+  const bar = document.getElementById(barId);
+  if (!bar) return;
+  const controls = bar.closest(".controls");
+  const datas = [...new Set(itens.map(getData).filter(Boolean))].sort((a, b) => {
+    const [da, ma] = a.split("/").map(Number), [db, mb] = b.split("/").map(Number);
+    return (ma - mb) || (da - db);
+  });
+  if (datas.length <= 1) { if (controls) controls.style.display = "none"; bar.innerHTML = ""; return; }
+  if (controls) controls.style.display = "";
+  bar.innerHTML = "";
+  const hj = hoje();
+  const chips = [{ k: "", l: "Todos" }].concat(datas.map((d) => ({ k: d, l: d === hj ? "Hoje " + d : d })));
+  chips.forEach((c) => {
+    const chip = el("button", "date-chip" + (atual === c.k ? " active" : ""), c.l);
+    chip.addEventListener("click", () => onPick(c.k));
+    bar.appendChild(chip);
+  });
+}
+// "dd/mm HH:MM" -> "dd/mm"
+function horaData(h) { return (h || "").split(" ")[0]; }
+
 function valorFiltradas() {
   return VALOR_ITENS.filter((v) => {
     const prob = Number(v.prob || (v.justa > 0 ? 100 / v.justa : 0));
     return (!VALOR_SPORT || v.esporte === VALOR_SPORT) &&
+      (!VALOR_DATE || horaData(v.hora) === VALOR_DATE) &&
       !VALOR_OFF.has(v.casa) &&
       Number(v.valor || 0) >= VALOR_MIN &&
       prob >= VALOR_PROB &&
@@ -859,6 +885,8 @@ function renderValorLista() {
   const empty = document.getElementById("valor-empty");
   if (!list) return;
   list.innerHTML = "";
+  montarDateBar("valor-date-bar", VALOR_ITENS, (v) => horaData(v.hora), VALOR_DATE,
+    (k) => { VALOR_DATE = k; renderValorLista(); });
   const visiveis = valorFiltradas();
   const cont = document.getElementById("valor-count");
   if (cont) cont.textContent = visiveis.length + (visiveis.length === 1 ? " odd errada" : " odds erradas");
@@ -975,6 +1003,7 @@ async function renderValor() {
 
 // ---------- Apostas de Intervalo (middles) — mesmo dashboard das Surebets, BETA fechado ----------
 let MIDDLE_ITENS = [], MIDDLE_SPORT = "", MIDDLE_MIN = 0;
+let MIDDLE_DATE = "";         // filtro de data ("dd/mm" ou "" = todas)
 let MIDDLE_OFF = new Set();   // casas DESmarcadas na lateral (casa nova entra marcada)
 let MIDDLE_BOUND = false;     // listeners da lateral já ligados (só uma vez)
 
@@ -1073,6 +1102,7 @@ function middleFiltradas() {
   return MIDDLE_ITENS.filter((m) => {
     const casas = (m.legs || []).map((g) => g.casa);
     return (!MIDDLE_SPORT || m.esporte === MIDDLE_SPORT) &&
+      (!MIDDLE_DATE || horaData(m.hora) === MIDDLE_DATE) &&
       !casas.some((c) => MIDDLE_OFF.has(c)) &&
       Number(m.profit || 0) >= MIDDLE_MIN;
   });
@@ -1083,6 +1113,8 @@ function renderMiddleLista() {
   const empty = document.getElementById("middle-empty");
   if (!list) return;
   list.innerHTML = "";
+  montarDateBar("middle-date-bar", MIDDLE_ITENS, (m) => horaData(m.hora), MIDDLE_DATE,
+    (k) => { MIDDLE_DATE = k; renderMiddleLista(); });
   const visiveis = middleFiltradas();
   const cont = document.getElementById("middle-count");
   if (cont) cont.textContent = visiveis.length + (visiveis.length === 1 ? " aposta de intervalo" : " apostas de intervalo");
