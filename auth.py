@@ -278,6 +278,7 @@ def init():
     for tabela, coluna in [("checkouts", "pi TEXT"),
                            ("checkouts", "addon TEXT"),
                            ("users", f"valor_expira {_NUM}"),
+                           ("users", f"middle_expira {_NUM}"),
                            ("users", f"plano_expira {_NUM}"),
                            ("users", "whatsapp TEXT"),
                            ("users", f"email_verificado {_NUM} DEFAULT 1"),
@@ -327,6 +328,7 @@ def _perfil(row):
         "id": row["id"], "nome": row["nome"], "email": row["email"],
         "plano": row["plano"], "plano_expira": row["plano_expira"],
         "valor_expira": _col(row, "valor_expira"),
+        "middle_expira": _col(row, "middle_expira"),
     }
 
 
@@ -746,8 +748,10 @@ def listar_usuarios():
     """Todos os usuários (para o painel admin), do mais novo ao mais antigo."""
     with _db() as c:
         rows = c.execute(
-            # valor_expira = add-on das Odds Erradas (o painel mostra o selo 💎)
-            "SELECT id, nome, email, plano, plano_expira, valor_expira, origem, campanha, criado"
+            # valor_expira = add-on das Odds Erradas / middle_expira = add-on das
+            # Apostas de Intervalo (o painel mostra os selos 💎/🎯)
+            "SELECT id, nome, email, plano, plano_expira, valor_expira, middle_expira,"
+            " origem, campanha, criado"
             " FROM users ORDER BY criado DESC"
         ).fetchall()
     return [dict(r) for r in rows]
@@ -952,24 +956,36 @@ def checkout_pagar(provider, external_id, pi=None):
 
 
 def _liberar_compra(row):
-    """Entrega o que foi comprado: plano PRO, add-on avulso, ou plano + order bump."""
+    """Entrega o que foi comprado: plano PRO, add-on avulso, ou plano + combo/bump."""
     import config
-    addon = config.ADDON_VALOR
     if row["plano"] == "valor":                       # comprou SÓ as Odds Erradas
         ativar_valor(row["user_id"], int(row["dias"]), float(row["valor"]),
                      metodo=row["metodo"])
         return
+    if row["plano"] == "middle":                      # comprou SÓ as Apostas de Intervalo
+        ativar_middle(row["user_id"], int(row["dias"]), float(row["valor"]),
+                      metodo=row["metodo"])
+        return
     ativar_pro(row["user_id"], row["plano"], int(row["dias"]),
                float(row["valor"]), metodo=row["metodo"])
-    # BRINDE DO ANUAL: quem assina/renova o Pro Anual ganha as Odds Erradas pelo
-    # MESMO período do plano (365 dias), de graça — sem pagar o add-on. SOMA nos
-    # dias que já tiver (renovar antes de vencer não perde nada). Vale pro Pix
-    # avulso e pro cartão (1ª cobrança e cada renovação anual passam por aqui).
+    # BRINDE DO ANUAL: quem assina/renova o Pro Anual ganha os DOIS add-ons (Odds
+    # Erradas + Apostas de Intervalo) pelo MESMO período do plano (365 dias), de
+    # graça. SOMA nos dias que já tiver. Vale pro Pix, cartão e cada renovação anual.
     if row["plano"] == "anual":
         ativar_valor(row["user_id"], int(row["dias"]), 0.0, metodo="brinde-anual")
+        ativar_middle(row["user_id"], int(row["dias"]), 0.0, metodo="brinde-anual")
         return
-    if _col(row, "addon") == "valor":                 # marcou o bump no checkout
-        ativar_valor(row["user_id"], addon["dias"], addon["valor"], metodo=row["metodo"])
+    addon = _col(row, "addon")
+    if addon == "combo":                              # COMPLETO: os 2 add-ons pelos
+        # dias do plano (mensal 30 / trimestral 90 / semestral 180) — pagou no combo.
+        ativar_valor(row["user_id"], int(row["dias"]), 0.0, metodo=row["metodo"])
+        ativar_middle(row["user_id"], int(row["dias"]), 0.0, metodo=row["metodo"])
+    elif addon == "valor":                            # legado: bump só das Odds Erradas
+        a = config.ADDON_VALOR
+        ativar_valor(row["user_id"], a["dias"], a["valor"], metodo=row["metodo"])
+    elif addon == "middle":                           # bump só das Apostas de Intervalo
+        a = config.ADDON_MIDDLE
+        ativar_middle(row["user_id"], a["dias"], a["valor"], metodo=row["metodo"])
 
 
 def assinatura_set(user_id, provider, sub_id, customer_id, plano, dias, valor, status="ativa"):
@@ -1028,13 +1044,23 @@ def checkout_revogar_por_pi(pi):
 
 
 def _revogar_compra(row):
-    """Desfaz o que a compra tinha liberado (plano PRO e/ou o add-on das odds erradas)."""
+    """Desfaz o que a compra tinha liberado (plano PRO e/ou os add-ons)."""
     if row["plano"] == "valor":
         revogar_valor(row["user_id"])
         return
+    if row["plano"] == "middle":
+        revogar_middle(row["user_id"])
+        return
     voltar_free(row["user_id"])
-    if _col(row, "addon") == "valor":
+    addon = _col(row, "addon")
+    # anual e combo liberam os DOIS add-ons de brinde -> estorno tira os dois
+    if row["plano"] == "anual" or addon == "combo":
         revogar_valor(row["user_id"])
+        revogar_middle(row["user_id"])
+    elif addon == "valor":
+        revogar_valor(row["user_id"])
+    elif addon == "middle":
+        revogar_middle(row["user_id"])
 
 
 def checkout_revogar(provider, external_id):
@@ -1548,7 +1574,8 @@ def usuario_da_sessao(token: str):
         plano, exp = _normalizar_plano(c, row)
     perfil = {"id": row["id"], "nome": row["nome"], "email": row["email"],
               "whatsapp": row["whatsapp"], "plano": plano, "plano_expira": exp,
-              "valor_expira": _col(row, "valor_expira")}
+              "valor_expira": _col(row, "valor_expira"),
+              "middle_expira": _col(row, "middle_expira")}
     with _sess_lock:
         _sess_cache[token] = (dict(perfil), time.time())
     return perfil
@@ -1598,6 +1625,36 @@ def revogar_valor(user_id: int):
 def valor_dias_restantes(user):
     """Dias que faltam do add-on de odds erradas (None = não tem)."""
     exp = (user or {}).get("valor_expira")
+    if not exp or exp < time.time():
+        return None
+    return max(1, math.ceil((exp - time.time()) / 86400))
+
+
+def ativar_middle(user_id: int, dias: int, valor: float, metodo: str = "manual"):
+    """Libera o add-on 'Apostas de Intervalo' por N dias. Igual ao PRO/valor: SOMA
+    nos dias que a pessoa já tiver (renovar antes de vencer não perde nada)."""
+    agora = time.time()
+    with _db() as c:
+        atual = c.execute(_q("SELECT middle_expira FROM users WHERE id=?"), (user_id,)).fetchone()
+        base = max(agora, (_col(atual, "middle_expira") or 0)) if atual else agora
+        nova_exp = base + dias * 86400
+        c.execute(_q("UPDATE users SET middle_expira=? WHERE id=?"), (nova_exp, user_id))
+        c.execute(_q("INSERT INTO pagamentos(user_id,valor,plano,metodo,criado) VALUES(?,?,?,?,?)"),
+                  (user_id, valor, "addon-middle", metodo, agora))
+    limpar_cache_sessoes()
+    return nova_exp
+
+
+def revogar_middle(user_id: int):
+    """Tira o add-on de intervalo (estorno/chargeback ou na mão pelo admin)."""
+    with _db() as c:
+        c.execute(_q("UPDATE users SET middle_expira=NULL WHERE id=?"), (user_id,))
+    limpar_cache_sessoes()
+
+
+def middle_dias_restantes(user):
+    """Dias que faltam do add-on de apostas de intervalo (None = não tem)."""
+    exp = (user or {}).get("middle_expira")
     if not exp or exp < time.time():
         return None
     return max(1, math.ceil((exp - time.time()) / 86400))

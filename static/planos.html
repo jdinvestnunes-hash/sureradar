@@ -171,10 +171,10 @@
       </ul>
       <label class="bump">
         <input type="checkbox" data-bump />
-        <span class="bump-txt"><b>💎 Adicionar Odds Erradas das Casas — R$ 47</b>
-          30 dias de acesso à aba onde a casa <b style="display:inline">errou o preço</b> e paga acima do justo. Vai junto no mesmo pagamento.</span>
+        <span class="bump-txt"><b data-bumptitle>🚀 Completo — Odds Erradas + Apostas de Intervalo · +R$ 50</b>
+          Leve os <b style="display:inline">dois add-ons</b> liberados pelo <b style="display:inline">mesmo período do plano</b>. Avulso sairia R$ 47 + R$ 97 — no combo vai por bem menos, no mesmo pagamento.</span>
       </label>
-      <div class="bump-free" data-bumpfree style="display:none">💎&nbsp;<span><b>Odds Erradas das Casas incluídas — GRÁTIS por 1 ano</b> no plano Anual. A aba onde a casa errou o preço e paga acima do justo, liberada junto, sem pagar nada a mais.</span></div>
+      <div class="bump-free" data-bumpfree style="display:none">🚀&nbsp;<span><b>Odds Erradas + Apostas de Intervalo incluídas — GRÁTIS por 1 ano</b> no plano Anual. Os dois add-ons liberados junto, pelo ano inteiro, sem pagar nada a mais.</span></div>
       <div class="pay-row">
         <button class="btn btn-primary" data-pay="cartao">💳 Cartão</button>
         <button class="btn btn-pix" data-pay="pix">⚡ Pix</button>
@@ -200,8 +200,8 @@
       </ul>
       <label class="bump">
         <input type="checkbox" data-bump />
-        <span class="bump-txt"><b>💎 Adicionar Odds Erradas das Casas — R$ 47</b>
-          30 dias de acesso à aba onde a casa <b style="display:inline">errou o preço</b> e paga acima do justo. Vai junto no mesmo pagamento.</span>
+        <span class="bump-txt"><b data-bumptitle>🚀 Completo — Odds Erradas + Apostas de Intervalo · +R$ 50</b>
+          Leve os <b style="display:inline">dois add-ons</b> liberados pelo <b style="display:inline">mesmo período do plano</b>. Avulso sairia R$ 47 + R$ 97 — no combo vai por bem menos, no mesmo pagamento.</span>
       </label>
       <div class="pay-row">
         <button class="btn btn-ghost" data-pay="cartao">💳 Cartão</button>
@@ -234,6 +234,26 @@
       <button class="btn btn-pix" data-pay="pix">⚡ Pix</button>
     </div>
     <div class="addon-nota">Pagamento único de R$ 47 — não é assinatura, não renova sozinho.</div>
+  </div>
+
+  <!-- ADD-ON AVULSO: Apostas de Intervalo (middles) — avulso é premium; no combo sai bem menos -->
+  <div class="addon" id="addon-middle" data-plano="middle">
+    <div class="addon-top">
+      <h2>🎯 Apostas de Intervalo</h2>
+      <div class="price">R$ 97<small>/30 dias</small></div>
+    </div>
+    <p>Duas apostas num <b>intervalo</b> (ex.: total acima 25,5 e abaixo 26,5). Se o placar <b>cair no meio</b>, as <b>duas ganham</b> — lucro alto. Se não cair, a perda é <b>pequena e controlada</b>. Comprado <b>à parte</b> aqui é premium; dentro do <b>Completo</b> sai bem mais barato.</p>
+    <ul>
+      <li><span class="ck">✓</span> Todas as apostas de intervalo do dia, sem borrado</li>
+      <li><span class="ck">✓</span> Calculadora com os dois cenários (bateu / não bateu)</li>
+      <li><span class="ck">✓</span> Filtro por casa, esporte e data</li>
+      <li><span class="ck">✓</span> 30 dias — renovou antes de vencer, os dias somam</li>
+    </ul>
+    <div class="pay-row">
+      <button class="btn btn-valor" data-pay="cartao">💳 Cartão</button>
+      <button class="btn btn-pix" data-pay="pix">⚡ Pix</button>
+    </div>
+    <div class="addon-nota">Pagamento único de R$ 97 — não é assinatura, não renova sozinho. No <b>Completo</b> vem junto do plano por bem menos.</div>
   </div>
 
   <div class="guarantee">
@@ -343,10 +363,10 @@ $id('pix-go').onclick = ()=>{
 
 // ---- Seletor de período (Mensal/Trimestral · Semestral/Anual) ----
 const PLANOS = {
-  mensal:     { price:'R$ 147<small>/mês</small>',        note:'pagamento à vista', badge:'' },
-  trimestral: { price:'R$ 237<small>/trimestre</small>', note:'sai por <b>R$ 79/mês</b> · <span class="save">46% OFF</span> · 💳 parcele no cartão', badge:'💚 46% OFF' },
-  semestral:  { price:'R$ 387<small>/semestre</small>',  note:'sai por <b>R$ 64,50/mês</b> · <span class="save">56% OFF</span> · 💳 parcele no cartão', badge:'💚 56% OFF' },
-  anual:      { price:'R$ 497<small>/ano</small>',        note:'sai por <b>R$ 41/mês</b> · <span class="save">economize R$ 1.267</span> · 💳 <b>até 12x no cartão</b>', badge:'⭐ MAIS VANTAJOSO · 72% OFF' },
+  mensal:     { price:'R$ 147<small>/mês</small>',        note:'pagamento à vista', badge:'', combo:50 },
+  trimestral: { price:'R$ 237<small>/trimestre</small>', note:'sai por <b>R$ 79/mês</b> · <span class="save">46% OFF</span> · 💳 parcele no cartão', badge:'💚 46% OFF', combo:80 },
+  semestral:  { price:'R$ 387<small>/semestre</small>',  note:'sai por <b>R$ 64,50/mês</b> · <span class="save">56% OFF</span> · 💳 parcele no cartão', badge:'💚 56% OFF', combo:130 },
+  anual:      { price:'R$ 497<small>/ano</small>',        note:'sai por <b>R$ 41/mês</b> · <span class="save">economize R$ 1.267</span> · 💳 <b>até 12x no cartão</b>', badge:'⭐ MAIS VANTAJOSO · 72% OFF', combo:0 },
 };
 function setPlano(card, key){
   const p = PLANOS[key]; if(!p) return;
@@ -360,13 +380,17 @@ function setPlano(card, key){
   // aviso de "incluído" e DESMARCA o add-on (senão cobraria R$ 47 por algo grátis).
   const anual = key === 'anual';
   const bumpL = card.querySelector('.bump');
-  const bumpF = card.querySelector('[data-bumpfree]');
-  if (bumpL && bumpF){
+  const bumpF = card.querySelector('[data-bumpfree]');   // só o card longo tem (Anual)
+  if (bumpL){
     bumpL.style.display = anual ? 'none' : '';
-    bumpF.style.display = anual ? '' : 'none';
     const cb = bumpL.querySelector('[data-bump]');
     if (cb && anual) cb.checked = false;
+    // Combo "Completo" custa +R$ por plano (mensal 50 · tri 80 · sem 130) — mesma
+    // proporção do mensal. Atualiza o preço mostrado na caixinha do order bump.
+    const title = bumpL.querySelector('[data-bumptitle]');
+    if (title) title.textContent = '🚀 Completo — Odds Erradas + Apostas de Intervalo · +R$ ' + (p.combo || 0);
   }
+  if (bumpF) bumpF.style.display = anual ? '' : 'none';
 }
 document.querySelectorAll('.seg-opt').forEach(opt=>{
   opt.addEventListener('click', ()=> setPlano(opt.closest('.plan'), opt.dataset.plan));
@@ -404,10 +428,13 @@ document.querySelectorAll('[data-pay]').forEach(b=>{
   });
 });
 
-// ---- Veio do painel pelo botão "Desbloquear" das Odds Erradas (/planos?addon=1) ----
+// ---- Veio do painel pelo botão "Desbloquear" de um add-on ----
+//  /planos?addon=1   → Odds Erradas das Casas   ·   /planos?addon=mid → Apostas de Intervalo
 (function(){
-  if (new URLSearchParams(location.search).get('addon') !== '1') return;
-  const box = document.getElementById('addon-box'); if (!box) return;
+  const a = new URLSearchParams(location.search).get('addon');
+  const alvo = a === '1' ? 'addon-box' : a === 'mid' ? 'addon-middle' : null;
+  if (!alvo) return;
+  const box = document.getElementById(alvo); if (!box) return;
   setTimeout(()=>{
     box.scrollIntoView({behavior:'smooth', block:'center'});
     box.classList.add('flash');

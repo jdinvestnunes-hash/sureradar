@@ -259,6 +259,18 @@ PLANOS = {
 # N dias de acesso à aba — SOMA nos dias que já tiver, igual o PRO.
 ADDON_VALOR = {"nome": "Odds Erradas das Casas", "dias": 30, "valor": 47.0}
 
+# ADD-ON "Apostas de Intervalo" (middles). Também vendido À PARTE: avulso ou dentro
+# do COMBO "Completo" junto do plano. Pagamento único, SOMA nos dias — igual o PRO.
+# Avulso é PREMIUM (R$97): sozinho custa bem mais do que dentro do combo (incentivo).
+ADDON_MIDDLE = {"nome": "Apostas de Intervalo", "dias": 30, "valor": 97.0}
+
+# COMBO "Completo" = plano + os DOIS add-ons (Odds Erradas + Apostas de Intervalo)
+# no MESMO checkout, por um EXTRA promocional (bem menor que os R$47+R$97 avulsos) e
+# válido pelos MESMOS dias do plano. É o "pulo do gato" do checkout. Por plano:
+#   mensal +50 (=197) · trimestral +80 (=317) · semestral +130 (=517) · anual +0.
+# No ANUAL os dois já vêm de BRINDE (extra 0) — ver _liberar_compra no auth.py.
+COMBO_EXTRA = {"mensal": 50.0, "trimestral": 80.0, "semestral": 130.0, "anual": 0.0}
+
 STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "").strip()
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "").strip()
 

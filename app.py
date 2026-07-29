@@ -523,18 +523,35 @@ def health(fb: int = 0, venda: int = 0):
 # PAGAMENTOS — Stripe (cartão) e AbacatePay (Pix)
 # ===========================================================================
 def _plano_valido(payload):
-    """Plano do payload. 'valor' = add-on das Odds Erradas comprado AVULSO (à parte
-    do plano) — tem nome/dias/valor próprios, então cai no mesmo fluxo de checkout."""
+    """Plano do payload. 'valor'/'middle' = add-ons comprados AVULSO (à parte do
+    plano) — têm nome/dias/valor próprios, então caem no mesmo fluxo de checkout."""
     plano = (payload or {}).get("plano", "mensal")
     if plano == "valor":
         return plano, dict(config.ADDON_VALOR)
+    if plano == "middle":
+        return plano, dict(config.ADDON_MIDDLE)
     return plano, config.PLANOS.get(plano)
 
 
 def _quer_bump(payload, plano):
-    """Marcou a caixinha do order bump (Odds Erradas +R$47) junto do plano?
-    Só faz sentido junto de um PLANO — comprando o add-on avulso já é o produto."""
-    return bool((payload or {}).get("addon")) and plano != "valor"
+    """Marcou a caixinha do COMBO 'Completo' (Odds Erradas + Apostas de Intervalo)
+    junto do plano? Só faz sentido junto de um PLANO da tabela PLANOS, e não no anual
+    (lá os dois add-ons já vão de brinde — extra 0)."""
+    return (bool((payload or {}).get("addon"))
+            and plano in config.PLANOS and plano != "anual")
+
+
+def _combo_extra(plano):
+    """Quanto o COMBO 'Completo' soma no total do plano (0 se não houver)."""
+    return float(config.COMBO_EXTRA.get(plano, 0) or 0)
+
+
+def _combo_produto(plano):
+    """Produto sintético do COMBO pra alimentar o checkout (nome/valor/dias). Os dias
+    são os do PLANO — o combo libera os dois add-ons pelo mesmo período do plano."""
+    p = config.PLANOS.get(plano) or {}
+    return {"nome": "Completo — Odds Erradas + Apostas de Intervalo",
+            "valor": _combo_extra(plano), "dias": p.get("dias", 30)}
 
 
 def _confirmar_compra_email(user_id):
@@ -600,6 +617,15 @@ def checkout_stripe(request: Request, payload: dict = Body(...)):
         "payment_intent_data[metadata][user_id]": str(user["id"]),
         "payment_intent_data[metadata][plano]": plano,
     }
+    bump = _quer_bump(payload, plano)                  # COMBO Completo (2 add-ons)
+    total = p["valor"]
+    if bump:
+        cb = _combo_produto(plano)
+        data["line_items[1][quantity]"] = "1"
+        data["line_items[1][price_data][currency]"] = "brl"
+        data["line_items[1][price_data][unit_amount]"] = str(int(round(cb["valor"] * 100)))
+        data["line_items[1][price_data][product_data][name]"] = "SureRadar " + cb["nome"]
+        total += cb["valor"]
     if parcelar:
         # parcelamento: só aparece p/ cartão BR e precisa estar ATIVADO no painel Stripe
         # (Configurações → Métodos de pagamento → Cartões → Parcelamento).
@@ -612,7 +638,8 @@ def checkout_stripe(request: Request, payload: dict = Body(...)):
     if not r.ok:
         return JSONResponse({"erro": "Stripe recusou", "detalhe": r.text[:200]}, status_code=502)
     sess = r.json()
-    auth.checkout_registrar("stripe", sess["id"], user["id"], plano, p["dias"], p["valor"], "stripe")
+    auth.checkout_registrar("stripe", sess["id"], user["id"], plano, p["dias"], total, "stripe",
+                            addon="combo" if bump else None)
     return {"url": sess["url"]}
 
 
@@ -750,16 +777,16 @@ def checkout_pix(request: Request, payload: dict = Body(...)):
         "quantity": 1,
         "price": int(round(p["valor"] * 100)),
     }]
-    if bump:                                   # order bump: entra como 2º item da cobrança
-        a = config.ADDON_VALOR
+    if bump:                                   # COMBO Completo: 2º item da cobrança
+        cb = _combo_produto(plano)
         produtos.append({
-            "externalId": "addon-valor",
-            "name": "SureRadar " + a["nome"],
-            "description": a["nome"] + " (" + str(a["dias"]) + " dias)",
+            "externalId": "combo-" + plano,
+            "name": "SureRadar " + cb["nome"],
+            "description": cb["nome"] + " (" + str(cb["dias"]) + " dias)",
             "quantity": 1,
-            "price": int(round(a["valor"] * 100)),
+            "price": int(round(cb["valor"] * 100)),
         })
-    total = p["valor"] + (config.ADDON_VALOR["valor"] if bump else 0)
+    total = p["valor"] + (_combo_extra(plano) if bump else 0)
     body = {
         "frequency": "ONE_TIME",
         "methods": ["PIX"],
@@ -786,7 +813,7 @@ def checkout_pix(request: Request, payload: dict = Body(...)):
     if not bid or not url:
         return JSONResponse({"erro": "resposta inesperada do AbacatePay"}, status_code=502)
     auth.checkout_registrar("abacatepay", bid, user["id"], plano, p["dias"], total, "pix",
-                            addon="valor" if bump else None)
+                            addon="combo" if bump else None)
     return {"url": url}
 
 
@@ -856,8 +883,13 @@ def _abacate_prewarm_produtos():
                     existentes[prod["externalId"]] = prod["id"]
     except requests.RequestException:
         pass
-    # planos + o add-on das Odds Erradas (order bump) já prontos no boot
-    for plano, p in list(config.PLANOS.items()) + [("valor", config.ADDON_VALOR)]:
+    # planos + add-ons avulsos (Odds Erradas / Apostas de Intervalo) + os produtos do
+    # COMBO por plano (mensal/trimestral/semestral) — tudo pronto no boot.
+    combos = [("combo-" + k, _combo_produto(k)) for k in config.PLANOS
+              if k != "anual" and _combo_extra(k) > 0]
+    for plano, p in (list(config.PLANOS.items())
+                     + [("valor", config.ADDON_VALOR), ("middle", config.ADDON_MIDDLE)]
+                     + combos):
         ext = "pro-%s-%d" % (plano, int(round(p["valor"] * 100)))   # id carrega o preço
         if ext in existentes:
             _abacate_prod_cache[ext] = existentes[ext]
@@ -913,13 +945,14 @@ def checkout_cartao(request: Request, payload: dict = Body(...)):
         return JSONResponse({"erro": "AbacatePay (produto)", "detalhe": str(e)[:200]}, status_code=502)
     bump = _quer_bump(payload, plano)
     items = [{"id": prod_id, "quantity": 1}]
-    if bump:                                   # order bump: 2º produto na mesma cobrança
+    if bump:                                   # COMBO Completo: 2º produto na mesma cobrança
         try:
-            items.append({"id": _abacate_produto_id("valor", config.ADDON_VALOR), "quantity": 1})
-        except Exception as e:                 # add-on falhou: vende o plano do mesmo jeito
-            print("!! produto do add-on:", e)
+            items.append({"id": _abacate_produto_id("combo-" + plano, _combo_produto(plano)),
+                          "quantity": 1})
+        except Exception as e:                 # combo falhou: vende o plano do mesmo jeito
+            print("!! produto do combo:", e)
             bump = False
-    total = p["valor"] + (config.ADDON_VALOR["valor"] if bump else 0)
+    total = p["valor"] + (_combo_extra(plano) if bump else 0)
     body = {
         "items": items,
         "methods": ["CARD"],
@@ -944,7 +977,7 @@ def checkout_cartao(request: Request, payload: dict = Body(...)):
     if not bid or not url:
         return JSONResponse({"erro": "resposta inesperada do AbacatePay"}, status_code=502)
     auth.checkout_registrar("abacatepay", bid, user["id"], plano, p["dias"], total, "cartao",
-                            addon="valor" if bump else None)
+                            addon="combo" if bump else None)
     return {"url": url}
 
 
@@ -1036,8 +1069,12 @@ def me(request: Request):
             "valor_dias": auth.valor_dias_restantes(user),
             "valor_preco": config.ADDON_VALOR["valor"],
             "valor_dias_addon": config.ADDON_VALOR["dias"],
-            # aba "Apostas de Intervalo" (middles) — beta fechado, só p/ e-mails liberados
-            "middle_beta": _middle_liberado(user)}
+            # aba "Apostas de Intervalo" (middles): aparece pra todo mundo; quem tem
+            # acesso total (add-on/combo/anual/beta) vê tudo, o resto vê amostra borrada
+            "middle_tem": _middle_liberado(user),
+            "middle_dias": auth.middle_dias_restantes(user),
+            "middle_preco": config.ADDON_MIDDLE["valor"],
+            "middle_dias_addon": config.ADDON_MIDDLE["dias"]}
 
 
 def _valor_liberado(user):
@@ -1061,12 +1098,16 @@ def _valor_liberado(user):
 
 
 def _middle_liberado(user):
-    """Aba 'Apostas de Intervalo' (middles): BETA FECHADO. Só existe pros e-mails em
-    MIDDLE_BETA_EMAILS (o Leo, pra estudar o produto). Ninguém mais vê a aba."""
+    """ACESSO TOTAL à aba 'Apostas de Intervalo' (middles): quem comprou o add-on
+    (avulso R$97, no combo Completo, ou de brinde no Anual) e os e-mails do beta em
+    MIDDLE_BETA_EMAILS (o Leo, pra gravar/estudar). A ABA aparece pra todo mundo — quem
+    não tem acesso vê só uma amostra, as melhores borradas (igual às Odds Erradas)."""
     if not user:
         return False
     emails = [e.strip().lower() for e in (config.MIDDLE_BETA_EMAILS or "").split(",") if e.strip()]
-    return user.get("email", "").strip().lower() in emails
+    if user.get("email", "").strip().lower() in emails:
+        return True
+    return bool(auth.middle_dias_restantes(user))
 
 
 def _alerta_liberado(user):
@@ -1139,6 +1180,10 @@ def perfil_dados(request: Request):
         "valor_dias": auth.valor_dias_restantes(user),
         "valor_preco": config.ADDON_VALOR["valor"],
         "valor_dias_addon": config.ADDON_VALOR["dias"],
+        # add-on das Apostas de Intervalo (avulso ou de brinde no anual/combo)
+        "middle_dias": auth.middle_dias_restantes(user),
+        "middle_preco": config.ADDON_MIDDLE["valor"],
+        "middle_dias_addon": config.ADDON_MIDDLE["dias"],
     }
 
 
@@ -2174,13 +2219,15 @@ def ingest_valor(request: Request, payload: dict = Body(...)):
 
 @app.get("/api/middles")
 def middles(request: Request):
-    """Apostas de intervalo (middles) pro painel. BETA FECHADO: só responde pros e-mails
-    liberados (o Leo). Quem não está na lista recebe 403 e nem vê a aba no front."""
+    """Apostas de intervalo (middles) pro painel. Igual às Odds Erradas: responde pra
+    TODO MUNDO logado — quem tem acesso total (add-on/combo/anual/beta) recebe `tem:True`
+    e vê tudo; quem não tem vê a mesma lista mas o painel BORRA as melhores (as de maior
+    lucro) e deixa só uma amostra aberta, pra dar vontade de liberar. Ordena por lucro ↓
+    pro corte do borrado ser previsível (borra do topo)."""
     user = _usuario(request)
-    if not _middle_liberado(user):
-        return JSONResponse({"erro": "indisponível"}, status_code=403)
+    tem = _middle_liberado(user)
     itens = sorted(middle_feed.get_middles(), key=lambda i: i.get("profit", 0), reverse=True)
-    return {"itens": itens, "tem": True}
+    return {"itens": itens, "tem": tem}
 
 
 @app.post("/api/ingest-middle")

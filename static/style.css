@@ -249,6 +249,10 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 17p
 .bank-col .v.red { color: #ff6b6b; }
 .bank-status { padding: 5px 10px; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-dim); font-family: inherit; }
 .bank-status.done { color: var(--green); border-color: rgba(52,211,153,.3); background: rgba(52,211,153,.1); }
+.bank-status.miss { color: #ff6b6b; border-color: rgba(255,107,107,.3); background: rgba(255,107,107,.1); }
+.bank-res { display: flex; gap: 6px; }
+.bank-mid-win { font-size: 12.5px; font-weight: 700; color: var(--green); font-variant-numeric: tabular-nums; margin-top: 2px; }
+.bank-mid-lose { font-size: 11.5px; font-weight: 600; color: #ff6b6b; font-variant-numeric: tabular-nums; margin-top: 1px; }
 .bank-del { background: none; border: none; color: var(--text-mute); cursor: pointer; font-size: 16px; padding: 4px; }
 .bank-del:hover { color: var(--red); }
 .bank-edit { width: 84px; background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: 6px 8px; font-family: inherit; font-size: 13px; font-weight: 600; text-align: right; }

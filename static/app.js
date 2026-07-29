@@ -523,12 +523,36 @@ function launchToBank() {
 }
 
 // ---------- Banca ----------
+// Surebet tem lucro GARANTIDO (expected) e "conta" quando concluída. Middle é aposta
+// de intervalo: só é resolvido quando o usuário marca se BATEU (as duas ganham) ou NÃO.
+function bankResolvido(e) {
+  return e.tipo === "middle" ? (e.resultado === "bateu" || e.resultado === "errou")
+                             : e.status === "concluida";
+}
+// Ganho do middle quando BATE (as duas ganham). Recalcula das pernas p/ entradas antigas.
+function midGanho(e) {
+  if (e.mid_ganho != null) return Number(e.mid_ganho);
+  if (!e.legs || !e.legs.length) return 0;
+  const total = e.total || e.legs.reduce((s, l) => s + (Number(l.stake) || 0), 0);
+  const ret = e.legs.reduce((s, l) => s + (Number(l.stake) || 0) * (Number(l.odd) || 0), 0);
+  return ret - total;
+}
+// Lucro REALIZADO de uma entrada: middle usa o resultado marcado; surebet usa o garantido.
+function bankRealizado(e) {
+  if (e.tipo === "middle") {
+    if (e.resultado === "bateu") return midGanho(e);
+    if (e.resultado === "errou") return Number(e.expected || 0);
+    return 0;                       // ainda pendente: não puxa nada
+  }
+  return Number(e.expected || 0);
+}
 function renderBankBadge() { $("#bank-count").textContent = banca.length; }
 function renderBanca() {
   const list = $("#bank-list"), empty = $("#bank-empty");
   const apostado = banca.reduce((s, e) => s + e.total, 0);
-  const previsto = banca.reduce((s, e) => s + e.expected, 0);
-  const realizado = banca.filter((e) => e.status === "concluida").reduce((s, e) => s + e.expected, 0);
+  // Middle não tem lucro "previsto" (depende de bater no intervalo) -> fica de fora daqui.
+  const previsto = banca.reduce((s, e) => s + (e.tipo === "middle" ? 0 : (e.expected || 0)), 0);
+  const realizado = banca.filter(bankResolvido).reduce((s, e) => s + bankRealizado(e), 0);
   $("#bank-metrics").innerHTML = "";
   [["Entradas", banca.length, ""], ["Total apostado", brl(apostado), "cyan"],
    ["Lucro previsto", brl(previsto), previsto < 0 ? "red" : "green"],
@@ -580,14 +604,42 @@ function renderBanca() {
       pin.style.color = (e.expected || 0) < 0 ? "#ff6b6b" : "#2ee6a8";
       pin.addEventListener("change", () => { e.expected = parseFloat(pin.value) || 0; saveBanca(); renderBanca(); });
       profCol.appendChild(pin);
+    } else if (e.tipo === "middle") {
+      // Middle: enquanto pendente mostra os dois cenários; depois de marcado, o real.
+      if (e.resultado === "bateu") {
+        profCol.appendChild(el("div", "v green", "+" + brl(midGanho(e))));
+      } else if (e.resultado === "errou") {
+        profCol.appendChild(el("div", "v red", brl(e.expected)));
+      } else {
+        const win = el("div", "bank-mid-win", "bateu +" + brl(midGanho(e)));
+        const lose = el("div", "bank-mid-lose", "não " + brl(e.expected));
+        profCol.appendChild(win); profCol.appendChild(lose);
+      }
     } else {
       const neg = (e.expected || 0) < 0;
       profCol.appendChild(el("div", "v " + (neg ? "red" : "green"), (neg ? "" : "+") + brl(e.expected)));
     }
     row.appendChild(profCol);
-    const stBtn = el("button", "bank-status" + (e.status === "concluida" ? " done" : ""), e.status === "concluida" ? "✓ Concluída" : "Pendente");
-    stBtn.addEventListener("click", () => { e.status = e.status === "concluida" ? "pendente" : "concluida"; saveBanca(); renderBanca(); });
-    row.appendChild(stBtn);
+    if (e.tipo === "middle") {
+      // Resolução do intervalo: BATEU (as duas ganham) ou NÃO bateu (perda pequena).
+      const res = el("div", "bank-res");
+      const mk = (val, on, cls, label) => {
+        const b = el("button", "bank-status" + (on ? " " + cls : ""), label);
+        b.addEventListener("click", () => {
+          e.resultado = e.resultado === val ? "pendente" : val;
+          e.status = e.resultado === "pendente" ? "pendente" : "concluida";
+          saveBanca(); renderBanca();
+        });
+        return b;
+      };
+      res.appendChild(mk("bateu", e.resultado === "bateu", "done", "✅ Bateu"));
+      res.appendChild(mk("errou", e.resultado === "errou", "miss", "❌ Não"));
+      row.appendChild(res);
+    } else {
+      const stBtn = el("button", "bank-status" + (e.status === "concluida" ? " done" : ""), e.status === "concluida" ? "✓ Concluída" : "Pendente");
+      stBtn.addEventListener("click", () => { e.status = e.status === "concluida" ? "pendente" : "concluida"; saveBanca(); renderBanca(); });
+      row.appendChild(stBtn);
+    }
     const del = el("button", "bank-del", "🗑"); del.title = "Excluir";
     del.addEventListener("click", () => { banca = banca.filter((x) => x.id !== e.id); saveBanca(); renderBanca(); });
     row.appendChild(del); list.appendChild(row);
@@ -1006,9 +1058,15 @@ let MIDDLE_ITENS = [], MIDDLE_SPORT = "", MIDDLE_MIN = 0;
 let MIDDLE_DATE = "";         // filtro de data ("dd/mm" ou "" = todas)
 let MIDDLE_OFF = new Set();   // casas DESmarcadas na lateral (casa nova entra marcada)
 let MIDDLE_BOUND = false;     // listeners da lateral já ligados (só uma vez)
+// Sem acesso: vê a lista TODA, mas as de MAIOR lucro vêm borradas (o prêmio de quem
+// paga) e só as MIDDLE_ABERTAS de menor lucro ficam abertas, como amostra real.
+const MIDDLE_ABERTAS = 2;
+// add-on "Apostas de Intervalo": comprado à parte OU no combo (/api/me manda os números)
+let MIDDLE_TEM = false, MIDDLE_PRECO = 97, MIDDLE_DIAS_ADDON = 30, MIDDLE_DIAS = null;
 
 // Card no MESMO padrão das Surebets (.op) — 2 pernas: Acima numa casa, Abaixo em outra.
-function middleOpEl(m) {
+// locked=true: card borrado (teaser) — sem link e sem calculadora (o overlay cobre).
+function middleOpEl(m, locked) {
   const op = el("div", "op op-mid");
 
   const head = el("div", "op-head");
@@ -1036,7 +1094,7 @@ function middleOpEl(m) {
     }
     const book = el("div", "op-box-book");
     book.appendChild(el("span", null, escH(g.casa)));
-    const link = (g.link && !/surebet\.com/i.test(g.link)) ? g.link : null;
+    const link = (!locked && g.link && !/surebet\.com/i.test(g.link)) ? g.link : null;
     if (link) book.appendChild(el("span", "ext", "↗ ir para a casa"));
     main.appendChild(book);
     box.appendChild(main);
@@ -1053,10 +1111,38 @@ function middleOpEl(m) {
     (Number(m.profit) ? `LUCRO MÁX +${Number(m.profit).toFixed(2)}%` : "APOSTA DE INTERVALO")));
   const calc = el("button", "op-calc", "CALCULAR " + ICON_CALC);
   // calculadora PRÓPRIA da aposta de intervalo (mostra os dois mundos)
-  calc.addEventListener("click", () => openMidCalc(m));
+  if (!locked) calc.addEventListener("click", () => openMidCalc(m));
   bar.appendChild(calc);
   op.appendChild(bar);
   return op;
+}
+
+// Bloqueada: mesmo blur + selo das surebets/valuebets do FREE
+function middleTeaserEl(m) {
+  const wrap = el("div", "teaser");
+  wrap.appendChild(middleOpEl(m, true));
+  const lock = el("div", "teaser-lock");
+  lock.appendChild(el("div", "tl-txt",
+    `<span class="ci" style="width:14px;height:14px;margin-right:6px;vertical-align:-2px">${ICONS.lock}</span>Intervalo de <b>+${Number(m.profit || 0).toFixed(1)}%</b>`));
+  const btn = el("button", "upgrade-btn", "Desbloquear");
+  btn.addEventListener("click", () => { location.href = "/planos?addon=mid"; });
+  lock.appendChild(btn);
+  wrap.appendChild(lock);
+  return wrap;
+}
+
+// Faixa de venda do add-on — some pra quem já tem acesso
+function renderMiddleCTA(bloqueadas) {
+  const box = document.getElementById("middle-cta");
+  if (!box) return;
+  if (MIDDLE_TEM || bloqueadas <= 0) { box.classList.add("hidden"); box.innerHTML = ""; return; }
+  box.classList.remove("hidden");
+  box.innerHTML =
+    `<div><b>+${bloqueadas} ${bloqueadas === 1 ? "aposta de intervalo bloqueada" : "apostas de intervalo bloqueadas"}</b>` +
+    `<span>Libere todas por R$ ${MIDDLE_PRECO.toFixed(2).replace(".", ",")} — ${MIDDLE_DIAS_ADDON} dias de acesso. É um extra, não mexe no seu plano.</span></div>` +
+    `<button class="valor-cta-btn">Desbloquear por R$ ${MIDDLE_PRECO.toFixed(0)}</button>`;
+  const b = box.querySelector(".valor-cta-btn");
+  if (b) b.addEventListener("click", () => { location.href = "/planos?addon=mid"; });
 }
 
 // Chips de esporte (filtra na tela, igual às Surebets)
@@ -1119,10 +1205,17 @@ function renderMiddleLista() {
   const cont = document.getElementById("middle-count");
   if (cont) cont.textContent = visiveis.length + (visiveis.length === 1 ? " aposta de intervalo" : " apostas de intervalo");
   if (empty) empty.classList.toggle("hidden", visiveis.length > 0);
-  visiveis.forEach((m) => {
-    try { list.appendChild(middleOpEl(m)); }
+  // Com acesso: tudo aberto. Sem acesso: as de MAIOR lucro borradas (o prêmio) e só as
+  // MIDDLE_ABERTAS menores abertas. A lista chega por lucro ↓, então o corte é do topo.
+  const total = visiveis.length;
+  const abertas = MIDDLE_TEM ? total : Math.min(MIDDLE_ABERTAS, total);
+  const corte = total - abertas;
+  visiveis.forEach((m, i) => {
+    const locked = i < corte;
+    try { list.appendChild(locked ? middleTeaserEl(m) : middleOpEl(m, false)); }
     catch (e) { console.error("middle:", e); }
   });
+  renderMiddleCTA(corte);
 }
 
 // Liga a lateral UMA vez (o esqueleto mora no HTML)
@@ -1165,7 +1258,12 @@ async function renderMiddle() {
   try { const r = await fetch("/api/middles"); if (r.ok) itens = (await r.json()).itens || []; } catch {}
   MIDDLE_ITENS = itens;
   const fonte = document.getElementById("middle-fonte");
-  if (fonte) fonte.textContent = "atualiza a cada 10 min";
+  if (fonte) {
+    const base = "atualiza a cada 10 min";
+    fonte.textContent = MIDDLE_TEM && MIDDLE_DIAS
+      ? base + " · acesso por mais " + MIDDLE_DIAS + (MIDDLE_DIAS === 1 ? " dia" : " dias")
+      : base;
+  }
   renderMiddleCasas();
   renderMiddleChips();
   renderMiddleLista();
@@ -1309,11 +1407,14 @@ function launchMidToBank() {
   const total = stakes.reduce((s, v) => s + v, 0);
   const retornos = stakes.map((s, i) => s * odds[i]);
   const fora = retornos.length ? Math.min(...retornos.map((r) => r - total)) : 0;
-  // Guarda o PIOR caso (fora) como "expected" -> a banca não infla o lucro previsto.
+  // Middle tem DOIS desfechos: BATEU no intervalo (as duas ganham -> lucrão) ou NÃO
+  // bateu (perda pequena = fora). Guarda os dois; o realizado usa o que o usuário marcar.
+  const ganho = retornos.reduce((s, r) => s + r, 0) - total;
   banca.push({
     id: "mid-" + Date.now(),
     event: MIDC.event, market: "🎯 aposta de intervalo", sport: "",
-    profit_pct: MIDC.profit, total, expected: fora, status: "pendente", tipo: "middle",
+    profit_pct: MIDC.profit, total, expected: fora, mid_ganho: ganho,
+    status: "pendente", resultado: "pendente", tipo: "middle",
     legs: MIDC.legs.map((l, i) => ({ outcome: l.desc || l.mercado, odd: odds[i], book: l.casa, stake: stakes[i] })),
     jogo: "",
     created: new Date().toLocaleDateString("pt-BR"),
@@ -1470,13 +1571,13 @@ function renderLearn() {
 function renderBankChart() {
   const box = document.getElementById("bank-chart");
   if (!box) return;
-  const done = banca.filter((e) => e.status === "concluida");
+  const done = banca.filter(bankResolvido);
   if (done.length < 2) { box.style.display = "none"; box.innerHTML = ""; return; }
   box.style.display = "";
   const parse = (s) => { const p = (s || "").split("/"); return p.length === 3 ? new Date(+p[2], +p[1] - 1, +p[0]).getTime() : 0; };
   const sorted = done.slice().sort((a, b) => parse(a.created) - parse(b.created));
   let acc = 0; const pts = [0];
-  sorted.forEach((e) => { acc += (e.expected || 0); pts.push(acc); });
+  sorted.forEach((e) => { acc += bankRealizado(e); pts.push(acc); });
   const W = 700, H = 200, pad = 10;
   const min = Math.min(...pts, 0), max = Math.max(...pts, 0), rng = (max - min) || 1;
   const X = (i) => pad + i * (W - 2 * pad) / (pts.length - 1);
@@ -1573,8 +1674,14 @@ async function initUser() {
     if (me.valor_dias_addon) VALOR_DIAS_ADDON = me.valor_dias_addon;
     VALOR_DIAS = me.valor_dias || null;
   }
-  // aba Apostas de Intervalo (middles): BETA FECHADO — só aparece pros e-mails liberados
-  if (me && me.middle_beta) {
+  // aba Apostas de Intervalo (middles): aparece pra TODO MUNDO logado (add-on de R$97 ou
+  // dentro do Completo). Quem não tem acesso vê uma amostra e o resto borrado, com o
+  // botão de desbloquear — igual às Odds Erradas.
+  if (me) {
+    MIDDLE_TEM = !!me.middle_tem;
+    if (me.middle_preco) MIDDLE_PRECO = me.middle_preco;
+    if (me.middle_dias_addon) MIDDLE_DIAS_ADDON = me.middle_dias_addon;
+    MIDDLE_DIAS = me.middle_dias || null;
     const tm = document.getElementById("tab-middle");
     if (tm) tm.style.display = "";
   }
