@@ -1795,15 +1795,48 @@ def admin_metricas(request: Request):
     return auth.metricas()
 
 
+# Cache do mapa {id_conjunto: nome} do Meta (5 min). O FB manda o adset.id no
+# utm_campaign; aqui a gente troca pelo NOME do conjunto (ABO 1/2/3) no selo.
+_ADSET_NOMES = {"t": 0.0, "map": {}}
+
+
+def _adset_nomes():
+    if _time.time() - _ADSET_NOMES["t"] > 300:
+        try:
+            m = meta_ads.status_adsets()   # {id: {nome, ...}}
+            _ADSET_NOMES["map"] = {k: (v.get("nome") or "").strip()
+                                   for k, v in m.items() if (v.get("nome") or "").strip()}
+        except Exception:
+            pass
+        _ADSET_NOMES["t"] = _time.time()
+    return _ADSET_NOMES["map"]
+
+
+def _resolver_campanha(camp, nomes):
+    """Decodifica a campanha do FB (%20/%7C) e troca ids numéricos de conjunto
+    pelo nome legível. Se não achar o nome, deixa como está (o front descarta id)."""
+    if not camp:
+        return camp
+    from urllib.parse import unquote
+    try:
+        dec = unquote(str(camp))
+    except Exception:
+        dec = str(camp)
+    partes = [p.strip() for p in dec.split("|") if p.strip()]
+    return "|".join((nomes.get(p, p) if p.isdigit() else p) for p in partes)
+
+
 @app.get("/api/admin/usuarios")
 def admin_usuarios(request: Request):
     user = _usuario(request)
     erro = _guard_admin(request, user)
     if erro:
         return erro
+    nomes = _adset_nomes()
     lista = []
     for u in auth.listar_usuarios():
-        lista.append({**u, "dias": auth.dias_restantes(u),
+        lista.append({**u, "campanha": _resolver_campanha(u.get("campanha"), nomes),
+                      "dias": auth.dias_restantes(u),
                       "aviso_renovar": _aviso_renovar(auth.dias_restantes(u)),
                       "valor_dias": auth.valor_dias_restantes(u)})   # add-on Odds Erradas
     return {"usuarios": lista}
