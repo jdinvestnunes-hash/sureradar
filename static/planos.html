@@ -171,7 +171,7 @@
       </ul>
       <label class="bump">
         <input type="checkbox" data-bump />
-        <span class="bump-txt"><b data-bumptitle>🚀 Completo — Odds Erradas + Apostas de Intervalo · +R$ 50</b>
+        <span class="bump-txt"><b data-bumptitle>🚀 Completo — Odds Erradas + Apostas de Intervalo · +R$ 97</b>
           Leve os <b style="display:inline">dois add-ons</b> liberados pelo <b style="display:inline">mesmo período do plano</b>. Avulso sairia R$ 47 + R$ 97 — no combo vai por bem menos, no mesmo pagamento.</span>
       </label>
       <div class="bump-free" data-bumpfree style="display:none">🚀&nbsp;<span><b>Odds Erradas + Apostas de Intervalo incluídas — GRÁTIS por 1 ano</b> no plano Anual. Os dois add-ons liberados junto, pelo ano inteiro, sem pagar nada a mais.</span></div>
@@ -200,7 +200,7 @@
       </ul>
       <label class="bump">
         <input type="checkbox" data-bump />
-        <span class="bump-txt"><b data-bumptitle>🚀 Completo — Odds Erradas + Apostas de Intervalo · +R$ 50</b>
+        <span class="bump-txt"><b data-bumptitle>🚀 Completo — Odds Erradas + Apostas de Intervalo · +R$ 97</b>
           Leve os <b style="display:inline">dois add-ons</b> liberados pelo <b style="display:inline">mesmo período do plano</b>. Avulso sairia R$ 47 + R$ 97 — no combo vai por bem menos, no mesmo pagamento.</span>
       </label>
       <div class="pay-row">
@@ -363,9 +363,9 @@ $id('pix-go').onclick = ()=>{
 
 // ---- Seletor de período (Mensal/Trimestral · Semestral/Anual) ----
 const PLANOS = {
-  mensal:     { price:'R$ 147<small>/mês</small>',        note:'pagamento à vista', badge:'', combo:50 },
-  trimestral: { price:'R$ 237<small>/trimestre</small>', note:'sai por <b>R$ 79/mês</b> · <span class="save">46% OFF</span> · 💳 parcele no cartão', badge:'💚 46% OFF', combo:80 },
-  semestral:  { price:'R$ 387<small>/semestre</small>',  note:'sai por <b>R$ 64,50/mês</b> · <span class="save">56% OFF</span> · 💳 parcele no cartão', badge:'💚 56% OFF', combo:130 },
+  mensal:     { price:'R$ 147<small>/mês</small>',        note:'pagamento à vista', badge:'', combo:97 },
+  trimestral: { price:'R$ 237<small>/trimestre</small>', note:'sai por <b>R$ 79/mês</b> · <span class="save">46% OFF</span> · 💳 parcele no cartão', badge:'💚 46% OFF', combo:127 },
+  semestral:  { price:'R$ 387<small>/semestre</small>',  note:'sai por <b>R$ 64,50/mês</b> · <span class="save">56% OFF</span> · 💳 parcele no cartão', badge:'💚 56% OFF', combo:177 },
   anual:      { price:'R$ 497<small>/ano</small>',        note:'sai por <b>R$ 41/mês</b> · <span class="save">economize R$ 1.267</span> · 💳 <b>até 12x no cartão</b>', badge:'⭐ MAIS VANTAJOSO · 72% OFF', combo:0 },
 };
 function setPlano(card, key){
@@ -385,8 +385,8 @@ function setPlano(card, key){
     bumpL.style.display = anual ? 'none' : '';
     const cb = bumpL.querySelector('[data-bump]');
     if (cb && anual) cb.checked = false;
-    // Combo "Completo" custa +R$ por plano (mensal 50 · tri 80 · sem 130) — mesma
-    // proporção do mensal. Atualiza o preço mostrado na caixinha do order bump.
+    // Combo "Completo" custa +R$ por plano (mensal 97 · tri 127 · sem 177). Avulso
+    // seria R$ 47 + R$ 97 = R$ 144, então 97 pelos dois já é desconto forte.
     const title = bumpL.querySelector('[data-bumptitle]');
     if (title) title.textContent = '🚀 Completo — Odds Erradas + Apostas de Intervalo · +R$ ' + (p.combo || 0);
   }

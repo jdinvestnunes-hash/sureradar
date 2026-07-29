@@ -269,7 +269,7 @@ ADDON_MIDDLE = {"nome": "Apostas de Intervalo", "dias": 30, "valor": 97.0}
 # válido pelos MESMOS dias do plano. É o "pulo do gato" do checkout. Por plano:
 #   mensal +50 (=197) · trimestral +80 (=317) · semestral +130 (=517) · anual +0.
 # No ANUAL os dois já vêm de BRINDE (extra 0) — ver _liberar_compra no auth.py.
-COMBO_EXTRA = {"mensal": 50.0, "trimestral": 80.0, "semestral": 130.0, "anual": 0.0}
+COMBO_EXTRA = {"mensal": 97.0, "trimestral": 127.0, "semestral": 177.0, "anual": 0.0}
 
 STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "").strip()
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "").strip()
