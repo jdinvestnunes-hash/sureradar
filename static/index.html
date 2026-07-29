@@ -38,7 +38,7 @@
 
     <nav class="tabs">
       <button class="tab active" data-view="ops" title="Surebets ao vivo">⚽ Surebets</button>
-      <button class="tab" id="tab-valor" data-view="valor" title="Odds erradas das casas">💎 Odds Erradas das Casas</button>
+      <button class="tab" id="tab-valor" data-view="valor" title="Odds erradas das casas">💎 Odds Erradas</button>
       <button class="tab" id="tab-middle" data-view="middle" title="Apostas de intervalo (middles)" style="display:none">🎯 Apostas de Intervalo</button>
       <button class="tab" data-view="bank" title="Suas entradas e o lucro">💰 Minha Banca <span id="bank-count" class="tab-badge">0</span></button>
       <button class="tab" data-view="calc" title="Calculadora de surebet">🧮 Calculadora</button>
@@ -254,7 +254,7 @@
         <div class="filter-title">Lucro máx (se cair no meio)</div>
         <label class="slider">
           <div class="slider-head"><span>Mínimo</span><output id="middle-min-out">todas</output></div>
-          <input type="range" id="middle-min" min="0" max="15" step="0.5" value="0" />
+          <input type="range" id="middle-min" min="0" max="100" step="5" value="0" />
         </label>
       </div>
 
@@ -286,9 +286,9 @@
         </div>
       </div>
 
-      <div id="middle-list" class="grid"></div>
-
       <div id="middle-cta" class="valor-cta hidden"></div>
+
+      <div id="middle-list" class="grid"></div>
 
       <div id="middle-empty" class="empty hidden">
         <div class="empty-icon">🎯</div>
@@ -581,7 +581,7 @@
     <span class="tg-bubble-txt">Grupo grátis</span>
   </a>
 
-  <script src="/static/app.js?v=29"></script>
+  <script src="/static/app.js?v=30"></script>
 
   <style>
     #view-calc .cv-leg{background:var(--surface2,#121a2b);border:1px solid var(--border,#1b2740);border-radius:14px;padding:16px;margin-bottom:14px}

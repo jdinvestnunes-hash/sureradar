@@ -1058,11 +1058,21 @@ let MIDDLE_ITENS = [], MIDDLE_SPORT = "", MIDDLE_MIN = 0;
 let MIDDLE_DATE = "";         // filtro de data ("dd/mm" ou "" = todas)
 let MIDDLE_OFF = new Set();   // casas DESmarcadas na lateral (casa nova entra marcada)
 let MIDDLE_BOUND = false;     // listeners da lateral já ligados (só uma vez)
-// Sem acesso: vê a lista TODA, mas as de MAIOR lucro vêm borradas (o prêmio de quem
-// paga) e só as MIDDLE_ABERTAS de menor lucro ficam abertas, como amostra real.
-const MIDDLE_ABERTAS = 2;
+// Sem acesso: vê a lista TODA, mas as MIDDLE_BORRADAS de MAIOR lucro vêm borradas
+// (o prêmio de quem paga); o resto fica aberto como amostra real.
+const MIDDLE_BORRADAS = 15;
 // add-on "Apostas de Intervalo": comprado à parte OU no combo (/api/me manda os números)
 let MIDDLE_TEM = false, MIDDLE_PRECO = 97, MIDDLE_DIAS_ADDON = 30, MIDDLE_DIAS = null;
+
+// Lucro MÁXIMO se o placar cair no intervalo (as duas pernas ganham). Calculado na
+// hora pelas odds — o data-profit da fonte às vezes vem zerado, e +0,0% não vende.
+// Split de retorno igual: cada perna devolve total/margem; as duas juntas = N/margem.
+function midMaxPct(m) {
+  const odds = (m.legs || []).map((g) => Number(g.odd) || 0).filter((o) => o > 1);
+  if (odds.length < 2) return Number(m.profit) || 0;
+  const margem = odds.reduce((s, o) => s + 1 / o, 0);
+  return margem > 0 ? (odds.length / margem - 1) * 100 : 0;
+}
 
 // Card no MESMO padrão das Surebets (.op) — 2 pernas: Acima numa casa, Abaixo em outra.
 // locked=true: card borrado (teaser) — sem link e sem calculadora (o overlay cobre).
@@ -1106,9 +1116,10 @@ function middleOpEl(m, locked) {
   op.appendChild(body);
 
   const bar = el("div", "op-bar");
+  const pct = midMaxPct(m);
   bar.appendChild(el("div", "op-return",
     `<span class="ci" style="width:15px;height:15px;margin-right:7px">${ICONS.chart}</span>` +
-    (Number(m.profit) ? `LUCRO MÁX +${Number(m.profit).toFixed(2)}%` : "APOSTA DE INTERVALO")));
+    (pct > 0 ? `LUCRO MÁX +${pct.toFixed(1)}%` : "APOSTA DE INTERVALO")));
   const calc = el("button", "op-calc", "CALCULAR " + ICON_CALC);
   // calculadora PRÓPRIA da aposta de intervalo (mostra os dois mundos)
   if (!locked) calc.addEventListener("click", () => openMidCalc(m));
@@ -1123,7 +1134,7 @@ function middleTeaserEl(m) {
   wrap.appendChild(middleOpEl(m, true));
   const lock = el("div", "teaser-lock");
   lock.appendChild(el("div", "tl-txt",
-    `<span class="ci" style="width:14px;height:14px;margin-right:6px;vertical-align:-2px">${ICONS.lock}</span>Intervalo de <b>+${Number(m.profit || 0).toFixed(1)}%</b>`));
+    `<span class="ci" style="width:14px;height:14px;margin-right:6px;vertical-align:-2px">${ICONS.lock}</span>Se cair no meio: <b>+${midMaxPct(m).toFixed(1)}%</b>`));
   const btn = el("button", "upgrade-btn", "Desbloquear");
   btn.addEventListener("click", () => { location.href = "/planos?addon=mid"; });
   lock.appendChild(btn);
@@ -1190,7 +1201,7 @@ function middleFiltradas() {
     return (!MIDDLE_SPORT || m.esporte === MIDDLE_SPORT) &&
       (!MIDDLE_DATE || horaData(m.hora) === MIDDLE_DATE) &&
       !casas.some((c) => MIDDLE_OFF.has(c)) &&
-      Number(m.profit || 0) >= MIDDLE_MIN;
+      midMaxPct(m) >= MIDDLE_MIN;
   });
 }
 
@@ -1201,15 +1212,15 @@ function renderMiddleLista() {
   list.innerHTML = "";
   montarDateBar("middle-date-bar", MIDDLE_ITENS, (m) => horaData(m.hora), MIDDLE_DATE,
     (k) => { MIDDLE_DATE = k; renderMiddleLista(); });
-  const visiveis = middleFiltradas();
+  // Ordena por lucro máximo (se cair no meio) ↓ — garante que as borradas sejam as melhores.
+  const visiveis = middleFiltradas().sort((a, b) => midMaxPct(b) - midMaxPct(a));
   const cont = document.getElementById("middle-count");
   if (cont) cont.textContent = visiveis.length + (visiveis.length === 1 ? " aposta de intervalo" : " apostas de intervalo");
   if (empty) empty.classList.toggle("hidden", visiveis.length > 0);
-  // Com acesso: tudo aberto. Sem acesso: as de MAIOR lucro borradas (o prêmio) e só as
-  // MIDDLE_ABERTAS menores abertas. A lista chega por lucro ↓, então o corte é do topo.
+  // Com acesso: tudo aberto. Sem acesso: as MIDDLE_BORRADAS de MAIOR lucro borradas
+  // (o prêmio) e o RESTO aberto como amostra.
   const total = visiveis.length;
-  const abertas = MIDDLE_TEM ? total : Math.min(MIDDLE_ABERTAS, total);
-  const corte = total - abertas;
+  const corte = MIDDLE_TEM ? 0 : Math.min(MIDDLE_BORRADAS, total);
   visiveis.forEach((m, i) => {
     const locked = i < corte;
     try { list.appendChild(locked ? middleTeaserEl(m) : middleOpEl(m, false)); }
