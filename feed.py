@@ -154,6 +154,45 @@ def merge_surebets(lista, quando=None):
         _ultima_ts = now
 
 
+def snapshot_acima(lista, piso, quando=None):
+    """SNAPSHOT PARCIAL só da faixa de lucro >= `piso` (a "página 1" do robô).
+
+    É o coração da passada RÁPIDA (~a cada 75s): o robô lê só a página 1 (as de
+    MAIOR lucro = as mais frescas) e manda por aqui, junto com o menor lucro que
+    apareceu nela (o piso). Como a lista da fonte é DECRESCENTE, tudo que tem
+    lucro >= piso obrigatoriamente estava na página 1 — então a troca é EXATA:
+
+      • aposta nova de alto lucro  -> ENTRA na hora
+      • aposta do topo que expirou -> SAI (estava >= piso e não reapareceu)
+      • aposta que só DESCEU p/ pág 2 (lucro < piso) -> FICA intocada (é da funda)
+      • nada duplicado, nada velho subindo pro dashboard.
+
+    Guarda-chuva: só mexe se veio lista (o handler já garante isso); lista vazia
+    NUNCA deve zerar o feed.
+    """
+    global _ultima_atualizacao, _ultima_ts
+    if not lista:
+        return
+    now = time.time()
+    novos = {b["id"] for b in lista if b.get("id")}
+    with _lock:
+        # 1) some com as do TOPO (>= piso) que não vieram nesta página 1 = expiraram
+        mortos = [k for k, (b, ts) in _bets.items()
+                  if b.get("profit_pct", 0) >= piso and k not in novos]
+        for k in mortos:
+            del _bets[k]
+        # 2) insere/atualiza as da página 1
+        for b in lista:
+            if b.get("id"):
+                _bets[b["id"]] = (b, now)
+        # 3) rede de segurança por TEMPO (igual ao merge)
+        expirados = [k for k, (b, ts) in _bets.items() if now - ts > _EXPIRY_SEG]
+        for k in expirados:
+            del _bets[k]
+        _ultima_atualizacao = quando
+        _ultima_ts = now
+
+
 def marcar_ingest():
     """Registra que a EXTENSÃO (conta paga real) acabou de alimentar o feed.
 

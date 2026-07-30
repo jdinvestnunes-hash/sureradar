@@ -151,8 +151,37 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 17p
 .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: stretch; }
 @media (max-width: 1280px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
-.op { display: flex; flex-direction: column; height: 100%; background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--radius); overflow: hidden; transition: 0.15s; }
+.op { position: relative; display: flex; flex-direction: column; height: 100%; background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--radius); overflow: hidden; transition: 0.15s; }
 .op:hover { border-color: var(--border); }
+
+/* "NOVA": surebet que acabou de entrar no feed — borda dourada + selo que some
+   sozinho depois de ~6s (o card fica; só o destaque de recém-chegada apaga). */
+.op.nova { animation: novaGlow 6s ease-out forwards; }
+@keyframes novaGlow {
+  0%   { border-color: #ffc23d; box-shadow: 0 0 0 1px #ffc23d, 0 0 20px rgba(255, 194, 61, 0.55); }
+  72%  { border-color: #ffc23d; box-shadow: 0 0 0 1px #ffc23d, 0 0 14px rgba(255, 194, 61, 0.4); }
+  100% { border-color: var(--border-soft); box-shadow: none; }
+}
+.op-nova-badge {
+  position: absolute; top: 8px; right: 8px; z-index: 4;
+  font-size: 10px; font-weight: 900; letter-spacing: 0.09em; color: #1a1206;
+  background: linear-gradient(90deg, #ffe07a, #ffab2e);
+  padding: 3px 9px; border-radius: 999px; pointer-events: none;
+  box-shadow: 0 2px 9px rgba(255, 171, 46, 0.55);
+  animation: novaBadge 6s ease-out forwards;
+}
+@keyframes novaBadge {
+  0%   { opacity: 0; transform: translateY(-5px) scale(0.85); }
+  9%   { opacity: 1; transform: translateY(0) scale(1); }
+  22%  { transform: scale(1.06); }
+  32%  { transform: scale(1); }
+  74%  { opacity: 1; }
+  100% { opacity: 0; transform: scale(0.92); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .op.nova { animation: none; border-color: #ffc23d; }
+  .op-nova-badge { animation: none; }
+}
 .ci { display: inline-flex; flex-shrink: 0; }
 .ci svg { width: 100%; height: 100%; }
 

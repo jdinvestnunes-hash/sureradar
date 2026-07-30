@@ -9,6 +9,8 @@ const filtersKey = () => FILTERS_BASE + "_" + USER_TAG;
 const bankKey = () => BANK_BASE + "_" + USER_TAG;
 
 let META = null, REFRESH_SEC = 600, LAST_TS = 0;
+// "NOVA": ids que já vimos no feed x ids que chegaram agora. NOVAS = os recém-chegados.
+let SEEN_IDS = new Set(), NOVAS = new Set();
 let filtros = {};      // carregados por conta em initUser()
 let banca = [];
 let SUREBETS = [];
@@ -174,6 +176,11 @@ async function carregar() {
   SUREBETS = data.surebets || [];
   LOCKED = data.locked || [];
   PLANO = data.plano || "free";
+  // Quais surebets ACABARAM de entrar (não estavam no feed anterior). No 1º load
+  // não marca nada (SEEN vazio) pra tela não abrir tudo piscando.
+  const ids = new Set(SUREBETS.map((s) => s.id).filter(Boolean));
+  NOVAS = SEEN_IDS.size ? new Set([...ids].filter((id) => !SEEN_IDS.has(id))) : new Set();
+  SEEN_IDS = ids;
   render();
 }
 
@@ -268,6 +275,11 @@ function teaserEl(t) {
 // Linha de oportunidade (estilo referência)
 function opEl(sb, teaser) {
   const op = el("div", "op");
+  // Recém-chegada: borda dourada + selo "NOVA" que some sozinho em ~6s.
+  if (!teaser && sb.id && NOVAS.has(sb.id)) {
+    op.classList.add("nova");
+    op.appendChild(el("span", "op-nova-badge", "NOVA"));
+  }
   const head = el("div", "op-head");
   const league = el("div", "op-league");
   league.appendChild(el("span", "ci", sportUI(sb.sport).ico));

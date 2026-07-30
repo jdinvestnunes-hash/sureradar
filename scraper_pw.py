@@ -46,7 +46,9 @@ MAX_VALOR = 150               # teto de segurança
 MAX_PAG_MIDDLE = 6            # middles já vêm filtradas nas suas casas — poucas págs
 MAX_MIDDLE = 150              # teto de segurança
 PERFIL = "pw_profile"          # sessão do Chrome fica salva aqui (login persiste)
-CICLO_MIN = 10                 # minutos entre varreduras
+CICLO_MIN = 10                 # minutos entre varreduras FUNDAS (completa: todas as págs)
+FAST_SEG = 75                  # segundos entre passadas RÁPIDAS (só a página 1 = as de
+                               # maior lucro/mais frescas). É o "quase ao vivo".
 VALOR_ATIVO = True             # liga/desliga a passada de ODDS DE VALOR (deixe True p/ raspar valuebets)
 MIDDLE_ATIVO = True            # liga/desliga a passada de APOSTAS DE INTERVALO (middles)
 MAX_PAGINAS = 40
@@ -411,6 +413,36 @@ def esperar_login(page):
     return False
 
 
+def uma_varredura_rapida(page, ctx):
+    """Passada RÁPIDA — SÓ a página 1 (as de MAIOR lucro = as mais frescas), a cada
+    FAST_SEG. Manda em modo 'snapshot_acima': o site troca só a faixa de topo
+    (lucro >= o menor lucro visto na página 1). Efeito: surebet nova aparece na
+    hora, a que expirou no topo some, e as de baixo (página 2+) NÃO são tocadas —
+    quem cuida delas é a varredura funda. Nada duplicado, nada velho no dashboard.
+
+    É UM carregamento de página (sem folhear) — leve, não pesa no surebet.com."""
+    try:
+        page.goto(URL_LISTA, wait_until="domcontentloaded", timeout=30000)
+        page.wait_for_selector("tbody.surebet_record", timeout=15000)
+    except Exception:
+        return                      # página 1 não carregou: não manda nada (não zera)
+    page.wait_for_timeout(700)
+    recs = page.evaluate(JS_RASPAR)
+    uteis, vistos = [], set()
+    for r in recs:
+        if r.get("profit", 0) >= MIN_PROFIT and r.get("id") and r["id"] not in vistos:
+            vistos.add(r["id"])
+            uteis.append(r)
+    if not uteis:
+        return                      # sem nada útil na página 1: não mexe no feed
+    try:                            # resolve link só dos NOVOS (cache cobre o resto)
+        resolver_todos(ctx, uteis)
+    except Exception as e:
+        print("   !! rápida: erro ao resolver links:", str(e)[:80])
+    print(f">> Passada RÁPIDA (pág 1): {len(uteis)} apostas — enviando (snapshot_acima).")
+    enviar(uteis, modo="snapshot_acima")
+
+
 def uma_varredura(page, ctx):
     page.goto(URL_LISTA, wait_until="domcontentloaded", timeout=60000)
     if not esperar_login(page):
@@ -519,6 +551,7 @@ def main():
         print("=" * 60)
         print(" ROBÔ SUREBET (Playwright) — deixe a janela aberta.")
         print("=" * 60)
+        prox_funda = 0.0            # 0 = faz a FUNDA já na 1ª volta (igual antes)
         while True:
             # BLINDAGEM: se a janela foi fechada / o navegador travou, reabre sozinho
             # em vez de ficar errando pra sempre ou derrubar o processo.
@@ -535,26 +568,38 @@ def main():
                     print("!! não consegui reabrir agora:", str(e)[:150], "— tento em 30s.")
                     time.sleep(30)
                     continue
-            try:
-                uma_varredura(page, ctx)                 # PRINCIPAL: surebet
-            except Exception as e:
-                print("!! erro na varredura:", str(e)[:150])
-            if VALOR_ATIVO:                              # EXTRA: odds de valor (isolada, opcional)
+
+            if time.time() >= prox_funda:
+                # --- VARREDURA FUNDA (completa): surebet + valor + middle ---
                 try:
-                    uma_varredura_valor(page, ctx)
+                    uma_varredura(page, ctx)             # PRINCIPAL: surebet (todas as págs)
                 except Exception as e:
-                    print("!! erro nas valuebets (surebet NÃO afetada):", str(e)[:150])
-            if MIDDLE_ATIVO and _ctx_vivo(page):         # EXTRA: apostas de intervalo (isolada)
+                    print("!! erro na varredura:", str(e)[:150])
+                if VALOR_ATIVO:                          # EXTRA: odds de valor (isolada)
+                    try:
+                        uma_varredura_valor(page, ctx)
+                    except Exception as e:
+                        print("!! erro nas valuebets (surebet NÃO afetada):", str(e)[:150])
+                if MIDDLE_ATIVO and _ctx_vivo(page):     # EXTRA: apostas de intervalo (isolada)
+                    try:
+                        uma_varredura_middle(page, ctx)
+                    except Exception as e:
+                        print("!! erro nas middles (surebet NÃO afetada):", str(e)[:150])
+                prox_funda = time.time() + CICLO_MIN * 60
+                print(f">> Funda ok. Passadas RÁPIDAS a cada {FAST_SEG}s; "
+                      f"próxima funda em {CICLO_MIN} min.\n")
+            else:
+                # --- PASSADA RÁPIDA (só página 1) — o "quase ao vivo" ---
                 try:
-                    uma_varredura_middle(page, ctx)
+                    uma_varredura_rapida(page, ctx)
                 except Exception as e:
-                    print("!! erro nas middles (surebet NÃO afetada):", str(e)[:150])
-            # Se o navegador morreu no meio da varredura, reabre JÁ (não espera 10 min).
+                    print("!! erro na passada rápida (surebet NÃO afetada):", str(e)[:150])
+
+            # Se o navegador morreu no meio, reabre JÁ (não espera o timer).
             if not _ctx_vivo(page):
                 print("!! navegador morreu durante a varredura — reabrindo já.")
                 continue
-            print(f">> Próxima varredura em {CICLO_MIN} min.\n")
-            time.sleep(CICLO_MIN * 60)
+            time.sleep(FAST_SEG)
 
 
 if __name__ == "__main__":

@@ -2359,9 +2359,18 @@ def ingest(request: Request, payload: dict = Body(...)):
     contratos = _converter_raspagem(payload.get("records", []))
     quando = pipeline._agora_iso() + " (conta)"
     # SNAPSHOT (raspagem completa): SUBSTITUI o feed — o que saiu da conta sai do
-    # site, o que ficou permanece. MERGE (parcial/backup): só soma, não remove.
-    if payload.get("modo") == "snapshot":
+    # site, o que ficou permanece. SNAPSHOT_ACIMA (passada rápida da página 1):
+    # troca só a faixa de topo (lucro >= piso do lote) — entra a nova, sai a que
+    # expirou no topo, não mexe no resto. MERGE (parcial/backup): só soma.
+    modo = payload.get("modo")
+    if modo == "snapshot":
         feed.set_surebets(contratos, quando=quando)
+    elif modo == "snapshot_acima":
+        # piso = menor lucro do lote da página 1 (mesma escala do profit_pct).
+        # Lote VAZIO nunca chega aqui a zerar o feed: sem piso, não mexe.
+        if contratos:
+            piso = min(c["profit_pct"] for c in contratos)
+            feed.snapshot_acima(contratos, piso, quando=quando)
     else:
         feed.merge_surebets(contratos, quando=quando)
     if contratos:

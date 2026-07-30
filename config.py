@@ -190,7 +190,8 @@ POLL_INTERVAL_SEG = 60
 
 # Timer do PAINEL (dashboard) — de quanto em quanto tempo a tela se atualiza
 # sozinha (tira as que sumiram, adiciona as novas). Independe do polling acima.
-DASHBOARD_REFRESH_SEG = 600   # 10 minutos
+DASHBOARD_REFRESH_SEG = 60    # 60s — casa com a passada rápida do robô (~75s):
+                              # surebet nova aparece na tela do cliente em ~1-2 min
 
 # ROBÔ OFFLINE: se a última raspagem chegou há MAIS que isto, o painel entende
 # que o robô parou e mostra o aviso "reconferindo as apostas". O ciclo real do
