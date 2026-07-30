@@ -19,6 +19,7 @@ import time
 import auth
 import config
 import emailer
+import mkt
 
 _CHECK_SEG = 3600          # verifica de hora em hora
 _thread = None
@@ -31,14 +32,19 @@ _JANELAS = [(1, 3, "nudge1"), (3, 5, "nudge2"), (5, 7, "nudge3"), (7, 9, "nudge4
 def _rodar_uma_vez():
     if not config.RESEND_API_KEY:
         return
+    orc = mkt.Orcamento()                    # teto por 24h / por ciclo (trilhos de segurança)
     agora = time.time()
     for u in auth.usuarios_free_verificados():
+        if not orc.pode():
+            break                            # atingiu o teto -> o resto espera a próxima rodada
         dias = (agora - u["criado"]) / 86400
         for dmin, dmax, tipo in _JANELAS:
             if dmin <= dias < dmax:
-                if auth.registrar_email(u["id"], tipo):
+                if mkt.pode_pessoa(u["id"]) and auth.registrar_email(u["id"], tipo):
                     unsub = config.SITE_URL + "/descadastrar?u=" + auth.unsub_token(u["id"])
                     ok = emailer.enviar_nudge(u["email"], u["nome"], tipo, unsub)
+                    orc.gastou()
+                    mkt.espacar()
                     print(f">> nudge {tipo} -> {u['email']} ({'ok' if ok else 'falhou'})")
                 break      # no máximo 1 nudge por usuário por rodada
 

@@ -17,6 +17,7 @@ from datetime import datetime
 import auth
 import config
 import emailer
+import mkt
 
 _CHECK_SEG = 3600            # verifica de hora em hora
 _GAP_SERIE = 2 * 86400       # ~2 dias entre um e-mail da série e o próximo
@@ -34,8 +35,13 @@ def _enviar(u, tipo, idx=0):
 def _rodar_uma_vez():
     if not config.RESEND_API_KEY:
         return
+    orc = mkt.Orcamento()                    # teto por 24h / por ciclo (trilhos de segurança)
     agora = time.time()
     for u in auth.usuarios_para_recuperacao():
+        if not orc.pode():
+            break                            # atingiu o teto -> o resto espera a próxima rodada
+        if not mkt.pode_pessoa(u["id"]):
+            continue                         # recebeu marketing há pouco -> não bombardeia
         try:
             tipos, ultimo = auth.recup_status(u["id"])
             n = sum(1 for i in range(1, 8) if f"recup_{i}" in tipos)   # quantos da série já foram
@@ -44,11 +50,11 @@ def _rodar_uma_vez():
                     # 1º e-mail: manda ~1h após o checkout (pra novos; imediato p/ antigos)
                     if agora - float(u.get("primeiro_checkout") or agora) >= 3600:
                         if auth.registrar_email(u["id"], "recup_1"):
-                            _enviar(u, "recup_1")
+                            _enviar(u, "recup_1"); orc.gastou(); mkt.espacar()
                 elif agora - ultimo >= _GAP_SERIE:
                     proximo = f"recup_{n + 1}"
                     if auth.registrar_email(u["id"], proximo):
-                        _enviar(u, proximo)
+                        _enviar(u, proximo); orc.gastou(); mkt.espacar()
             else:
                 # fase mensal: 2/mês, com folga mínima
                 if agora - ultimo >= _GAP_MENSAL:
@@ -57,7 +63,7 @@ def _rodar_uma_vez():
                     tipo = f"recup_m_{d.year}-{d.month:02d}_{metade}"
                     if tipo not in tipos and auth.registrar_email(u["id"], tipo):
                         idx = d.year * 2 + d.month + (0 if metade == "A" else 1)
-                        _enviar(u, tipo, idx)
+                        _enviar(u, tipo, idx); orc.gastou(); mkt.espacar()
         except Exception as e:
             print("!! recuperacao usuario:", e)
 

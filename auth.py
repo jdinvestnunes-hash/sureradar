@@ -388,6 +388,32 @@ def registrar_email(user_id, tipo):
         return False
 
 
+def emails_marketing_24h():
+    """Quantos e-mails de marketing (tudo que passa por email_enviados: nudge, recup,
+    vencimento, semanal...) saíram nas últimas 24h. Usado pra não furar o teto diário."""
+    try:
+        with _db() as c:
+            row = c.execute(_q("SELECT COUNT(*) AS n FROM email_enviados WHERE criado >= ?"),
+                            (time.time() - 86400,)).fetchone()
+        return int(row["n"]) if row else 0
+    except Exception as e:
+        print("!! emails_marketing_24h:", e)
+        return 10**9      # em caso de erro, finge que estourou (não manda) — fail-safe
+
+
+def ultimo_email_marketing(user_id):
+    """Timestamp do último e-mail de marketing enviado a esta pessoa (0 se nunca).
+    Usado pra respeitar a frequência mínima (não bombardear a mesma pessoa)."""
+    try:
+        with _db() as c:
+            row = c.execute(_q("SELECT MAX(criado) AS m FROM email_enviados WHERE user_id=?"),
+                            (user_id,)).fetchone()
+        return float(row["m"]) if row and row["m"] is not None else 0.0
+    except Exception as e:
+        print("!! ultimo_email_marketing:", e)
+        return time.time()    # em caso de erro, finge que acabou de mandar (não manda) — fail-safe
+
+
 def usuarios_para_recuperacao(planos=None):
     """Quem GEROU checkout (Pix/cartão) e NÃO é PRO agora (nem descadastrou). Traz o
     1º checkout (momento da intenção). PRO ativo = plano='pro' E expira no futuro.

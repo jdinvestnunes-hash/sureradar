@@ -286,6 +286,16 @@ RESEND_API_KEY = os.getenv("RESEND_API_KEY", "").strip()
 LIFECYCLE_ATIVO = os.getenv("LIFECYCLE_ATIVO", "1") not in ("0", "false", "False", "no")
 # Régua de recuperação por e-mail (quem gerou checkout Pix/cartão e não pagou).
 RECUP_ATIVO = os.getenv("RECUP_ATIVO", "1") not in ("0", "false", "False", "no")
+# --- Trilhos de segurança do e-mail marketing (mkt.py) ---
+# Teto de e-mails de MARKETING nas últimas 24h. Deixa folga pro transacional dentro
+# do cap do provedor (Resend free = 100/dia). O excedente espera a próxima rodada.
+EMAIL_MKT_CAP_24H = int(os.getenv("EMAIL_MKT_CAP_24H", "80"))
+# Teto por rodada (a thread roda de hora em hora) — espalha o envio ao longo do dia.
+EMAIL_MKT_CAP_CICLO = int(os.getenv("EMAIL_MKT_CAP_CICLO", "25"))
+# Frequência mínima por pessoa: não manda 2 e-mails de marketing em menos de X horas.
+EMAIL_MKT_FREQ_H = int(os.getenv("EMAIL_MKT_FREQ_H", "48"))
+# Pausa entre um envio e o próximo (segundos) — respeita o rate limit (~2/s).
+EMAIL_MKT_PAUSA_S = float(os.getenv("EMAIL_MKT_PAUSA_S", "0.6"))
 
 # Segredo do /api/ingest: só o robô (que sabe o token) pode publicar surebets.
 # VAZIO = endpoint aberto (compatível com o robô atual). Setar p/ exigir o token.
