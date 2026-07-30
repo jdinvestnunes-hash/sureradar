@@ -1012,19 +1012,23 @@ def checkout_registrar(provider, external_id, user_id, plano, dias, valor, metod
 
 def checkout_pagar(provider, external_id, pi=None):
     """Confirma o pagamento (chamado pelo webhook): acha o checkout pendente,
-    ativa o PRO e marca como pago. IDEMPOTENTE (webhook pode vir duplicado).
+    ativa o PRO e marca como pago. IDEMPOTENTE mesmo com webhooks CONCORRENTES:
+    a virada pendente->pago é atômica (UPDATE ... WHERE status='pendente') e só
+    quem MUDOU a linha (rowcount=1) libera/notifica. Quem perde a corrida — ou
+    reentrega tardia — volta com _repetido=True (não re-notifica, não dobra PRO).
     `pi` = payment_intent do Stripe (guardado p/ mapear estorno/chargeback)."""
     with _db() as c:
         row = c.execute(_q("SELECT * FROM checkouts WHERE provider=? AND external_id=?"),
                         (provider, external_id)).fetchone()
         if not row:
             return None
-        if row["status"] == "pago":
-            r = dict(row)
-            r["_repetido"] = True        # já processado (webhook duplicado) — não re-notifica
-            return r
-        c.execute(_q("UPDATE checkouts SET status='pago', pi=? WHERE id=? AND status='pendente'"),
-                  (pi, row["id"]))
+        cur = c.execute(_q("UPDATE checkouts SET status='pago', pi=? WHERE id=? AND status='pendente'"),
+                        (pi, row["id"]))
+        venci = (getattr(cur, "rowcount", 0) == 1)   # True só p/ quem virou pendente->pago
+    if not venci:
+        r = dict(row)
+        r["_repetido"] = True            # já pago (reentrega) ou perdeu a corrida — não re-notifica
+        return r
     _liberar_compra(row)
     return dict(row)
 
