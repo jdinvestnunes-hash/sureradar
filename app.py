@@ -51,6 +51,7 @@ import notifier
 import pipeline
 import promo
 import recuperacao
+import retencao
 import tg_tracker
 import valor_feed
 import middle_feed
@@ -128,6 +129,10 @@ async def lifespan(app):
         recuperacao.iniciar()         # régua de recuperação (gerou checkout e não pagou)
     except Exception as e:
         print(f"!! Recuperação de e-mail não iniciou: {e}")
+    try:
+        retencao.iniciar()            # retenção do PRO (vencimento D-5/D-3/D-0 + win-back)
+    except Exception as e:
+        print(f"!! Retenção de e-mail não iniciou: {e}")
     try:
         tg_tracker.iniciar()          # conta membros por link de campanha (Telegram)
     except Exception as e:

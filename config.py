@@ -286,6 +286,9 @@ RESEND_API_KEY = os.getenv("RESEND_API_KEY", "").strip()
 LIFECYCLE_ATIVO = os.getenv("LIFECYCLE_ATIVO", "1") not in ("0", "false", "False", "no")
 # Régua de recuperação por e-mail (quem gerou checkout Pix/cartão e não pagou).
 RECUP_ATIVO = os.getenv("RECUP_ATIVO", "1") not in ("0", "false", "False", "no")
+# Retenção do PRO por e-mail: lembrete de vencimento (D-5/D-3/D-0, só mensal/tri/sem)
+# + win-back de quem venceu (D+3/D+10). Anual não recebe. Preço cheio (sem desconto).
+RETENCAO_ATIVO = os.getenv("RETENCAO_ATIVO", "1") not in ("0", "false", "False", "no")
 # --- Trilhos de segurança do e-mail marketing (mkt.py) ---
 # Teto de e-mails de MARKETING nas últimas 24h. Deixa folga pro transacional dentro
 # do cap do provedor (Resend free = 100/dia). O excedente espera a próxima rodada.

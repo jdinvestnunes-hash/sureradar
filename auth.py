@@ -455,6 +455,47 @@ def usuarios_free_verificados():
     return [dict(r) for r in rows]
 
 
+# Só o último pagamento é 'anual' => é anual (não recebe régua de vencimento/win-back).
+# Correlated subquery (sem parâmetro) — roda igual em SQLite e Postgres.
+_NAO_ANUAL = ("COALESCE((SELECT p.plano FROM pagamentos p WHERE p.user_id=u.id "
+              "ORDER BY p.criado DESC LIMIT 1),'mensal') <> 'anual'")
+
+
+def usuarios_pro_vencendo(dias=6):
+    """PRO ativo (não anual, não descadastrado) que vence nos próximos `dias`.
+    Traz plano_expira pra régua decidir se é D-5, D-3 ou D-0 (dedup por tipo)."""
+    agora = time.time()
+    with _db() as c:
+        rows = c.execute(_q(
+            f"""SELECT u.id, u.nome, u.email, u.plano_expira
+                FROM users u
+                WHERE u.plano='pro'
+                  AND u.plano_expira > ?
+                  AND u.plano_expira <= ?
+                  AND (u.email_optout IS NULL OR u.email_optout=0)
+                  AND {_NAO_ANUAL}"""),
+            (agora, agora + dias * 86400)).fetchall()
+    return [dict(r) for r in rows]
+
+
+def usuarios_pro_vencidos(dias=11):
+    """Quem VENCEU o PRO há no máximo `dias` (não anual, não descadastrado, não
+    renovou). Consulta pelo timestamp (o downgrade p/ free é lazy, no login), então
+    pega até quem sumiu. Traz plano_expira pra régua decidir D+3 ou D+10."""
+    agora = time.time()
+    with _db() as c:
+        rows = c.execute(_q(
+            f"""SELECT u.id, u.nome, u.email, u.plano_expira
+                FROM users u
+                WHERE u.plano_expira IS NOT NULL
+                  AND u.plano_expira < ?
+                  AND u.plano_expira >= ?
+                  AND (u.email_optout IS NULL OR u.email_optout=0)
+                  AND {_NAO_ANUAL}"""),
+            (agora, agora - dias * 86400)).fetchall()
+    return [dict(r) for r in rows]
+
+
 def unsub_token(user_id):
     """Token estável de descadastro (cria se ainda não tiver)."""
     with _db() as c:

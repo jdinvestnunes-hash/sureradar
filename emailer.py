@@ -215,6 +215,62 @@ def enviar_recup(to: str, nome: str, tipo: str, unsub_url: str = "", idx: int = 
     return enviar(to, assunto, texto=texto, headers=headers)
 
 
+# ---------------------------------------------------------------------------
+# RETENÇÃO DO PRO: lembrete de vencimento (D-5/D-3/D-0) + win-back (D+3/D+10).
+# Só mensal/tri/semestral (anual não recebe). Preço cheio. Plain text.
+# {n}=primeiro nome, {url}=site, {d}=dias (restantes no vencimento).
+# ---------------------------------------------------------------------------
+_RETENCAO = {
+    "venc_5": ("seu PRO renova em {d} dias ⏳",
+        "Oi {n},\n\n"
+        "Passando pra avisar com calma: seu acesso PRO do SureRadar vence em {d} dias.\n\n"
+        "Você tá no ritmo — as entradas de maior lucro (1% a 20%+) seguem saindo todo dia. "
+        "Renovando antes de vencer, você não perde um único green.\n\n"
+        "Renovar em 1 clique: {url}/planos\n\n"
+        "Qualquer dúvida, é só responder este e-mail.\nAbraço,\nEquipe SureRadar"),
+    "venc_3": ("faltam {d} dias no seu PRO",
+        "Oi {n},\n\n"
+        "Seu PRO vence em {d} dias. Não deixa vencer e travar as entradas bem na hora que "
+        "sai aquela surebet gorda — 1 ou 2 entradas já pagam a renovação e ainda sobra.\n\n"
+        "Garantir agora: {url}/planos\n\nAbraço,\nEquipe SureRadar"),
+    "venc_0": ("seu acesso PRO vence hoje ⏰",
+        "Oi {n},\n\n"
+        "Hoje é o último dia do seu PRO. Quando vencer, o radar de alto lucro e os alertas "
+        "no Telegram param — e as entradas continuam saindo, só que sem você.\n\n"
+        "Renova em 1 clique e segue no green: {url}/planos\n\n"
+        "Tô aqui se precisar.\nAbraço,\nEquipe SureRadar"),
+    "winback_1": ("seu PRO venceu — dá pra voltar 👇",
+        "Oi {n},\n\n"
+        "Seu PRO venceu há alguns dias e sua conta voltou pro grátis (só entradas até 1%).\n\n"
+        "Enquanto isso, as surebets de 5%, 8%, 12%+ continuaram saindo todo dia — travadas pra você. "
+        "É só reativar pra destravar tudo de novo, do mesmo jeito que era.\n\n"
+        "Voltar pro PRO: {url}/planos\n\nAbraço,\nEquipe SureRadar"),
+    "winback_2": ("última chamada: seu lugar no PRO 🏁",
+        "Oi {n},\n\n"
+        "Esse é o último lembrete — não quero encher sua caixa.\n\n"
+        "Seu histórico continua salvo e o PRO segue com garantia de 7 dias: reativa, usa, e se "
+        "não fizer sentido a gente devolve 100%. Quando quiser voltar pro green, é só um clique.\n\n"
+        "{url}/planos\n\nAbraço,\nEquipe SureRadar"),
+}
+
+
+def enviar_retencao(to: str, nome: str, tipo: str, unsub_url: str = "", dias: int = 0) -> bool:
+    """Um e-mail da régua de retenção do PRO. tipo = venc_5/venc_3/venc_0/winback_1/winback_2."""
+    par = _RETENCAO.get(tipo)
+    if not par:
+        return False
+    assunto, corpo = par
+    d = max(1, int(dias))
+    assunto = assunto.format(d=d)
+    texto = corpo.format(n=_primeiro(nome), url=config.SITE_URL, d=d)
+    headers = None
+    if unsub_url:
+        texto += f"\n\n---\nNão quer mais esses e-mails? Descadastre aqui: {unsub_url}"
+        headers = {"List-Unsubscribe": f"<{unsub_url}>",
+                   "List-Unsubscribe-Post": "List-Unsubscribe=One-Click"}
+    return enviar(to, assunto, texto=texto, headers=headers)
+
+
 def enviar_parcelamento(to: str, nome: str, unsub_url: str = "") -> bool:
     """Aviso ÚNICO: liberamos o PARCELAMENTO no cartão (até 12x). Pra quem gerou
     checkout e não fechou. Plain text (melhor entrega)."""
