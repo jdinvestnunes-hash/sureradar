@@ -1020,7 +1020,9 @@ def checkout_pagar(provider, external_id, pi=None):
         if not row:
             return None
         if row["status"] == "pago":
-            return dict(row)             # já processado
+            r = dict(row)
+            r["_repetido"] = True        # já processado (webhook duplicado) — não re-notifica
+            return r
         c.execute(_q("UPDATE checkouts SET status='pago', pi=? WHERE id=? AND status='pendente'"),
                   (pi, row["id"]))
     _liberar_compra(row)

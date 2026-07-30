@@ -571,18 +571,46 @@ def _confirmar_compra_email(user_id):
         print("!! email de compra:", e)
 
 
+_METODO_LABEL = {"pix": "Pix", "cartao": "Cartão (AbacatePay)", "stripe": "Cartão (Stripe)"}
+
+
+def _descricao_compra(res):
+    """Descreve em PT-BR o que a pessoa levou de fato (plano + add-ons/combo),
+    espelhando o que o _liberar_compra entrega — pra o alerta não vir com código
+    cru ('mensal'/'valor'/'middle')."""
+    plano = str(res.get("plano") or "")
+    addon = res.get("addon")
+    if plano == "valor":                       # add-on avulso (Odds Erradas)
+        return config.ADDON_VALOR["nome"] + " (avulso)"
+    if plano == "middle":                      # add-on avulso (Apostas de Intervalo)
+        return config.ADDON_MIDDLE["nome"] + " (avulso)"
+    base = (config.PLANOS.get(plano) or {}).get("nome") or plano or "?"
+    if plano == "anual":
+        return base + " + 2 add-ons de brinde (Odds Erradas + Apostas de Intervalo)"
+    if addon == "combo":
+        return base + " + Completo (Odds Erradas + Apostas de Intervalo)"
+    if addon == "valor":
+        return base + " + " + config.ADDON_VALOR["nome"]
+    if addon == "middle":
+        return base + " + " + config.ADDON_MIDDLE["nome"]
+    return base
+
+
 def _avisar_venda_admin(res):
     """Avisa VOCÊ no Telegram (chat privado) sempre que cai uma venda."""
     try:
+        if res.get("_repetido"):               # webhook re-entregue: não notifica de novo
+            return
         u = auth.pegar_por_id(res.get("user_id")) or {}
         valor = float(res.get("valor", 0) or 0)
+        metodo = str(res.get("metodo") or "?")
         msg = (
             "💰 <b>NOVA VENDA!</b> 🎉\n\n"
             f"👤 {notifier._esc(u.get('nome', '?'))}\n"
             f"✉️ {notifier._esc(u.get('email', '?'))}\n"
-            f"📦 Plano: <b>{notifier._esc(str(res.get('plano', '?')))}</b>\n"
+            f"🛒 <b>{notifier._esc(_descricao_compra(res))}</b>\n"
             f"💵 Valor: <b>R$ {valor:.2f}</b>\n"
-            f"💳 {notifier._esc(str(res.get('metodo', '?')))}\n"
+            f"💳 {notifier._esc(_METODO_LABEL.get(metodo, metodo))}\n"
             f"📍 Origem: {notifier._esc(str(u.get('origem') or 'direto'))}"
         )
         notifier.enviar_admin(msg)
