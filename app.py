@@ -17,6 +17,7 @@ import hmac
 import json
 import secrets
 import sys
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -184,6 +185,10 @@ INGESTED_PROFIT = {}
 # dele (marca/desmarca à vontade) e nunca perde uma casa por causa da raspagem.
 CASAS_CAT = {}     # bookmaker_key -> label
 SPORTS_CAT = {}    # sport_key -> label
+# Quando cada casa/esporte foi visto por último numa raspagem (epoch). Serve pra
+# EXPIRAR do filtro o que sumiu da fonte: casa não vista há > CATALOGO_TTL_SEG sai.
+CASAS_VISTO = {}   # bookmaker_key -> last_seen_ts
+SPORTS_VISTO = {}  # sport_key -> last_seen_ts
 
 
 def _carregar_catalogo():
@@ -192,6 +197,16 @@ def _carregar_catalogo():
         cat = auth.catalogo_get()
         CASAS_CAT.update(cat.get("casas", {}))
         SPORTS_CAT.update(cat.get("esportes", {}))
+        CASAS_VISTO.update(cat.get("casas_visto", {}))
+        SPORTS_VISTO.update(cat.get("esportes_visto", {}))
+        # Carência: tudo que já estava no catálogo ganha o relógio zerado AGORA,
+        # pra um redeploy não podar nada antes do feed voltar a encher. Quem
+        # sumiu de verdade da fonte só será podado depois de CATALOGO_TTL_SEG.
+        agora = time.time()
+        for k in CASAS_CAT:
+            CASAS_VISTO.setdefault(k, agora)
+        for k in SPORTS_CAT:
+            SPORTS_VISTO.setdefault(k, agora)
     except Exception as e:
         print("!! catalogo nao carregou:", e)
 
@@ -205,14 +220,27 @@ def _recalcular_filtros(todos=None):
     global INGESTED_BOOKS, INGESTED_SPORTS, INGESTED_PROFIT
     if todos is None:
         todos = feed.get_surebets()
-    # acumula o que veio agora no catálogo (nunca remove)
+    agora = time.time()
+    # acumula o que veio agora no catálogo e MARCA como visto agora
     mudou = False
     for c in todos:
         if c["sport"] not in SPORTS_CAT:
             SPORTS_CAT[c["sport"]] = SPORT_LABELS_PT.get(c["sport"], c["sport"]); mudou = True
+        SPORTS_VISTO[c["sport"]] = agora
         for l in c["legs"]:
             if l["bookmaker"] not in CASAS_CAT:
                 CASAS_CAT[l["bookmaker"]] = l["bookmaker_label"]; mudou = True
+            CASAS_VISTO[l["bookmaker"]] = agora
+    # PODA: casa/esporte não visto há mais que o TTL sai do filtro. É isso que faz
+    # uma casa TIRADA na fonte (surebet.com) sumir do dashboard sozinha — ela para
+    # de aparecer nas raspagens e, passada a janela, é removida do catálogo.
+    ttl = getattr(config, "CATALOGO_TTL_SEG", 6 * 3600)
+    velhas = [k for k, ts in CASAS_VISTO.items() if agora - ts > ttl]
+    for k in velhas:
+        CASAS_CAT.pop(k, None); CASAS_VISTO.pop(k, None); mudou = True
+    velhos = [k for k, ts in SPORTS_VISTO.items() if agora - ts > ttl]
+    for k in velhos:
+        SPORTS_CAT.pop(k, None); SPORTS_VISTO.pop(k, None); mudou = True
     # opções do filtro = catálogo inteiro (todas as casas/esportes já vistos)
     INGESTED_BOOKS = [{"key": k, "label": v} for k, v in
                       sorted(CASAS_CAT.items(), key=lambda x: x[1].lower())]
@@ -221,9 +249,11 @@ def _recalcular_filtros(todos=None):
     if todos:
         vals = [c["profit_pct"] for c in todos]
         INGESTED_PROFIT = {"min": 0, "max": round(max(vals) + 0.5, 1)}
-    if mudou:                                  # persiste o catálogo que cresceu
+    if mudou:                                  # persiste o catálogo (cresceu ou podou)
         try:
-            auth.catalogo_set({"casas": CASAS_CAT, "esportes": SPORTS_CAT})
+            auth.catalogo_set({"casas": CASAS_CAT, "esportes": SPORTS_CAT,
+                               "casas_visto": CASAS_VISTO,
+                               "esportes_visto": SPORTS_VISTO})
         except Exception:
             pass
 

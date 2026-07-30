@@ -193,6 +193,13 @@ POLL_INTERVAL_SEG = 60
 DASHBOARD_REFRESH_SEG = 60    # 60s — casa com a passada rápida do robô (~75s):
                               # surebet nova aparece na tela do cliente em ~1-2 min
 
+# CATÁLOGO DE FILTROS (casas/esportes do dashboard): uma casa/esporte só fica no
+# filtro enquanto aparece na raspagem. Se ficar mais que isto SEM aparecer em
+# nenhuma surebet, sai do filtro sozinho. Assim, quando você TIRA uma casa lá na
+# fonte (surebet.com), ela some do dashboard depois desta janela — sem catálogo
+# eterno. Curto demais faz casa "quieta" piscar; 6h é folga segura.
+CATALOGO_TTL_SEG = 6 * 3600    # 6 horas
+
 # ROBÔ OFFLINE: se a última raspagem chegou há MAIS que isto, o painel entende
 # que o robô parou e mostra o aviso "reconferindo as apostas". O ciclo real do
 # robô é ~13-14 min (raspagem + envio), então 20 min dá folga pra não dar

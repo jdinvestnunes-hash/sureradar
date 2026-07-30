@@ -1385,10 +1385,12 @@ def catalogo_get():
         if row:
             d = json.loads(row["dados"])
             if isinstance(d, dict):
-                return {"casas": d.get("casas", {}), "esportes": d.get("esportes", {})}
+                return {"casas": d.get("casas", {}), "esportes": d.get("esportes", {}),
+                        "casas_visto": d.get("casas_visto", {}),
+                        "esportes_visto": d.get("esportes_visto", {})}
     except Exception as e:
         print("!! catalogo_get:", e)
-    return {"casas": {}, "esportes": {}}
+    return {"casas": {}, "esportes": {}, "casas_visto": {}, "esportes_visto": {}}
 
 
 def catalogo_set(catalogo):
