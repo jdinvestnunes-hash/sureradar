@@ -264,7 +264,7 @@
     <a href="#roi">Quanto rende</a>
     <a href="#entradas">Entradas reais</a>
     <a href="#planos">Planos</a>
-    <a href="/login" class="btn btn-ghost" style="padding:11px 20px;font-size:14px">Entrar</a>
+    <a href="/login" id="nav-entrar" class="btn btn-ghost" style="padding:11px 20px;font-size:14px">Entrar</a>
   </div>
 </div></nav>
 
@@ -276,7 +276,7 @@
       <h1>A renda fixa te dá 1% <u style="text-decoration-color:#2ee6a8">ao mês</u>.<br>Aqui você faz <span class="grad">até 15%</span> em uma entrada.</h1>
       <p class="sub">O SureRadar encontra jogos em que as <b>casas do Brasil</b> discordam nas odds. Você aposta nos dois lados, e o lucro fica <b>matematicamente travado</b> — dê no que der. Sem palpite, sem torcida, sem depender de sorte.</p>
       <div class="cta-row">
-        <a href="/cadastro" class="btn btn-primary">Criar conta grátis →</a>
+        <a href="/cadastro" class="btn btn-primary" data-authcta>Criar conta grátis →</a>
         <a href="#roi" class="btn btn-ghost">Quanto posso ganhar?</a>
       </div>
       <div class="micro">
@@ -542,7 +542,7 @@
   <h2>Cada dia fora é entrada que você<br>deixou na mesa</h2>
   <p class="lead">Crie sua conta grátis agora e veja as entradas de hoje. Se gostar do que ver, o Pro destrava as grandes.</p>
   <div class="cta-row" style="justify-content:center;margin-top:34px">
-    <a href="/cadastro" class="btn btn-primary" style="font-size:17px;padding:18px 38px">Criar minha conta grátis →</a>
+    <a href="/cadastro" class="btn btn-primary" style="font-size:17px;padding:18px 38px" data-authcta>Criar minha conta grátis →</a>
   </div>
   <div class="micro" style="justify-content:center;margin-top:18px"><span>✓ Sem cartão</span><span>✓ Acesso na hora</span><span>✓ Garantia de 7 dias no Pro</span></div>
 </div></section>
@@ -564,6 +564,18 @@ try{
   if (_ml) _cl = _cl ? (_cl + '|' + _ml) : _ml;
   if (_cl) document.cookie = 'sr_camp=' + encodeURIComponent(String(_cl).slice(0,160)) + ';path=/;max-age=' + (60*60*24*60) + ';samesite=lax';
 }catch(e){}
+
+// se já está logado (cookie de sessão vale 30 dias), reflete isso no topo:
+// "Entrar" vira "Meu painel" e os CTAs de cadastro apontam pro /app.
+fetch('/api/me', { credentials: 'same-origin' }).then(function(r){
+  if (!r.ok) return;               // 401 = visitante -> deixa como está
+  var ent = document.getElementById('nav-entrar');
+  if (ent){ ent.textContent = 'Meu painel →'; ent.setAttribute('href', '/app'); }
+  document.querySelectorAll('[data-authcta]').forEach(function(a){
+    a.textContent = 'Ir pro meu painel →'; a.setAttribute('href', '/app');
+  });
+}).catch(function(){});
+
 // duplica o ticker para o loop ficar contínuo
 const tk = document.getElementById('tk');
 tk.innerHTML += tk.innerHTML;
