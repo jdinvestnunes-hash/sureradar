@@ -458,7 +458,7 @@
         <li class="off"><span class="ck">✗</span> Entradas de 1% a 15%+</li>
         <li class="off"><span class="ck">✗</span> Alertas no Telegram</li>
       </ul>
-      <a href="/cadastro" class="btn btn-ghost">Começar grátis</a>
+      <a href="/cadastro" class="btn btn-ghost" data-authcta>Começar grátis</a>
       <div class="payback">&nbsp;</div>
     </div>
 
@@ -475,7 +475,7 @@
         <li><span class="ck">✓</span> Calculadora + gestão de banca</li>
         <li><span class="ck">✓</span> Suporte direto no WhatsApp</li>
       </ul>
-      <a href="/cadastro?plano=anual" class="btn btn-primary">Quero o anual →</a>
+      <a href="/cadastro?plano=anual" class="btn btn-primary" data-planocta="anual">Quero o anual →</a>
       <div class="payback">💰 Uma entrada de 5% com banca de R$ 10 mil paga o ano inteiro</div>
     </div>
 
@@ -491,7 +491,7 @@
         <li><span class="ck">✓</span> Calculadora + gestão de banca</li>
         <li><span class="ck">✓</span> Suporte direto no WhatsApp</li>
       </ul>
-      <a href="/cadastro?plano=mensal" class="btn btn-ghost">Assinar mensal</a>
+      <a href="/cadastro?plano=mensal" class="btn btn-ghost" data-planocta="mensal">Assinar mensal</a>
       <div class="payback">💰 2 entradas de 5% já pagam o mês</div>
     </div>
   </div>
@@ -573,6 +573,10 @@ fetch('/api/me', { credentials: 'same-origin' }).then(function(r){
   if (ent){ ent.textContent = 'Meu painel →'; ent.setAttribute('href', '/app'); }
   document.querySelectorAll('[data-authcta]').forEach(function(a){
     a.textContent = 'Ir pro meu painel →'; a.setAttribute('href', '/app');
+  });
+  // botões de plano: logado vai pro checkout (/planos), não pro cadastro
+  document.querySelectorAll('[data-planocta]').forEach(function(a){
+    a.setAttribute('href', '/planos?plano=' + a.getAttribute('data-planocta') + '&upgrade=1');
   });
 }).catch(function(){});
 
