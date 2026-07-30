@@ -41,7 +41,7 @@ MAX_ENTRADAS_DIA = 15
 # Iscas PRO: entradas de alto lucro (8-12%), só times + %, 2x/dia.
 ISCA_MIN_PCT = 8.0
 ISCA_MAX_PCT = 12.0
-PRO_MENSAL = 97
+PRO_MENSAL = int(config.PLANOS["mensal"]["valor"])   # 147 — sempre em sincronia com o config
 ISCA_MAX_DIA = 2                    # no MÁX. 2 iscas por dia (contador persistente)
 ISCA_JANELA = (11 * 60, 20 * 60)   # só entre 11h e 20h
 ISCA_GAP_SEG = int(3.5 * 3600)     # mín. 3h30 entre uma isca e outra
