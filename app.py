@@ -1149,14 +1149,17 @@ def _valor_liberado(user):
     emails = [e.strip().lower() for e in (config.VALUEBET_BETA_EMAILS or "").split(",") if e.strip()]
     if user and user.get("email", "").strip().lower() in emails:
         return True
-    # Modo vitrine de lançamento: NINGUÉM MAIS tem acesso total (nem PRO, nem quem
-    # comprou). Todo mundo cai na amostra borrada. Desliga com a env VALOR_TEASER_GERAL=0.
+    # Quem COMPROU o add-on (avulso, combo ou brinde do Anual) vê SEMPRE o que pagou —
+    # mesmo com a vitrine ligada. Pagante nunca cai na amostra borrada.
+    if user and auth.valor_dias_restantes(user):
+        return True
+    # Modo vitrine de lançamento: quem NÃO comprou cai na amostra borrada.
+    # (VALOR_TEASER_GERAL só afeta não-pagantes; hoje o resultado é o mesmo do fluxo
+    # normal, já que sem compra o acesso é negado de qualquer jeito.)
     if config.VALOR_TEASER_GERAL:
         return False
     if not user:
         return False
-    if auth.valor_dias_restantes(user):
-        return True
     return False
 
 
