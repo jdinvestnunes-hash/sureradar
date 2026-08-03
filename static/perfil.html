@@ -131,6 +131,9 @@
     <!-- Add-on: Odds Erradas das Casas (comprado à parte do plano) -->
     <div class="card full" id="addon-card"></div>
 
+    <!-- Add-on: Apostas de Intervalo (comprado à parte do plano) -->
+    <div class="card full" id="addon-mid-card"></div>
+
     <!-- Assinatura / upgrade -->
     <div class="card full" id="sub-card"></div>
 
@@ -239,6 +242,19 @@ async function load(){
       : `<div class="ct">💎 Odds Erradas das Casas — ${preco}</div>
          <p style="color:var(--dim);font-size:14px;margin-bottom:14px">A casa <b style="color:var(--text)">errou o preço</b> e paga acima do justo: 1 aposta, 1 casa. Compra <b style="color:var(--text)">à parte do plano</b> e libera a aba por ${d.valor_dias_addon||30} dias.</p>
          <button class="btn btn-primary" onclick="location.href='/planos?addon=1'" style="width:100%">Liberar as Odds Erradas — ${preco}</button>`;
+  }
+
+  // add-on das Apostas de Intervalo: quem tem vê os dias, quem não tem vê a oferta
+  const mc = $("#addon-mid-card");
+  if (mc){
+    const precoM = brl(d.middle_preco || 97).replace(",00","");
+    mc.innerHTML = d.middle_dias
+      ? `<div class="ct">🎯 Apostas de Intervalo</div>
+         <p style="color:var(--dim);font-size:14px;margin-bottom:14px">Add-on <b style="color:#5fe0b6">ativo</b> — faltam <b style="color:var(--text)">${d.middle_dias} dia(s)</b> de acesso à aba. Renovar antes de vencer <b>soma</b> os dias.</p>
+         <button class="btn btn-ghost" onclick="location.href='/planos?addon=mid'" style="width:100%">Renovar por ${precoM} · +${d.middle_dias_addon||30} dias</button>`
+      : `<div class="ct">🎯 Apostas de Intervalo — ${precoM}</div>
+         <p style="color:var(--dim);font-size:14px;margin-bottom:14px">Duas apostas num intervalo (ex.: total acima 25,5 e abaixo 26,5). Se o placar cai no meio, <b style="color:var(--text)">as duas ganham</b>; se não, a perda é pequena. Compra <b style="color:var(--text)">à parte do plano</b> e libera a aba por ${d.middle_dias_addon||30} dias.</p>
+         <button class="btn btn-primary" onclick="location.href='/planos?addon=mid'" style="width:100%">Liberar as Apostas de Intervalo — ${precoM}</button>`;
   }
 
   // card de assinatura
