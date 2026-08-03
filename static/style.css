@@ -396,30 +396,39 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 17p
 .op-ref { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 10px; margin-top: 11px; padding-top: 10px; border-top: 1px dashed var(--border-soft); font-size: 11.5px; color: var(--text-mute); }
 .op-ref b { color: var(--text); font-variant-numeric: tabular-nums; }
 
-/* Faixa fina de renovação do plano — global, no topo (mesmo padrão do aviso do robô).
-   Aparece em TODAS as abas. A cor sobe conforme fica urgente: amarelo -> laranja -> vermelho. */
+/* Faixa de renovação do plano — no DESKTOP fica FIXA logo abaixo do menu (sticky),
+   aparece em todas as abas. A cor sobe conforme fica urgente: amarelo -> laranja ->
+   vermelho, com um botão destacado. No mobile ela some — o aviso vai no card do plano. */
 .renov-strip {
-  display: flex; align-items: center; justify-content: center; gap: 8px;
-  padding: 8px 16px; text-align: center;
-  font-size: 13px; line-height: 1.35; font-weight: 600;
-  background: linear-gradient(90deg, rgba(251,191,36,.14), rgba(251,191,36,.07));
-  border-bottom: 1px solid rgba(251,191,36,.4);
-  color: #ffe0a3;
+  position: sticky; top: 57px; z-index: 20;   /* 57px = altura do topbar */
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  padding: 9px 16px; text-align: center;
+  font-size: 13.5px; line-height: 1.35; font-weight: 600;
+  background: linear-gradient(90deg, rgba(251,191,36,.2), rgba(251,191,36,.12)), rgba(10,14,23,.94);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(251,191,36,.5);
+  color: #ffe6b0;
 }
 .renov-strip.today {
-  background: linear-gradient(90deg, rgba(255,138,61,.16), rgba(255,138,61,.08));
-  border-bottom-color: rgba(255,138,61,.5); color: #ffd4b0;
+  background: linear-gradient(90deg, rgba(255,138,61,.22), rgba(255,138,61,.13)), rgba(10,14,23,.94);
+  border-bottom-color: rgba(255,138,61,.6); color: #ffdcc0;
 }
 .renov-strip.expired {
-  background: linear-gradient(90deg, rgba(255,71,87,.16), rgba(255,71,87,.09));
-  border-bottom-color: rgba(255,71,87,.55); color: #ffc2c8;
+  background: linear-gradient(90deg, rgba(255,71,87,.22), rgba(255,71,87,.13)), rgba(10,14,23,.94);
+  border-bottom-color: rgba(255,71,87,.65); color: #ffccd0;
 }
 .renov-strip b { color: #fff; }
-.renov-strip a {
-  color: inherit; font-weight: 800; text-decoration: underline;
-  text-underline-offset: 2px; white-space: nowrap;
+.renov-strip .renov-btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 5px 14px; border-radius: 999px; border: 0;
+  font-weight: 800; font-size: 12.5px; line-height: 1;
+  text-decoration: none; white-space: nowrap; cursor: pointer;
+  background: #ffc94d; color: #241a02; box-shadow: 0 1px 8px rgba(0,0,0,.3);
 }
-@media (max-width: 640px) { .renov-strip { font-size: 12px; padding: 8px 12px; } }
+.renov-strip.today .renov-btn { background: #ff9a4d; color: #2a1400; }
+.renov-strip.expired .renov-btn { background: #ff5a68; color: #2a0508; }
+/* No mobile a faixa some — o aviso de renovação aparece no card do plano (#plano-banner). */
+@media (max-width: 860px) { .renov-strip { display: none; } }
 
 /* Banner do plano e botão de filtros — só aparecem no mobile */
 #plano-banner { display: none; }

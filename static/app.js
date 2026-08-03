@@ -1739,14 +1739,38 @@ async function initUser() {
   // só agora sabemos quais abas existem pra este usuário -> reabre a última usada
   restaurarAba();
 
-  // banner do plano (só aparece no mobile) — deixa claro se é grátis e o que o PRO libera
+  // banner do plano (só aparece no mobile). No PRO deixa claro que a renovação é POR DIAS
+  // ("renova em X dias"); quando falta pouco (<=5 dias) o card fica amarelo/laranja e ganha
+  // o botão "Renovar agora"; vencido fica vermelho. É aqui que o mobile avisa (a faixa some).
   const pb = document.getElementById("plano-banner");
   if (pb && me) {
+    const nowS = Date.now() / 1000;
+    const exp = me.plano_expira ? Number(me.plano_expira) : null;
+    const venceu = me.plano !== "pro" && exp && exp < nowS;
+    const btnRenovar =
+      `<button onclick="location.href='/planos'" style="width:100%;margin-top:13px;background:var(--grad,linear-gradient(112deg,#2ee6a8,#38d4f5));color:#052015;font-weight:800;font-size:15px;padding:13px;border:none;border-radius:11px;cursor:pointer;font-family:inherit">🔁 Renovar agora</button>`;
     if (me.plano === "pro") {
+      const avisar = me.dias != null && me.dias <= 5;   // 5..1 dias -> destaca
+      const urgente = me.dias != null && me.dias <= 1;  // último dia
+      const cor = !avisar ? "var(--green,#2ee6a8)" : (urgente ? "#ff8a3d" : "#ffc94d");
+      const borda = !avisar ? "rgba(46,230,168,.4)" : (urgente ? "rgba(255,138,61,.5)" : "rgba(255,201,77,.5)");
+      const fundo = !avisar ? "rgba(46,230,168,.12)" : (urgente ? "rgba(255,138,61,.14)" : "rgba(255,201,77,.13)");
+      const titulo = !avisar ? "💎 Plano PRO ativo" : (urgente ? "⏳ Seu PRO vence hoje" : "⏳ Seu PRO está acabando");
+      const diasTxt = me.dias != null
+        ? `Seu plano renova em <b style="color:var(--text,#f2f6fc)">${me.dias} ${me.dias === 1 ? "dia" : "dias"}</b> — a renovação é <b style="color:var(--text,#f2f6fc)">por dias</b>.`
+        : `A renovação do seu plano é <b style="color:var(--text,#f2f6fc)">por dias</b>.`;
       pb.innerHTML =
-        `<div style="background:linear-gradient(160deg,rgba(46,230,168,.12),var(--surface,#0e1421));border:1px solid rgba(46,230,168,.4);border-radius:14px;padding:14px 16px">
-           <div style="font-weight:800;font-size:15px;color:var(--green,#2ee6a8)">💎 Plano PRO ativo</div>
-           <div style="font-size:13px;color:var(--text-dim,#9aa7bd);margin-top:4px">Você vê todas as entradas de <b style="color:var(--text,#f2f6fc)">1% a 20%+</b> e tem os <b style="color:var(--text,#f2f6fc)">alertas no Telegram</b> liberados${me.dias != null ? ` · ${me.dias} dias` : ""}.</div>
+        `<div style="background:linear-gradient(160deg,${fundo},var(--surface,#0e1421));border:1px solid ${borda};border-radius:14px;padding:14px 16px">
+           <div style="font-weight:800;font-size:15px;color:${cor}">${titulo}</div>
+           <div style="font-size:13px;color:var(--text-dim,#9aa7bd);margin-top:4px">${diasTxt}</div>
+           ${avisar ? btnRenovar : ""}
+         </div>`;
+    } else if (venceu) {
+      pb.innerHTML =
+        `<div style="background:linear-gradient(160deg,rgba(255,71,87,.14),var(--surface,#0e1421));border:1px solid rgba(255,71,87,.5);border-radius:14px;padding:14px 16px">
+           <div style="font-weight:800;font-size:15px;color:#ff5a68">⛔ Seu plano PRO venceu</div>
+           <div style="font-size:13px;color:var(--text-dim,#9aa7bd);margin-top:4px">As apostas <b style="color:var(--text,#f2f6fc)">pararam de chegar</b> pra você. A renovação é <b style="color:var(--text,#f2f6fc)">por dias</b> — renove pra voltar a receber.</div>
+           ${btnRenovar}
          </div>`;
     } else {
       pb.innerHTML =
@@ -1774,21 +1798,29 @@ async function initUser() {
     const exp = me && me.plano_expira ? Number(me.plano_expira) : null;
     // PRO vencido: o backend já reverteu o plano pra 'free', mas manteve plano_expira.
     const venceu = me && me.plano !== "pro" && exp && exp < nowS;
-    const link = ' · <a href="/planos">Renovar →</a>';
-    let cls = "", html = "";
+    const btn = '<a class="renov-btn" href="/planos">🔁 Renovar agora</a>';
+    let cls = "", msg = "";
     if (me && me.plano === "pro" && me.dias != null && me.dias <= 5) {
       if (me.dias <= 1) {
         cls = "today";
-        html = "⏳ Seu <b>PRO</b> vence <b>hoje</b> — a renovação é por dias" + link;
+        msg = "⏳ Seu <b>PRO</b> vence <b>hoje</b> — a renovação é por dias.";
       } else {
-        html = `⏳ Seu <b>PRO</b> vence em <b>${me.dias} dias</b> — a renovação é por dias` + link;
+        msg = `⏳ Seu <b>PRO</b> vence em <b>${me.dias} dias</b> — a renovação é por dias.`;
       }
     } else if (venceu) {
       cls = "expired";
-      html = "⛔ Seu <b>PRO</b> venceu — as apostas pararam de chegar" + link;
+      msg = "⛔ Seu <b>PRO</b> venceu — as apostas pararam de chegar.";
     }
-    rs.innerHTML = html;
-    rs.className = "renov-strip" + (cls ? " " + cls : "") + (html ? "" : " hidden");
+    rs.innerHTML = msg ? `<span>${msg}</span>${btn}` : "";
+    rs.className = "renov-strip" + (cls ? " " + cls : "") + (msg ? "" : " hidden");
+    // fixa a faixa logo abaixo do header, usando a altura REAL do topbar (varia com a
+    // largura/conteúdo) — assim ela nunca fica escondida atrás do menu ao rolar a página.
+    const _tb = document.querySelector(".topbar");
+    if (_tb) {
+      const setTop = () => { rs.style.top = _tb.offsetHeight + "px"; };
+      setTop();
+      if (!rs.dataset.topBound) { window.addEventListener("resize", setTop); rs.dataset.topBound = "1"; }
+    }
   }
   return true;
 }
