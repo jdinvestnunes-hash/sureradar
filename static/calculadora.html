@@ -88,6 +88,11 @@
     .result .pct{display:inline-block;margin-top:10px;background:rgba(46,230,168,.15);color:var(--green);font-weight:800;font-size:14px;padding:5px 14px;border-radius:99px}
     .result.bad .pct{background:rgba(255,107,107,.15);color:var(--red)}
     .hint{color:var(--mute);font-size:12.5px;text-align:center;margin-top:10px}
+    .hidden{display:none!important}
+    .launch{width:100%;margin-top:14px;background:var(--grad);color:#052015;font-weight:800;
+      font-family:var(--fd);font-size:15.5px;padding:15px;border:none;border-radius:12px;cursor:pointer}
+    .launch:disabled{opacity:.7;cursor:default}
+    .launch.done{background:rgba(46,230,168,.18);color:var(--green);border:1px solid rgba(46,230,168,.5)}
     .foot{margin-top:18px;text-align:center}
     .foot a{color:var(--green);font-size:14px;font-weight:600}
     /* conteúdo SEO */
@@ -166,6 +171,7 @@
       <div class="lb">lucro garantido</div>
       <div class="pct" id="pct">0,00%</div>
     </div>
+    <button class="launch hidden" id="launch">＋ Lançar na banca</button>
     <p class="hint" id="hint">Preencha as odds e o total pra ver a divisão.</p>
   </div>
 
@@ -242,6 +248,7 @@ try{
   if (_cc) document.cookie = 'sr_camp=' + encodeURIComponent(String(_cc).slice(0,160)) + ';path=/;max-age=' + (60*60*24*60) + ';samesite=lax';
 }catch(e){}
 const $ = s => document.getElementById(s);
+let LOGGED = false;   // preenchido no load por /api/me
 const num = v => {
   v = (v||"").toString().trim();
   if (v.indexOf(",") >= 0) v = v.replace(/\./g,"").replace(",", ".");  // BR: ponto=milhar, vírgula=decimal
@@ -285,7 +292,8 @@ function render(){
   const res=$("result"), hint=$("hint");
   if(o1<=1||o2<=1||total<=0){
     res.classList.remove("bad"); $("lucro").textContent="R$ 0,00"; $("pct").textContent="0,00%";
-    hint.textContent="Preencha as odds e o total pra ver a divisão."; return;
+    hint.textContent="Preencha as odds e o total pra ver a divisão.";
+    $("launch").classList.add("hidden"); return;
   }
   const garant = Math.min(r1,r2)-total;
   const pct = (Math.min(r1,r2)/total-1)*100;
@@ -295,6 +303,13 @@ function render(){
   hint.textContent = garant>=0
     ? "✅ Lucro travado — ganhe quem ganhar. Aposte os valores acima em cada casa."
     : "⚠️ Com essas odds/valores não fecha lucro. Ajuste os valores ou as odds.";
+  // Botão "Lançar na banca": aparece quando há divisão válida (odds + valores).
+  const lb=$("launch");
+  lb.classList.remove("hidden");
+  if(lb.dataset.done!=="1"){
+    lb.disabled=false; lb.classList.remove("done");
+    lb.textContent = LOGGED ? "＋ Lançar na banca" : "＋ Lançar na banca (entrar)";
+  }
 }
 
 // eventos
@@ -309,12 +324,84 @@ document.querySelectorAll("[data-round]").forEach(b=>b.addEventListener("click",
 $("equilibrar").addEventListener("click", equilibrar);
 
 // pré-preenche pela URL: ?o1=1.40&o2=3.10&n1=Casa%20A&n2=Casa%20B&total=250
+// (do Telegram vem também b1,b2,ev,sp,mk,pf,dt pra montar a entrada completa)
 (function(){
   const p = new URLSearchParams(location.search);
   ["o1","o2","n1","n2","total"].forEach(k=>{ const v=p.get(k); if(v){ $(k).value = v; } });
+  const _t = num($("total").value); if(_t>0) setTotal(_t);   // normaliza p/ "1.000,00"
   ["n1","n2"].forEach(id=>{ const t=$("tag"+(id==="n1"?"1":"2")); if($(id).value.trim()) t.textContent=$(id).value.trim(); });
   if(num($("total").value)>0) equilibrar(); else render();
 })();
+
+// ---- Lançar na banca (logado lança direto; deslogado guarda e manda logar) ----
+const PENDING_KEY = "sureradar_pending_launch";
+
+// monta a entrada no MESMO formato do painel (app.js launchToBank)
+function buildEntry(){
+  const [o1,o2]=odds(); const st=stakes(); const total=st[0]+st[1];
+  const r1=st[0]*o1, r2=st[1]*o2; const garant=Math.min(r1,r2)-total;
+  const p = new URLSearchParams(location.search);
+  const nm1=($("n1").value||"").trim(), nm2=($("n2").value||"").trim();
+  const ev=(p.get("ev")||"").trim();
+  const pf=parseFloat(p.get("pf")||"");
+  return {
+    id: "calc-"+Date.now(),
+    event: ev || ((nm1&&nm2)? (nm1+" x "+nm2) : "Entrada da calculadora"),
+    market: (p.get("mk")||"").trim(),
+    sport: (p.get("sp")||"").trim() || "?",
+    profit_pct: isFinite(pf)? pf : Math.max(0,(Math.min(r1,r2)/total-1)*100),
+    total: total, expected: garant, status: "pendente",
+    legs: [
+      { outcome: nm1||"Casa 1", odd: o1, book: (p.get("b1")||"").trim(), stake: st[0] },
+      { outcome: nm2||"Casa 2", odd: o2, book: (p.get("b2")||"").trim(), stake: st[1] },
+    ],
+    jogo: (p.get("dt")||"").trim(),
+    created: new Date().toLocaleDateString("pt-BR"),
+  };
+}
+
+async function lancarNaBanca(){
+  const [o1,o2]=odds(); const st=stakes();
+  if(o1<=1||o2<=1||(st[0]+st[1])<=0) return;   // sem divisão válida
+  const entry = buildEntry();
+  const btn = $("launch");
+  if(!LOGGED){
+    // deslogado: guarda a entrada e manda logar -> cai no /app já lançada
+    try{ localStorage.setItem(PENDING_KEY, JSON.stringify(entry)); }catch(e){}
+    location.href = "/login";
+    return;
+  }
+  // logado: soma na banca do servidor (lê a lista atual, adiciona, salva)
+  btn.disabled = true; btn.textContent = "Lançando...";
+  try{
+    let entradas = [];
+    const r = await fetch("/api/banca", { credentials:"same-origin" });
+    if(r.ok){ const j = await r.json(); entradas = j.entradas || []; }
+    entradas.push(entry);
+    const pr = await fetch("/api/banca", { method:"POST", credentials:"same-origin",
+      headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ entradas }) });
+    if(!pr.ok) throw new Error("falhou");
+    btn.dataset.done = "1"; btn.classList.add("done"); btn.textContent = "✓ Lançado na banca!";
+    $("hint").textContent = "Levando você pro painel...";
+    setTimeout(()=>{ location.href = "/app"; }, 900);
+  }catch(e){
+    btn.disabled = false; btn.textContent = "＋ Lançar na banca";
+    $("hint").textContent = "Não deu pra salvar agora. Tente de novo.";
+  }
+}
+$("launch").addEventListener("click", lancarNaBanca);
+
+// detecta login: troca os CTAs de "criar conta" e libera o lançamento direto
+fetch("/api/me", { credentials:"same-origin" }).then(r=>{
+  LOGGED = r.ok;
+  if(LOGGED){
+    const nav = document.querySelector('nav a.back');
+    if(nav){ nav.textContent = "← Meu painel"; nav.href = "/app"; }
+    const foot = document.querySelector('.foot a');
+    if(foot){ foot.textContent = "Ver minha banca no painel →"; foot.href = "/app"; }
+    render();   // atualiza o texto do botão
+  }
+}).catch(()=>{});
 </script>
 </body>
 </html>

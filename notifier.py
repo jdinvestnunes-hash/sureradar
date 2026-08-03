@@ -161,14 +161,25 @@ def formatar_surebet(sb):
     if sb.get("lucro_brl") is not None:
         linhas.append("")
         linhas.append(f"✅ Lucro garantido: <b>{_brl(sb['lucro_brl'])}</b>")
-    # Calculadora pré-preenchida com as odds da entrada (banca do usuário).
+    # Calculadora pré-preenchida com a ENTRADA INTEIRA (odds, casas, jogo, banca, lucro).
+    # Assim, logado, a pessoa clica "Lançar na banca" e a entrada cai completa no painel.
     legs = sb.get("legs", [])[:2]
     if len(legs) == 2 and getattr(config, "SITE_URL", ""):
-        qs = urlencode({
+        params = {
             "o1": f"{legs[0]['odd']:.2f}", "o2": f"{legs[1]['odd']:.2f}",
-            "n1": str(legs[0].get("outcome") or legs[0].get("bookmaker") or "Casa 1")[:30],
-            "n2": str(legs[1].get("outcome") or legs[1].get("bookmaker") or "Casa 2")[:30],
-        })
+            "n1": str(legs[0].get("outcome") or legs[0].get("bookmaker") or "Casa 1")[:40],
+            "n2": str(legs[1].get("outcome") or legs[1].get("bookmaker") or "Casa 2")[:40],
+            "b1": str(legs[0].get("bookmaker") or "")[:30],   # casa da perna 1
+            "b2": str(legs[1].get("bookmaker") or "")[:30],   # casa da perna 2
+            "total": f"{banca:.2f}",                          # banca -> já abre dividido
+            "ev": str(sb.get("event") or "")[:80],            # nome do jogo
+            "sp": str(sb.get("sport_label") or sb.get("sport") or "")[:30],
+            "mk": str(sb.get("market_label") or sb.get("market") or "")[:40],
+            "pf": f"{sb['profit_pct']:.2f}",                  # lucro %
+        }
+        if sb.get("commence_br"):
+            params["dt"] = str(sb["commence_br"])[:30]        # dia/hora do jogo
+        qs = urlencode(params)
         linhas.append("")
         linhas.append(f'🧮 <b>Tem outra banca?</b> Calcule 👉 '
                       f'<a href="{config.SITE_URL}/calculadora?{qs}&utm_source=telegram">abrir calculadora</a>')

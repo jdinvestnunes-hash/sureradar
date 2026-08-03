@@ -5,6 +5,7 @@
 const FILTERS_BASE = "sureradar_filtros_v6";
 const BANK_BASE = "sureradar_banca_v1";
 let USER_TAG = "anon";
+let PENDING_LANCADA = false;   // entrada da calculadora pública lançada ao logar
 const filtersKey = () => FILTERS_BASE + "_" + USER_TAG;
 const bankKey = () => BANK_BASE + "_" + USER_TAG;
 
@@ -1681,6 +1682,21 @@ async function initUser() {
     filtros = load(filtersKey(), {});
     banca = load(bankKey(), []);
     await syncBancaDoServidor();
+    // Entrada vinda da calculadora pública: deslogado clicou "Lançar na banca",
+    // logou, e agora cai aqui já com a entrada lançada na banca dele.
+    try {
+      const pend = localStorage.getItem("sureradar_pending_launch");
+      if (pend) {
+        localStorage.removeItem("sureradar_pending_launch");
+        const ent = JSON.parse(pend);
+        if (ent && ent.legs && ent.legs.length) {
+          ent.id = "calc-" + Date.now();     // id novo pra não colidir
+          banca.push(ent);
+          saveBanca();
+          PENDING_LANCADA = true;            // abre a aba Banca depois de montar a tela
+        }
+      }
+    } catch {}
   } catch { return true; }           // sem rede: deixa o painel abrir
   const chip = $("#user-chip");
   if (chip && me && me.nome) {
@@ -1757,6 +1773,8 @@ async function initUser() {
   renderBankBadge();
   await initMeta();
   await carregar();
+  // veio da calculadora pública (lançou ao logar): abre a aba Banca já com a entrada
+  if (PENDING_LANCADA) { switchView("bank"); renderBankBadge(); }
   setInterval(tickTimer, 1000);      // atualiza o mostrador do timer
   setInterval(carregar, 30000);      // busca dados novos a cada 30s (pega novas raspagens)
 })();
