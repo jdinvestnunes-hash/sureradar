@@ -971,6 +971,29 @@ function renderValorLista() {
   renderValorCTA(corte);
 }
 
+// Selo de PRAZO do add-on (Odds Erradas / Apostas de Intervalo). Cada add-on é
+// comprado à parte e vence POR DIAS, separado do plano PRO — então cada aba mostra
+// o seu próprio prazo. Quem está acabando (<=5 dias) ganha cor de aviso + "Renovar".
+function renderAddonPrazo(elId, tem, dias, linkRenovar) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  if (!tem) { el.className = "addon-prazo hidden"; el.innerHTML = ""; return; }
+  if (dias == null) {   // acesso sem data marcada (cortesia/beta) — sem contagem
+    el.className = "addon-prazo beta";
+    el.innerHTML = "🎁 acesso liberado";
+    return;
+  }
+  const txt = dias === 1 ? "1 dia" : dias + " dias";
+  if (dias <= 5) {      // acabando: amarelo + botão renovar (renova por dias)
+    el.className = "addon-prazo warn";
+    el.innerHTML = `⏳ acaba em <b>${txt}</b>` +
+      `<a class="prazo-renov" href="${linkRenovar}">🔁 Renovar</a>`;
+  } else {              // com folga: verde
+    el.className = "addon-prazo";
+    el.innerHTML = `🎯 seu acesso: <b>${txt}</b>`;
+  }
+}
+
 // Faixa de venda do add-on — some pra quem já comprou
 function renderValorCTA(bloqueadas) {
   const box = document.getElementById("valor-cta");
@@ -1054,13 +1077,9 @@ async function renderValor() {
   VALOR_REAL = itens.length > 0;
   VALOR_ITENS = itens;
   const fonte = document.getElementById("valor-fonte");
-  if (fonte) {
-    const base = "atualiza a cada 10 min";
-    // quem comprou o add-on vê quanto tempo ainda tem de acesso
-    fonte.textContent = VALOR_TEM && VALOR_DIAS
-      ? base + " · acesso por mais " + VALOR_DIAS + (VALOR_DIAS === 1 ? " dia" : " dias")
-      : base;
-  }
+  if (fonte) fonte.textContent = "atualiza a cada 10 min";
+  // selo de prazo do add-on (separado do plano PRO — este add-on vence por dias)
+  renderAddonPrazo("valor-prazo", VALOR_TEM, VALOR_DIAS, "/planos?addon=1");
   renderValorCasas();
   renderValorChips();
   renderValorLista();
@@ -1282,12 +1301,8 @@ async function renderMiddle() {
   try { const r = await fetch("/api/middles"); if (r.ok) itens = (await r.json()).itens || []; } catch {}
   MIDDLE_ITENS = itens;
   const fonte = document.getElementById("middle-fonte");
-  if (fonte) {
-    const base = "atualiza a cada 10 min";
-    fonte.textContent = MIDDLE_TEM && MIDDLE_DIAS
-      ? base + " · acesso por mais " + MIDDLE_DIAS + (MIDDLE_DIAS === 1 ? " dia" : " dias")
-      : base;
-  }
+  if (fonte) fonte.textContent = "atualiza a cada 10 min";
+  renderAddonPrazo("middle-prazo", MIDDLE_TEM, MIDDLE_DIAS, "/planos?addon=mid");
   renderMiddleCasas();
   renderMiddleChips();
   renderMiddleLista();
