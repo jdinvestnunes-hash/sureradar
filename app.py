@@ -1875,17 +1875,20 @@ def admin_usuarios(request: Request):
     for u in auth.listar_usuarios():
         lista.append({**u, "dias": auth.dias_restantes(u),
                       "aviso_renovar": _aviso_renovar(auth.dias_restantes(u)),
-                      "valor_dias": auth.valor_dias_restantes(u)})   # add-on Odds Erradas
+                      "valor_dias": auth.valor_dias_restantes(u),      # add-on Odds Erradas
+                      "middle_dias": auth.middle_dias_restantes(u)})   # add-on Apostas de Intervalo
     return {"usuarios": lista}
 
 
 @app.post("/api/admin/plano")
 def admin_plano(request: Request, payload: dict = Body(...)):
     """Admin ativa/renova PRO (com a duração escolhida — SOMA nos dias restantes)
-    ou volta pra Free. Body: {email, acao:'pro'|'free'|'valor'|'valor-off', dias:int}.
+    ou volta pra Free. Body: {email, acao, dias:int} com
+    acao in {'pro','free','valor','valor-off','middle','middle-off'}.
 
-    'valor' libera SÓ o add-on das Odds Erradas — é independente do plano, então dá
-    pra deixar a pessoa no FREE e mesmo assim com a aba liberada."""
+    'valor' (Odds Erradas) e 'middle' (Apostas de Intervalo) liberam SÓ o add-on —
+    são independentes do plano, então dá pra deixar a pessoa no FREE e mesmo assim
+    com a aba liberada. Cortesia = R$ 0, com data real (conta por dias)."""
     user = _usuario(request)
     erro = _guard_admin(request, user)
     if erro:
@@ -1910,6 +1913,19 @@ def admin_plano(request: Request, payload: dict = Body(...)):
         atual = auth.pegar_por_email(alvo["email"])
         return {"ok": True, "email": alvo["email"],
                 "valor_dias": auth.valor_dias_restantes(atual)}
+    if acao == "middle-off":
+        auth.revogar_middle(alvo["id"])
+        return {"ok": True, "email": alvo["email"], "middle_dias": None}
+    if acao == "middle":                       # add-on Apostas de Intervalo, igual ao valor
+        try:
+            dias_m = int(payload.get("dias", config.ADDON_MIDDLE["dias"]))
+        except (TypeError, ValueError):
+            dias_m = config.ADDON_MIDDLE["dias"]
+        dias_m = max(1, min(dias_m, 3650))
+        auth.ativar_middle(alvo["id"], dias_m, 0.0, metodo="admin")   # cortesia: R$ 0
+        atual = auth.pegar_por_email(alvo["email"])
+        return {"ok": True, "email": alvo["email"],
+                "middle_dias": auth.middle_dias_restantes(atual)}
     try:
         dias = int(payload.get("dias", 30))
     except (TypeError, ValueError):
