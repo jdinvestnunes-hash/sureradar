@@ -1122,9 +1122,13 @@ def me(request: Request):
     if not user:
         return JSONResponse({"erro": "não autenticado"}, status_code=401)
     dias = auth.dias_restantes(user)
+    # plano_expira (epoch) — mesmo depois de vencer, o _normalizar_plano vira o plano
+    # pra 'free' mas MANTÉM a data. Serve pro painel detectar "PRO vencido, renove".
+    exp = user.get("plano_expira")
     return {"id": user["id"], "nome": user["nome"], "email": user["email"],
             "plano": _plano_efetivo(user),
             "dias": dias, "aviso_renovar": _aviso_renovar(dias),
+            "plano_expira": exp or None,
             "whatsapp": user.get("whatsapp") or "",
             "admin": _admin_email(user),
             "alertas": _alerta_liberado(user),

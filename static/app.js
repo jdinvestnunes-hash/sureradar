@@ -1764,6 +1764,44 @@ async function initUser() {
          </div>`;
     }
   }
+
+  // aviso de renovação / plano vencido — SEMPRE visível (desktop e mobile), no topo da
+  // aba de surebets. A renovação é POR DIAS: quando faltam poucos, avisa em amarelo;
+  // no último dia fica laranja; e depois de vencer, um banner VERMELHO chamando pra renovar.
+  const rb = document.getElementById("renov-banner");
+  if (rb) {
+    let html = "";
+    const nowS = Date.now() / 1000;
+    const exp = me && me.plano_expira ? Number(me.plano_expira) : null;
+    // PRO vencido: o backend já reverteu o plano pra 'free', mas manteve plano_expira.
+    const venceuHa = (me && me.plano !== "pro" && exp && exp < nowS)
+      ? Math.max(1, Math.ceil((nowS - exp) / 86400)) : null;
+    if (me && me.plano === "pro" && me.dias != null && me.dias <= 5) {
+      const d = me.dias;
+      const forte = d <= 1;                        // último dia -> laranja mais forte
+      const quando = forte ? "vence <b>hoje</b>" : `vence em <b>${d} dias</b>`;
+      const cor = forte ? "#ff8a3d" : "#ffc94d";
+      const bg = forte ? "rgba(255,138,61,.13)" : "rgba(255,201,77,.12)";
+      html =
+        `<div style="background:${bg};border:1px solid ${cor}66;border-radius:14px;padding:14px 16px;display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+           <div style="flex:1;min-width:220px">
+             <div style="font-weight:800;font-size:15px;color:${cor}">⏳ Seu plano PRO ${quando}</div>
+             <div style="font-size:13px;color:var(--text-dim,#9aa7bd);margin-top:4px">A renovação é <b style="color:var(--text,#f2f6fc)">por dias</b> — renove agora pra não parar de receber as entradas no painel e no Telegram.</div>
+           </div>
+           <button onclick="location.href='/planos'" style="background:var(--grad,linear-gradient(112deg,#2ee6a8,#38d4f5));color:#052015;font-weight:800;font-size:14.5px;padding:12px 18px;border:none;border-radius:11px;cursor:pointer;font-family:inherit;white-space:nowrap">🔁 Renovar agora</button>
+         </div>`;
+    } else if (venceuHa != null) {
+      html =
+        `<div style="background:rgba(255,71,87,.13);border:1px solid rgba(255,71,87,.55);border-radius:14px;padding:14px 16px;display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+           <div style="flex:1;min-width:220px">
+             <div style="font-weight:800;font-size:15px;color:#ff5a68">⛔ Seu plano PRO venceu</div>
+             <div style="font-size:13px;color:var(--text-dim,#9aa7bd);margin-top:4px">As apostas <b style="color:var(--text,#f2f6fc)">pararam de chegar</b> pra você. A renovação é <b style="color:var(--text,#f2f6fc)">por dias</b> — renove pra voltar a receber as entradas no painel e no Telegram.</div>
+           </div>
+           <button onclick="location.href='/planos'" style="background:linear-gradient(112deg,#ff5a68,#ff8a3d);color:#2a0508;font-weight:800;font-size:14.5px;padding:12px 18px;border:none;border-radius:11px;cursor:pointer;font-family:inherit;white-space:nowrap">🔴 Renovar plano</button>
+         </div>`;
+    }
+    rb.innerHTML = html;
+  }
   return true;
 }
 
