@@ -273,11 +273,13 @@ def init():
             boanoite INTEGER DEFAULT 0,
             iscas INTEGER DEFAULT 0,
             entradas INTEGER DEFAULT 0,
-            ultima_isca REAL DEFAULT 0)""")
+            ultima_isca REAL DEFAULT 0,
+            ultima_entrada REAL DEFAULT 0)""")
     # Migrações leves para bancos antigos: cada ALTER na SUA transação (no
     # Postgres, um erro aborta a transação inteira). Erro = coluna já existe.
     for tabela, coluna in [("checkouts", "pi TEXT"),
                            ("checkouts", "addon TEXT"),
+                           ("promo_dia", "ultima_entrada REAL DEFAULT 0"),
                            ("alertas_tg", "esportes TEXT"),
                            ("users", f"valor_expira {_NUM}"),
                            ("users", f"middle_expira {_NUM}"),
@@ -600,16 +602,19 @@ def promo_dia_get(dia):
         row = c.execute(_q("SELECT * FROM promo_dia WHERE dia=?"), (dia,)).fetchone()
     if row:
         return dict(row)
-    return {"bomdia": 0, "boanoite": 0, "iscas": 0, "entradas": 0, "ultima_isca": 0}
+    return {"bomdia": 0, "boanoite": 0, "iscas": 0, "entradas": 0,
+            "ultima_isca": 0, "ultima_entrada": 0}
 
 
-def promo_dia_salvar(dia, bomdia, boanoite, iscas, entradas, ultima_isca):
+def promo_dia_salvar(dia, bomdia, boanoite, iscas, entradas, ultima_isca, ultima_entrada=0):
     with _db() as c:
-        c.execute(_q("""INSERT INTO promo_dia(dia,bomdia,boanoite,iscas,entradas,ultima_isca)
-            VALUES(?,?,?,?,?,?)
+        c.execute(_q("""INSERT INTO promo_dia(dia,bomdia,boanoite,iscas,entradas,ultima_isca,ultima_entrada)
+            VALUES(?,?,?,?,?,?,?)
             ON CONFLICT(dia) DO UPDATE SET bomdia=excluded.bomdia, boanoite=excluded.boanoite,
-                iscas=excluded.iscas, entradas=excluded.entradas, ultima_isca=excluded.ultima_isca"""),
-            (dia, int(bomdia), int(boanoite), int(iscas), int(entradas), float(ultima_isca or 0)))
+                iscas=excluded.iscas, entradas=excluded.entradas, ultima_isca=excluded.ultima_isca,
+                ultima_entrada=excluded.ultima_entrada"""),
+            (dia, int(bomdia), int(boanoite), int(iscas), int(entradas),
+             float(ultima_isca or 0), float(ultima_entrada or 0)))
 
 
 def _dia_br():

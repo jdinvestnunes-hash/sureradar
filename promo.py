@@ -108,7 +108,7 @@ _parar = threading.Event()
 _thread = None
 _estado = {"dia": None, "slots": set(), "social": set(), "postados": set(),
            "marcos": set(), "bomdia_min": 0, "boanoite_min": 0,
-           "iscas_feitas": 0, "ultima_isca": 0.0, "entradas": 0}
+           "iscas_feitas": 0, "ultima_isca": 0.0, "entradas": 0, "ultima_entrada": 0.0}
 _social_i = 0
 
 
@@ -137,6 +137,12 @@ def _reset_dia(dia):
         _ag = _agora()
         if (_ag.hour * 60 + _ag.minute) >= ISCA_JANELA[0]:
             ultima = _time.time()
+    # MESMA lógica pra ENTRADA NORMAL: se reiniciar/deploiar no meio do dia sem
+    # timestamp persistido, trava a próxima entrada pra daqui a um intervalo — senão
+    # cada deploy dispararia uma entrada na hora (ultimo=0 -> posta logo).
+    ultima_ent = float(est.get("ultima_entrada", 0) or 0)
+    if not ultima_ent and int(est.get("bomdia", 0) or 0):
+        ultima_ent = _time.time()                           # dia já aberto -> não posta no boot
     _estado.update({
         "dia": dia, "slots": set(), "social": set(), "postados": set(),
         "marcos": marcos,
@@ -145,6 +151,7 @@ def _reset_dia(dia):
         "iscas_feitas": int(est.get("iscas", 0) or 0),
         "ultima_isca": ultima,
         "entradas": int(est.get("entradas", 0) or 0),
+        "ultima_entrada": ultima_ent,
     })
 
 
@@ -155,7 +162,8 @@ def _salvar_estado():
             _estado["dia"],
             1 if "bomdia" in _estado["marcos"] else 0,
             1 if "boanoite" in _estado["marcos"] else 0,
-            _estado["iscas_feitas"], _estado["entradas"], _estado["ultima_isca"])
+            _estado["iscas_feitas"], _estado["entradas"], _estado["ultima_isca"],
+            _estado.get("ultima_entrada", 0.0))
     except Exception as e:
         print("!! _salvar_estado:", e)
 
@@ -395,7 +403,10 @@ def _loop():
             hora = a.hour
             if dia != _estado["dia"]:
                 _reset_dia(dia)
-                ultimo = 0.0
+                # retoma o timer do último post PERSISTIDO — assim um deploy no meio do
+                # dia NÃO dispara entrada na hora; respeita o intervalo normal (30-50 min).
+                ultimo = float(_estado.get("ultima_entrada") or 0.0)
+                intervalo_seg = _sortear_intervalo() if ultimo else 0
             if notifier.ativo():
                 agora = _time.time()
                 minuto = a.hour * 60 + a.minute
@@ -438,8 +449,10 @@ def _loop():
                                 and agora - ultimo >= intervalo_seg):
                             if postar_faixa(*FAIXA_NORMAL, "2-4%"):
                                 _estado["entradas"] += 1
-                                _salvar_estado()
+                            # persiste o ts SEMPRE (mesmo se nada saiu) -> deploy não reposta
                             ultimo = agora
+                            _estado["ultima_entrada"] = agora
+                            _salvar_estado()
                             intervalo_seg = _sortear_intervalo()
         except Exception as e:
             print("!! promo loop erro:", e)
