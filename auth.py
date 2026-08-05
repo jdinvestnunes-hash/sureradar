@@ -837,7 +837,7 @@ def checkouts_pendentes():
     with _db() as c:
         rows = c.execute(
             """SELECT ck.id, ck.provider, ck.metodo, ck.plano, ck.valor, ck.criado,
-                      u.email, u.nome, u.whatsapp, u.plano AS user_plano
+                      ck.user_id, u.email, u.nome, u.whatsapp, u.plano AS user_plano
                FROM checkouts ck JOIN users u ON u.id = ck.user_id
                WHERE ck.status = 'pendente'
                ORDER BY ck.criado DESC""").fetchall()

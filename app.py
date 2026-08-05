@@ -1409,6 +1409,47 @@ def admin_avisar_parcelamento(request: Request):
             "excluidos": sorted(excluir)}
 
 
+@app.post("/api/admin/recuperar-pendentes")
+def admin_recuperar_pendentes(request: Request):
+    """E-mail de recuperação pra quem GEROU checkout (Pix/cartão) e NÃO pagou — e ainda
+    não é PRO. Dedup: cada pessoa recebe só 1x (tipo 'recup_checkout'). Exclui admin/dono
+    e o próprio admin logado. Envia em 2º plano (não trava a resposta)."""
+    import threading
+    user = _usuario(request)
+    erro = _guard_admin(request, user)
+    if erro:
+        return erro
+    if not config.RESEND_API_KEY:
+        return JSONResponse({"erro": "RESEND_API_KEY não configurada"}, status_code=503)
+    excluir = _emails_excluidos(user)
+    # 1 entrada por pessoa (o mais recente), só quem ainda NÃO é PRO
+    vistos, audiencia = set(), []
+    for c in auth.checkouts_pendentes():
+        em = (c.get("email") or "").strip().lower()
+        if not em or em in excluir or em in vistos or c.get("user_plano") == "pro":
+            continue
+        vistos.add(em)
+        audiencia.append(c)
+
+    def _rodar():
+        enviados = 0
+        for c in audiencia:
+            try:
+                uid = c.get("user_id")
+                if not uid or not auth.registrar_email(uid, "recup_checkout"):
+                    continue                     # já recebeu esse aviso
+                unsub = config.SITE_URL + "/descadastrar?u=" + auth.unsub_token(uid)
+                if emailer.enviar_recup_checkout(c["email"], c.get("nome") or "",
+                                                 c.get("plano") or "", unsub):
+                    enviados += 1
+            except Exception as e:
+                print("!! recuperar-pendentes:", e)
+        print(f">> recuperação de pendentes: {enviados} e-mail(s) enviado(s).")
+
+    threading.Thread(target=_rodar, name="recup-pendentes", daemon=True).start()
+    return {"ok": True, "audiencia": len(audiencia)}
+
+
 @app.post("/api/admin/testar-email")
 def admin_testar_email(request: Request):
     """Manda um e-mail de teste pro próprio admin e devolve a resposta do Resend."""

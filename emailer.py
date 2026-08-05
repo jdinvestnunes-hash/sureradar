@@ -271,6 +271,29 @@ def enviar_retencao(to: str, nome: str, tipo: str, unsub_url: str = "", dias: in
     return enviar(to, assunto, texto=texto, headers=headers)
 
 
+def enviar_recup_checkout(to: str, nome: str, plano: str = "", unsub_url: str = "") -> bool:
+    """Recuperação de CHECKOUT ABANDONADO: a pessoa gerou o Pix/cartão e não pagou.
+    Lead quente — já estava com o dedo no botão. Plain text, 1 clique pra voltar."""
+    qual = (" do " + plano) if plano else ""
+    assunto = "faltou só o pagamento pra liberar seu PRO 👀"
+    texto = (
+        "Oi {n},\n\n"
+        "Vi aqui que você começou a assinatura{q} do SureRadar mas o pagamento não caiu ainda.\n\n"
+        "Se travou em algo, tô aqui pra ajudar. E se foi só correria do dia, tá tudo salvo — "
+        "é só voltar e finalizar em 1 clique (Pix cai na hora):\n\n"
+        "{url}/planos\n\n"
+        "Lembrando que o PRO destrava TODAS as entradas de 1% a 20%+ e vem com garantia de "
+        "7 dias: usa, pega os greens, e se não fizer sentido a gente devolve 100%.\n\n"
+        "Qualquer dúvida, é só responder este e-mail.\nAbraço,\nEquipe SureRadar"
+    ).format(n=_primeiro(nome), q=qual, url=config.SITE_URL)
+    headers = None
+    if unsub_url:
+        texto += f"\n\n---\nNão quer mais esses e-mails? Descadastre aqui: {unsub_url}"
+        headers = {"List-Unsubscribe": f"<{unsub_url}>",
+                   "List-Unsubscribe-Post": "List-Unsubscribe=One-Click"}
+    return enviar(to, assunto, texto=texto, headers=headers)
+
+
 def enviar_parcelamento(to: str, nome: str, unsub_url: str = "") -> bool:
     """Aviso ÚNICO: liberamos o PARCELAMENTO no cartão (até 12x). Pra quem gerou
     checkout e não fechou. Plain text (melhor entrega)."""
