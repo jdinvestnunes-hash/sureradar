@@ -1170,17 +1170,23 @@ async def webhook_abacate(request: Request):
             cands.append(v["id"])
     # log sem PII (só chaves + ids) — ajuda a confirmar o payload no 1º pagamento real
     print(">> webhook abacate:", tipo, "| data keys:", list(d.keys()), "| ids:", cands)
-    if tipo in ("billing.paid", "billing.completed", "payment.paid",
-                "checkout.completed", "transparent.completed"):
+    tl = (tipo or "").lower()
+    # status pode vir no data (ex.: {"status":"REFUNDED"}) — usa como reforço do match
+    st = str((d.get("status") or (d.get("billing") or {}).get("status") or
+              (d.get("transparent") or {}).get("status") or "")).lower()
+    _pago = any(k in tl for k in ("paid", "completed", "confirmed")) or st in ("paid", "confirmed")
+    _estorno = (any(k in tl for k in ("refund", "reembol", "estorn", "dispute", "chargeback",
+                                      "cancel", "reversed", "expired", "failed"))
+                or st in ("refunded", "cancelled", "canceled", "reversed", "expired", "failed"))
+    if _pago and not _estorno:
         for bid in cands:
             res = auth.checkout_pagar("abacatepay", bid)
             if res:
                 _confirmar_compra_email(res["user_id"])
                 _avisar_venda_admin(res)
                 break
-    elif tipo in ("checkout.refunded", "checkout.disputed", "billing.refunded",
-                  "transparent.refunded", "transparent.disputed", "payment.refunded"):
-        # estorno / chargeback do cartão -> tira o PRO da pessoa
+    elif _estorno:
+        # estorno / chargeback / cancelamento -> tira o PRO da pessoa (qualquer nome de evento)
         for bid in cands:
             if auth.checkout_revogar("abacatepay", bid):
                 break
