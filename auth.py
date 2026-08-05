@@ -1157,6 +1157,18 @@ def checkout_revogar(provider, external_id):
     return dict(row)
 
 
+def checkout_buscar(provider, external_id):
+    """Devolve o checkout (dict) por provider+external_id, ou None. Usado pelo
+    front do Pix transparente pra saber, via polling, quando o webhook já marcou
+    a cobrança como 'pago' — aí a tela do QR libera e manda pro /perfil."""
+    if not external_id:
+        return None
+    with _db() as c:
+        row = c.execute(_q("SELECT user_id, status FROM checkouts WHERE provider=? AND external_id=?"),
+                        (provider, external_id)).fetchone()
+    return dict(row) if row else None
+
+
 # ---------------------------------------------------------------------------
 # Métricas de negócio (para o dashboard admin)
 # ---------------------------------------------------------------------------

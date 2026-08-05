@@ -1049,6 +1049,77 @@ def checkout_cartao(request: Request, payload: dict = Body(...)):
     return {"url": url}
 
 
+def _fmt_celular(user):
+    """Celular do cadastro formatado pro AbacatePay, ou None se não tiver DDD válido."""
+    cel = "".join(ch for ch in str(user.get("whatsapp") or "") if ch.isdigit())
+    if len(cel) == 11:
+        return f"({cel[:2]}) {cel[2:7]}-{cel[7:]}"
+    if len(cel) == 10:
+        return f"({cel[:2]}) {cel[2:6]}-{cel[6:]}"
+    return None
+
+
+@app.post("/api/checkout/pix2")
+def checkout_pix_transparente(request: Request, payload: dict = Body(...)):
+    """Pix TRANSPARENTE (AbacatePay v2 /transparents/create): gera o QR na hora e
+    devolve brCode (copia-e-cola) + brCodeBase64 (imagem) pra renderizar na NOSSA
+    página — sem redirect, sem tela hospedada, sem endereço/CEP. Pra Pix o CPF é
+    opcional, então nem pedimos. Libera o PRO no webhook 'transparent.completed'
+    (a tela do QR fica escutando /api/checkout/status até virar 'pago')."""
+    user = _usuario(request)
+    if not user:
+        return JSONResponse({"erro": "não autenticado"}, status_code=401)
+    plano, p = _plano_valido(payload)
+    if not p:
+        return JSONResponse({"erro": "plano inválido"}, status_code=400)
+    if not _abacate_v2_key():
+        return JSONResponse({"erro": "AbacatePay não configurado"}, status_code=503)
+    bump = _quer_bump(payload, plano)
+    total = p["valor"] + (_combo_extra(plano) if bump else 0)
+    customer = {"name": user["nome"], "email": user["email"]}
+    cel = _fmt_celular(user)
+    if cel:
+        customer["cellphone"] = cel
+    body = {
+        "method": "PIX",
+        "data": {
+            "amount": int(round(total * 100)),
+            "description": "SureRadar " + p["nome"] + (" + Completo" if bump else ""),
+            "expiresIn": 3600,
+            "customer": customer,
+        },
+    }
+    try:
+        r = requests.post(_ABACATE_V2 + "/transparents/create", json=body,
+                          headers={"Authorization": "Bearer " + _abacate_v2_key()},
+                          timeout=20)
+    except requests.RequestException as e:
+        return JSONResponse({"erro": "falha de rede", "detalhe": str(e)[:120]}, status_code=502)
+    if not r.ok:
+        return JSONResponse({"erro": "AbacatePay recusou", "detalhe": r.text[:300]}, status_code=502)
+    d = (r.json() or {}).get("data") or {}
+    bid, brcode, brimg = d.get("id"), d.get("brCode"), d.get("brCodeBase64")
+    if not bid or not brcode:
+        return JSONResponse({"erro": "resposta inesperada do AbacatePay",
+                             "detalhe": str(d)[:200]}, status_code=502)
+    auth.checkout_registrar("abacatepay", bid, user["id"], plano, p["dias"], total, "pix",
+                            addon="combo" if bump else None)
+    return {"id": bid, "brcode": brcode, "brimg": brimg, "total": total}
+
+
+@app.get("/api/checkout/status")
+def checkout_status(request: Request, id: str = ""):
+    """Polling do Pix transparente: o front pergunta 'já caiu?'. Fonte da verdade é o
+    webhook, que marca o checkout como 'pago'. Só devolve o status do PRÓPRIO usuário."""
+    user = _usuario(request)
+    if not user or not id:
+        return {"status": "pendente"}
+    ck = auth.checkout_buscar("abacatepay", id)
+    if not ck or ck.get("user_id") != user["id"]:
+        return {"status": "pendente"}
+    return {"status": ck.get("status") or "pendente"}
+
+
 @app.get("/api/checkout/prep")
 def checkout_prep(request: Request):
     """Chamado ao abrir /planos: cria/cacheia o customer da AbacatePay em segundo
@@ -1068,14 +1139,19 @@ async def webhook_abacate(request: Request):
         ev = await request.json()
     except Exception:
         return JSONResponse({"erro": "payload inválido"}, status_code=400)
-    # v1 Pix = billing.paid; v2 cartão (parcelamento) = checkout.completed.
-    # A estrutura do data varia entre v1/v2, então tentamos vários caminhos de id.
+    # v1 Pix = billing.paid; v2 cartão (parcelamento) = checkout.completed;
+    # Pix transparente = transparent.completed. A estrutura do `data` varia entre
+    # v1/v2, então coletamos TODO id do `data` e de qualquer objeto aninhado 1 nível
+    # (billing/checkout/pixQrCode/payment/transparent/...). Como o checkout_pagar só
+    # casa com um external_id JÁ registrado, ids extras são inofensivos.
     tipo = ev.get("event")
     d = ev.get("data") or {}
     cands = []
-    for obj in (d, d.get("billing"), d.get("checkout"), d.get("pixQrCode"), d.get("payment")):
-        if isinstance(obj, dict) and obj.get("id"):
-            cands.append(obj["id"])
+    if isinstance(d, dict) and d.get("id"):
+        cands.append(d["id"])
+    for v in (d.values() if isinstance(d, dict) else []):
+        if isinstance(v, dict) and v.get("id"):
+            cands.append(v["id"])
     # log sem PII (só chaves + ids) — ajuda a confirmar o payload no 1º pagamento real
     print(">> webhook abacate:", tipo, "| data keys:", list(d.keys()), "| ids:", cands)
     if tipo in ("billing.paid", "billing.completed", "payment.paid",

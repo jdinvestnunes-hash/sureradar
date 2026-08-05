@@ -281,6 +281,25 @@
   </div>
 </div>
 
+<!-- Pix TRANSPARENTE: o QR aparece aqui mesmo, sem sair do site -->
+<div class="modal-bg" id="qr-modal">
+  <div class="modal" style="max-width:380px;text-align:center">
+    <div class="modal-title" id="qr-title">⚡ Pague com Pix</div>
+    <div class="modal-sub" id="qr-sub">Abra o app do seu banco, aponte pro QR ou cole o código. A liberação é <b>na hora</b>.</div>
+    <div id="qr-img-wrap" style="background:#fff;border-radius:14px;padding:12px;display:inline-block;margin:4px auto 12px">
+      <img id="qr-img" alt="QR Code Pix" style="width:210px;height:210px;display:block" />
+    </div>
+    <div id="qr-code-box" style="display:flex;gap:8px;align-items:stretch;margin-bottom:6px">
+      <input id="qr-code" readonly style="flex:1;min-width:0;font-size:12px;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.05);color:var(--txt);overflow:hidden;text-overflow:ellipsis" />
+      <button class="btn btn-primary" id="qr-copy" style="white-space:nowrap;padding:10px 14px">Copiar</button>
+    </div>
+    <div id="qr-status" style="margin:12px 0 4px;font-size:14px;color:var(--dim)">⏳ Aguardando o pagamento…</div>
+    <div class="modal-actions" style="justify-content:center">
+      <button class="btn btn-ghost" id="qr-close">Fechar</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -297,6 +316,49 @@ async function pagar(plano, metodo, btn, extras){
     if (r.status === 401) { toast('🔒 Faça login pra assinar.'); setTimeout(()=>location.href='/login?plano='+plano, 1200); return; }
     toast('❌ ' + (j.erro || 'Não foi possível iniciar o pagamento agora.') + (j.detalhe ? ' — ' + j.detalhe : ''));
   } catch (e) { toast('❌ Erro de conexão. Tente de novo.'); }
+  btn.textContent = txt; btn.disabled = false;
+}
+
+// ---- Pix TRANSPARENTE: gera o QR na nossa tela (sem redirect) e escuta o pagamento ----
+let qrPoll = null;
+function pararPoll(){ if (qrPoll){ clearInterval(qrPoll); qrPoll = null; } }
+function fecharQR(){ pararPoll(); document.getElementById('qr-modal').classList.remove('show'); }
+async function pagarPix2(plano, btn, extras){
+  const txt = btn.textContent; btn.textContent = '⏳ Gerando...'; btn.disabled = true;
+  try {
+    const body = Object.assign({plano}, extras || {});
+    const r = await fetch('/api/checkout/pix2', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+    const j = await r.json().catch(()=>({}));
+    if (r.status === 401){ toast('🔒 Faça login pra assinar.'); setTimeout(()=>location.href='/login?plano='+plano, 1200); btn.textContent=txt; btn.disabled=false; return; }
+    if (!r.ok || !j.brcode){
+      // rede de segurança: se o transparente falhar, cai no fluxo antigo (modal CPF + redirect)
+      btn.textContent = txt; btn.disabled = false;
+      abrirPix(plano, btn, 'pix', extras);
+      return;
+    }
+    const $ = document.getElementById.bind(document);
+    if (j.brimg) $('qr-img').src = j.brimg;
+    $('qr-code').value = j.brcode;
+    $('qr-status').innerHTML = '⏳ Aguardando o pagamento…';
+    $('qr-status').style.color = 'var(--dim)';
+    $('qr-modal').classList.add('show');
+    // escuta o webhook marcar como pago
+    pararPoll();
+    qrPoll = setInterval(async ()=>{
+      try {
+        const s = await fetch('/api/checkout/status?id=' + encodeURIComponent(j.id)).then(x=>x.json());
+        if (s.status === 'pago'){
+          pararPoll();
+          const st = $('qr-status'); st.innerHTML = '✅ Pagamento confirmado! Liberando…'; st.style.color = 'var(--green)';
+          setTimeout(()=>location.href='/perfil?pago=1', 1200);
+        }
+      } catch(e){}
+    }, 3000);
+  } catch (e) {
+    btn.textContent = txt; btn.disabled = false;
+    abrirPix(plano, btn, 'pix', extras);   // fallback
+    return;
+  }
   btn.textContent = txt; btn.disabled = false;
 }
 
@@ -326,6 +388,16 @@ function abrirPix(plano, btn, metodo, extras){
 function fecharPix(){ $id('pix-modal').classList.remove('show'); }
 $id('pix-cancel').onclick = fecharPix;
 $id('pix-modal').addEventListener('click', e=>{ if(e.target.id==='pix-modal') fecharPix(); });
+
+// ---- modal do QR (Pix transparente) ----
+$id('qr-close').onclick = fecharQR;
+$id('qr-modal').addEventListener('click', e=>{ if(e.target.id==='qr-modal') fecharQR(); });
+$id('qr-copy').onclick = async ()=>{
+  const code = $id('qr-code').value;
+  try { await navigator.clipboard.writeText(code); }
+  catch(e){ $id('qr-code').select(); document.execCommand('copy'); }
+  const b = $id('qr-copy'); const t = b.textContent; b.textContent = '✅ Copiado'; setTimeout(()=>b.textContent=t, 1800);
+};
 
 $id('pix-cpf').addEventListener('input', e=>{
   let v = e.target.value.replace(/\D/g,'').slice(0,11);
@@ -423,7 +495,7 @@ document.querySelectorAll('[data-pay]').forEach(b=>{
     const plano = card.dataset.plano;                   // 'mensal'... ou 'valor' (add-on avulso)
     const bump = card.querySelector('[data-bump]');     // caixinha das Odds Erradas marcada?
     const extras = bump && bump.checked ? {addon:true} : {};
-    if (metodo === 'pix') abrirPix(plano, b, 'pix', extras); // Pix (v1) pede CPF no modal
+    if (metodo === 'pix') pagarPix2(plano, b, extras);  // Pix transparente: QR na nossa tela (cai no modal CPF se falhar)
     else pagar(plano, metodo, b, extras);               // Cartão (v2) coleta CPF na tela da AbacatePay
   });
 });
