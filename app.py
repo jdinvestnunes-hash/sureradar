@@ -1076,22 +1076,37 @@ def checkout_pix_transparente(request: Request, payload: dict = Body(...)):
         return JSONResponse({"erro": "AbacatePay não configurado"}, status_code=503)
     bump = _quer_bump(payload, plano)
     total = p["valor"] + (_combo_extra(plano) if bump else 0)
-    # Pra gerar o QR do Pix o `customer` é OPCIONAL — e mandar um parcial (sem taxId)
-    # faz o AbacatePay recusar ("Value should be one of 'object','object'"). Então NÃO
-    # mandamos customer: o QR sai igual e sem fricção. O comprador é identificado pelo
-    # nosso checkout (external_id = id da cobrança), que o webhook usa pra liberar.
-    body = {
-        "method": "PIX",
-        "data": {
-            "amount": int(round(total * 100)),
-            "description": "SureRadar " + p["nome"] + (" + Completo" if bump else ""),
-            "expiresIn": 3600,
-        },
-    }
+
+    def _montar_body(com_customer):
+        # Pra gerar o QR do Pix o `customer` é OPCIONAL. Mandar um customer PARCIAL
+        # (name/email sem taxId) faz o AbacatePay recusar ("Value should be one of
+        # 'object','object'"), mas REFERENCIAR um customer já criado pelo `id` funciona
+        # e faz o e-mail aparecer no painel. Se mesmo assim recusar, refaz sem customer.
+        b = {
+            "method": "PIX",
+            "data": {
+                "amount": int(round(total * 100)),
+                "description": "SureRadar " + p["nome"] + (" + Completo" if bump else ""),
+                "expiresIn": 3600,
+            },
+        }
+        if com_customer:
+            # O erro original ("one of 'object','object'") veio de `data.customer` parcial,
+            # ou seja: o campo é `customer` e aceita um union de {id} OU customer novo
+            # completo. Referenciar pelo id é a variante válida sem exigir CPF.
+            b["data"]["customer"] = {"id": com_customer}
+        return b
+
+    cid = _abacate_customer_id(user)      # cria/reusa customer só com email+nome (sem CPF)
     try:
-        r = requests.post(_ABACATE_V2 + "/transparents/create", json=body,
+        r = requests.post(_ABACATE_V2 + "/transparents/create", json=_montar_body(cid),
                           headers={"Authorization": "Bearer " + _abacate_v2_key()},
                           timeout=20)
+        if not r.ok and cid:              # recusou com o customer? tenta sem, pra não quebrar o QR
+            print(">> pix2 recusou COM customer:", r.status_code, "|", r.text[:200], "-> retry sem")
+            r = requests.post(_ABACATE_V2 + "/transparents/create", json=_montar_body(None),
+                              headers={"Authorization": "Bearer " + _abacate_v2_key()},
+                              timeout=20)
     except requests.RequestException as e:
         return JSONResponse({"erro": "falha de rede", "detalhe": str(e)[:120]}, status_code=502)
     if not r.ok:
