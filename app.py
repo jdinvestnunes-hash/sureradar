@@ -1123,6 +1123,140 @@ def checkout_pix_transparente(request: Request, payload: dict = Body(...)):
     return {"id": bid, "brcode": brcode, "brimg": brimg, "total": total}
 
 
+# ===========================================================================
+# Mercado Pago — CARTÃO TRANSPARENTE (inline, sem redirect). O Brick tokeniza o
+# cartão no navegador; aqui a gente só cria o pagamento com o token. Em TESTE:
+# MP_PUBLICO=0 => só admin usa (via /planos-teste). Vire 1 pra liberar na /planos.
+# ===========================================================================
+_MP_API = "https://api.mercadopago.com"
+
+
+def _mp_token():
+    return config.MERCADOPAGO_ACCESS_TOKEN
+
+
+def _mp_pode(user):
+    """(None) se pode usar o cartão MP, ou um JSONResponse de erro. Em teste
+    (MP_PUBLICO=0) só admin; com MP_PUBLICO=1, qualquer usuário logado."""
+    if not user:
+        return JSONResponse({"erro": "não autenticado"}, status_code=401)
+    if not config.MP_PUBLICO and not _admin_email(user):
+        return JSONResponse({"erro": "em teste — só admin"}, status_code=403)
+    if not _mp_token() or not config.MERCADOPAGO_PUBLIC_KEY:
+        return JSONResponse({"erro": "Mercado Pago não configurado"}, status_code=503)
+    return None
+
+
+@app.get("/api/checkout/mp/pubkey")
+def checkout_mp_pubkey(request: Request):
+    """Public key do MP (pro front iniciar o Brick) + tabela de planos e o e-mail
+    do usuário. Só quem pode usar o cartão MP recebe."""
+    user = _usuario(request)
+    erro = _mp_pode(user)
+    if erro:
+        return erro
+    planos = {k: {"nome": v["nome"], "valor": v["valor"],
+                  "parcelas": _max_parcelas(v["dias"])}
+              for k, v in config.PLANOS.items()}
+    return {"public_key": config.MERCADOPAGO_PUBLIC_KEY, "planos": planos,
+            "email": user.get("email", ""), "publico": bool(config.MP_PUBLICO)}
+
+
+@app.post("/api/checkout/cartao-mp")
+def checkout_cartao_mp(request: Request, payload: dict = Body(...)):
+    """Cartão TRANSPARENTE via Mercado Pago. O front (Brick) tokeniza o cartão no
+    navegador e manda só o `token`; aqui criamos o pagamento (/v1/payments) e, se
+    'approved', liberamos o PRO na hora. 'in_process' fica pendente (o webhook
+    resolve). O número do cartão NUNCA passa por aqui — só o token."""
+    import uuid
+    user = _usuario(request)
+    erro = _mp_pode(user)
+    if erro:
+        return erro
+    plano, p = _plano_valido(payload)
+    if not p:
+        return JSONResponse({"erro": "plano inválido"}, status_code=400)
+    token = (payload.get("token") or "").strip()
+    if not token:
+        return JSONResponse({"erro": "cartão não tokenizado"}, status_code=400)
+    bump = _quer_bump(payload, plano)
+    total = round(p["valor"] + (_combo_extra(plano) if bump else 0), 2)
+    try:
+        parcelas = int(payload.get("installments") or 1)
+    except (TypeError, ValueError):
+        parcelas = 1
+    parcelas = max(1, min(parcelas, _max_parcelas(p["dias"])))
+    payer = {"email": (payload.get("payer_email") or user.get("email") or "").strip()}
+    ident = payload.get("identification") or {}
+    if ident.get("number"):
+        payer["identification"] = {"type": ident.get("type") or "CPF",
+                                   "number": str(ident.get("number"))}
+    body = {
+        "transaction_amount": float(total),
+        "token": token,
+        "description": "SureRadar " + p["nome"] + (" + Completo" if bump else ""),
+        "installments": parcelas,
+        "payer": payer,
+        "external_reference": "sr-%s-%s%s" % (user["id"], plano, "-combo" if bump else ""),
+        "notification_url": config.SITE_URL + "/api/webhook/mercadopago",
+    }
+    for k in ("payment_method_id", "issuer_id"):   # o Brick manda os dois
+        if payload.get(k):
+            body[k] = payload[k]
+    try:
+        r = requests.post(_MP_API + "/v1/payments", json=body, timeout=20,
+                          headers={"Authorization": "Bearer " + _mp_token(),
+                                   "X-Idempotency-Key": str(uuid.uuid4()),
+                                   "Content-Type": "application/json"})
+    except requests.RequestException as e:
+        return JSONResponse({"erro": "falha de rede", "detalhe": str(e)[:120]}, status_code=502)
+    d = r.json() if r.content else {}
+    if not r.ok:
+        print(">> MP cartão RECUSOU:", r.status_code, "|", str(d)[:400])
+        return JSONResponse({"erro": "Mercado Pago recusou",
+                             "detalhe": str(d.get("message") or d)[:300]}, status_code=502)
+    pid = str(d.get("id") or "")
+    status = str(d.get("status") or "").lower()
+    detalhe = d.get("status_detail") or ""
+    if pid:
+        auth.checkout_registrar("mercadopago", pid, user["id"], plano, p["dias"],
+                                total, "cartao", addon="combo" if bump else None)
+        if status == "approved":
+            auth.checkout_pagar("mercadopago", pid)
+    return {"status": status, "detalhe": detalhe, "id": pid,
+            "aprovado": status == "approved", "total": total}
+
+
+@app.post("/api/webhook/mercadopago")
+async def webhook_mercadopago(request: Request):
+    """Notificação do Mercado Pago (topic=payment). Busca o pagamento na API (fonte
+    da verdade) e libera/estorna. Como a gente RE-CONSULTA o MP com o nosso token, um
+    webhook forjado no máximo nos faz reler um pagamento real — então dispensa HMAC."""
+    body = {}
+    try:
+        body = await request.json()
+    except Exception:
+        pass
+    qp = dict(request.query_params)
+    tipo = str(body.get("type") or body.get("topic") or qp.get("type") or qp.get("topic") or "")
+    pid = str((body.get("data") or {}).get("id") or body.get("id")
+              or qp.get("id") or qp.get("data.id") or "").strip()
+    if "payment" not in tipo.lower() or not pid or not _mp_token():
+        return {"ok": True}          # não é evento de pagamento (ou MP off): ignora
+    try:
+        r = requests.get(_MP_API + "/v1/payments/" + pid, timeout=15,
+                         headers={"Authorization": "Bearer " + _mp_token()})
+        d = r.json() if r.content else {}
+    except requests.RequestException:
+        return JSONResponse({"ok": False}, status_code=502)
+    status = str(d.get("status") or "").lower()
+    if status == "approved":
+        auth.checkout_pagar("mercadopago", pid)
+    elif status in ("refunded", "charged_back", "cancelled", "canceled"):
+        auth.checkout_revogar("mercadopago", pid)
+    return {"ok": True}
+
+
 @app.get("/api/checkout/status")
 def checkout_status(request: Request, id: str = ""):
     """Polling do Pix transparente: o front pergunta 'já caiu?'. Fonte da verdade é o
@@ -2805,6 +2939,18 @@ def tela_planos(request: Request):
     if not _usuario(request):
         return RedirectResponse("/login", status_code=302)
     return FileResponse(STATIC_DIR / "planos.html")
+
+
+@app.get("/planos-teste")
+def tela_planos_teste(request: Request):
+    """Página de TESTE do cartão Mercado Pago (transparente). Escondida: só admin vê.
+    Depois de validar, plugamos o mesmo fluxo na /planos (é só virar MP_PUBLICO=1)."""
+    user = _usuario(request)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+    if not _admin_email(user):
+        return RedirectResponse("/app", status_code=302)
+    return FileResponse(STATIC_DIR / "planos-teste.html")
 
 
 @app.get("/admin")
