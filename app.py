@@ -1076,17 +1076,16 @@ def checkout_pix_transparente(request: Request, payload: dict = Body(...)):
         return JSONResponse({"erro": "AbacatePay não configurado"}, status_code=503)
     bump = _quer_bump(payload, plano)
     total = p["valor"] + (_combo_extra(plano) if bump else 0)
-    customer = {"name": user["nome"], "email": user["email"]}
-    cel = _fmt_celular(user)
-    if cel:
-        customer["cellphone"] = cel
+    # Pra gerar o QR do Pix o `customer` é OPCIONAL — e mandar um parcial (sem taxId)
+    # faz o AbacatePay recusar ("Value should be one of 'object','object'"). Então NÃO
+    # mandamos customer: o QR sai igual e sem fricção. O comprador é identificado pelo
+    # nosso checkout (external_id = id da cobrança), que o webhook usa pra liberar.
     body = {
         "method": "PIX",
         "data": {
             "amount": int(round(total * 100)),
             "description": "SureRadar " + p["nome"] + (" + Completo" if bump else ""),
             "expiresIn": 3600,
-            "customer": customer,
         },
     }
     try:
