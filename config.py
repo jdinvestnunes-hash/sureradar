@@ -288,19 +288,6 @@ ABACATEPAY_API_KEY = os.getenv("ABACATEPAY_API_KEY", "").strip()
 ABACATEPAY_V2_API_KEY = os.getenv("ABACATEPAY_V2_API_KEY", "").strip()
 ABACATEPAY_WEBHOOK_SECRET = os.getenv("ABACATEPAY_WEBHOOK_SECRET", "").strip()
 
-# --- Mercado Pago (Checkout Transparente / cartão INLINE, sem redirect) ---
-# EM TESTE: comece com credenciais de TESTE (começam com TEST-). A public key vai
-# pro front (inicia o Brick do cartão); o access token fica SÓ no back. Gere as duas
-# em mercadopago.com.br/developers -> Suas integrações -> sua app -> Credenciais.
-MERCADOPAGO_ACCESS_TOKEN = os.getenv("MERCADOPAGO_ACCESS_TOKEN", "").strip()
-MERCADOPAGO_PUBLIC_KEY = os.getenv("MERCADOPAGO_PUBLIC_KEY", "").strip()
-# Segredo do webhook (Assinatura secreta no painel de Webhooks do MP) — valida que a
-# notificação veio mesmo do MP. Se vazio, o webhook aceita sem validar assinatura.
-MERCADOPAGO_WEBHOOK_SECRET = os.getenv("MERCADOPAGO_WEBHOOK_SECRET", "").strip()
-# Trava de rollout: 0 = só ADMIN usa o cartão MP (página /planos-teste, pra você
-# testar). Vire 1 quando quiser liberar o cartão MP pra TODO mundo na /planos.
-MP_PUBLICO = os.getenv("MP_PUBLICO", "0") not in ("0", "false", "False", "no", "")
-
 # E-mail transacional (Resend) — recuperar senha, etc.
 RESEND_API_KEY = os.getenv("RESEND_API_KEY", "").strip()
 # Fluxo de nutrição por e-mail (boas-vindas + nudges pró p/ quem não comprou).
