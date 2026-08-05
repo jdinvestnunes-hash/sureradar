@@ -178,7 +178,7 @@
       <h3>💸 Geraram e não pagaram <small id="pend-count"></small></h3>
       <p style="color:var(--text-dim);font-size:12.5px;margin:4px 0 12px">Checkouts (Pix + cartão) gerados sem pagamento — potencial de recuperação.</p>
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px">
-        <button class="btn b-pro" id="btn-recuperar-pendentes">📧 Recuperar (falta pouco — finalize)</button>
+        <button class="btn b-pro" id="btn-recuperar-pendentes">📧 Rodar recuperação agora</button>
         <button class="btn b-pro" id="btn-avisar-parcelamento">📧 Avisar que liberou o parcelamento (até 12x)</button>
         <span id="avisar-msg" style="font-size:12.5px;color:var(--text-dim)"></span>
       </div>
@@ -801,14 +801,14 @@ document.addEventListener("click", e=>{
 document.addEventListener("click", e=>{
   if(e.target.id!=="btn-recuperar-pendentes") return;
   const b=e.target, msg=$("#avisar-msg");
-  if(!confirm("Enviar o e-mail de recuperação ('faltou o pagamento — finalize') pra todos que geraram checkout e ainda NÃO são PRO?\n\nCada pessoa recebe só 1x. Seu e-mail e os de admin são excluídos automaticamente.")) return;
-  b.disabled=true; b.textContent="⏳ Disparando...";
+  if(!confirm("A recuperação JÁ é automática (1º e-mail ~1h após a pessoa gerar o checkout e não pagar).\n\nEste botão só força a régua rodar agora, sem esperar a próxima hora. Reusa o mesmo controle, então ninguém recebe e-mail dobrado.")) return;
+  b.disabled=true; b.textContent="⏳ Rodando...";
   fetch("/api/admin/recuperar-pendentes",{method:"POST"}).then(r=>r.json().then(j=>({ok:r.ok,j}))).then(({ok,j})=>{
-    b.disabled=false; b.textContent="📧 Recuperar (falta pouco — finalize)";
+    b.disabled=false; b.textContent="📧 Rodar recuperação agora";
     if(!ok){ msg.style.color="#ff6b6b"; msg.textContent="❌ "+(j.erro||"erro"); return; }
     msg.style.color="var(--green)";
-    msg.textContent=`✅ Enviando em 2º plano para até ${j.audiencia} pessoa(s). Quem já recebeu é pulado.`;
-  }).catch(()=>{ b.disabled=false; b.textContent="📧 Recuperar (falta pouco — finalize)"; msg.style.color="#ff6b6b"; msg.textContent="❌ erro de conexão"; });
+    msg.textContent=`✅ Régua rodando em 2º plano. ${j.audiencia} pessoa(s) elegível(is) agora (só recebe quem já passou de 1h e ainda não recebeu esta etapa).`;
+  }).catch(()=>{ b.disabled=false; b.textContent="📧 Rodar recuperação agora"; msg.style.color="#ff6b6b"; msg.textContent="❌ erro de conexão"; });
 });
 async function loadPendentes(){
   const box=$("#pendentes"); if(!box) return;
