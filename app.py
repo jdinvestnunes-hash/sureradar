@@ -1016,12 +1016,17 @@ def checkout_cartao(request: Request, payload: dict = Body(...)):
             print("!! produto do combo:", e)
             bump = False
     total = p["valor"] + (_combo_extra(plano) if bump else 0)
+    # O externalId CARREGA a composição do carrinho (plano + combo + total em centavos).
+    # Se fosse fixo por usuário+plano, o AbacatePay reaproveitava um checkout antigo:
+    # quem um dia gerou COM add-on continuava vendo o add-on mesmo pedindo só o plano.
+    ext_id = "sr-%s-%s%s-%d" % (user["id"], plano, "-combo" if bump else "",
+                                int(round(total * 100)))
     body = {
         "items": items,
         "methods": ["CARD"],
         "returnUrl": config.SITE_URL + "/planos",
         "completionUrl": config.SITE_URL + "/perfil?pago=1",
-        "externalId": "sr-" + str(user["id"]) + "-" + plano,
+        "externalId": ext_id,
         "card": {"maxInstallments": _max_parcelas(p["dias"])},
     }
     cid = _abacate_customer_id(user)      # pré-preenche email+nome na tela (best-effort)
