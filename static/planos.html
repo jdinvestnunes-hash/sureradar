@@ -57,7 +57,9 @@
     .btn:disabled{opacity:.6;cursor:wait}
     .pay-row{display:flex;gap:8px}
     .pay-row .btn{padding:13px 10px;font-size:14px}
-    .btn-pix{background:rgba(56,212,245,.12);color:var(--cyan);border:1px solid rgba(56,212,245,.45)}
+    .btn-pix{background:rgba(50,188,173,.12);color:#3fd6c4;border:1px solid rgba(50,188,173,.5)}
+    .pixico{width:16px;height:16px;fill:currentColor;flex-shrink:0}
+    .btn-pix .pixico{width:17px;height:17px}
     /* seletor de período (Mensal/Trimestral e Semestral/Anual) */
     .seg{display:flex;gap:4px;background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:4px;margin-bottom:16px}
     .seg-opt{flex:1;border:none;background:none;color:var(--dim);font-weight:700;font-size:12.5px;padding:8px 6px;border-radius:999px;cursor:pointer;font-family:var(--font-b);transition:.15s}
@@ -104,8 +106,24 @@
     .modal-err{color:#ff6b6b;font-size:13px;min-height:18px;margin-bottom:8px}
     .modal-actions{display:flex;gap:10px;justify-content:flex-end}
     .modal-actions .btn{width:auto}
-    .btn-pix:hover{background:rgba(56,212,245,.2)}
+    .btn-pix:hover{background:rgba(50,188,173,.22);border-color:rgba(50,188,173,.9)}
     .payback{margin-top:12px;font-size:12px;text-align:center;color:var(--gold);font-weight:700;min-height:16px}
+
+    /* ---- Modal do QR (Pix transparente) ---- */
+    .qr-modal{max-width:404px;text-align:center;max-height:92vh;overflow-y:auto}
+    .qr-head{display:flex;align-items:center;justify-content:center;gap:9px;margin-bottom:16px}
+    .qr-head .pixico{width:23px;height:23px;color:#32BCAD}
+    .qr-resumo{background:var(--bg);border:1px solid var(--line);border-radius:13px;padding:6px 14px;margin-bottom:16px;text-align:left}
+    .qr-resumo-row{display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:13px;padding:9px 0}
+    .qr-resumo-row+.qr-resumo-row{border-top:1px solid var(--line)}
+    .qr-resumo-row span{color:var(--mute);font-weight:600;flex-shrink:0}
+    .qr-resumo-row b{color:var(--text);font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .qr-resumo-row b.grad{font-family:var(--font-d)}
+    .qr-steps{text-align:left;margin:0 0 16px;padding:0;list-style:none;counter-reset:s}
+    .qr-steps li{counter-increment:s;position:relative;padding:5px 0 5px 32px;font-size:12.7px;color:var(--dim);line-height:1.5}
+    .qr-steps li::before{content:counter(s);position:absolute;left:0;top:3px;width:21px;height:21px;border-radius:50%;background:rgba(50,188,173,.15);color:#3fd6c4;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center}
+    .qr-steps li b{color:var(--text)}
+    .qr-or{font-size:11px;color:var(--mute);text-transform:uppercase;letter-spacing:.09em;font-weight:800;margin:4px 0 9px}
 
     .guarantee{display:flex;align-items:center;gap:14px;max-width:620px;margin:20px auto 0;background:var(--card);border:1px solid rgba(255,201,77,.3);border-radius:16px;padding:18px 22px}
     .guarantee svg{width:38px;height:38px;flex-shrink:0;color:var(--gold)}
@@ -120,6 +138,8 @@
   </style>
 </head>
 <body>
+<!-- logo oficial do Pix (BACEN) como símbolo reutilizável -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="pixlogo" viewBox="0 0 512 512"><path d="M242.4 292.5C247.8 287.1 257.1 287.1 262.5 292.5L339.5 369.5C353.7 383.7 372.6 391.5 392.6 391.5H407.7L310.6 488.6C280.3 518.1 231.1 518.1 200.8 488.6L103.3 391.2H112.6C132.6 391.2 151.5 383.4 165.7 369.2L242.4 292.5zM262.5 218.9C257.1 224.3 247.8 224.4 242.4 218.9L165.7 142.2C151.5 127.1 132.6 120.2 112.6 120.2H103.3L200.9 22.87C231.2-7.412 280.4-7.412 310.7 22.87L407.8 119.9H392.6C372.6 119.9 353.7 127.7 339.5 141.9L262.5 218.9zM112.6 142.7C126.4 142.7 139.1 148.3 149.7 158L226.4 234.7C233.6 241.9 243 245.5 252.5 245.5C261.9 245.5 271.4 241.9 278.6 234.7L355.6 157.7C365.3 148 378.9 142.5 392.6 142.5H430.3L488.6 200.8C518.9 231.1 518.9 280.3 488.6 310.6L430.3 368.9H392.6C378.9 368.9 365.3 363.3 355.6 353.7L278.6 276.7C264.7 262.8 240.3 262.7 226.4 276.7L149.7 353.4C139.1 363 126.4 368.6 112.6 368.6H74.94L16.62 310.3C-13.68 279.1-13.68 230.8 16.62 200.5L74.94 142.2L112.6 142.7z"/></symbol></svg>
 <nav><div class="wrap navin">
   <a class="brand" href="/app">
     <svg viewBox="0 0 32 32" fill="none"><defs><linearGradient id="g" x1="0" y1="0" x2="32" y2="32"><stop stop-color="#2EE6A8"/><stop offset="1" stop-color="#38D4F5"/></linearGradient></defs><circle cx="16" cy="16" r="13" stroke="url(#g)" stroke-width="2.4" opacity=".35"/><circle cx="16" cy="16" r="7.5" stroke="url(#g)" stroke-width="2.4" opacity=".7"/><circle cx="16" cy="16" r="2.5" fill="url(#g)"/><path d="M16 16 L27 8" stroke="url(#g)" stroke-width="2.4" stroke-linecap="round"/></svg>
@@ -177,7 +197,7 @@
       <div class="bump-free" data-bumpfree style="display:none">🚀&nbsp;<span><b>Odds Erradas + Apostas de Intervalo incluídas — GRÁTIS por 1 ano</b> no plano Anual. Os dois add-ons liberados junto, pelo ano inteiro, sem pagar nada a mais.</span></div>
       <div class="pay-row">
         <button class="btn btn-primary" data-pay="cartao">💳 Cartão</button>
-        <button class="btn btn-pix" data-pay="pix">⚡ Pix</button>
+        <button class="btn btn-pix" data-pay="pix"><svg class="pixico"><use href="#pixlogo"/></svg> Pix</button>
       </div>
       <div class="payback">💰 1 entrada de 5% já paga meses</div>
     </div>
@@ -205,7 +225,7 @@
       </label>
       <div class="pay-row">
         <button class="btn btn-ghost" data-pay="cartao">💳 Cartão</button>
-        <button class="btn btn-pix" data-pay="pix">⚡ Pix</button>
+        <button class="btn btn-pix" data-pay="pix"><svg class="pixico"><use href="#pixlogo"/></svg> Pix</button>
       </div>
       <div class="payback">💰 2 entradas de 5% pagam o mês</div>
     </div>
@@ -213,7 +233,7 @@
 
   <p style="text-align:center;color:var(--mute);font-size:12.5px;margin:6px 0 24px;line-height:1.6">
     💳 <b style="color:var(--dim)">Cartão</b> = parcele em até 12x (Anual).
-    &nbsp;·&nbsp; ⚡ <b style="color:var(--dim)">Pix</b> = à vista, aprovação na hora.
+    &nbsp;·&nbsp; <svg class="pixico" style="color:#3fd6c4;vertical-align:-2px"><use href="#pixlogo"/></svg> <b style="color:var(--dim)">Pix</b> = à vista, aprovação na hora.
   </p>
 
   <!-- ADD-ON AVULSO: pra quem já tem plano (ou só quer as odds erradas) -->
@@ -231,7 +251,7 @@
     </ul>
     <div class="pay-row">
       <button class="btn btn-valor" data-pay="cartao">💳 Cartão</button>
-      <button class="btn btn-pix" data-pay="pix">⚡ Pix</button>
+      <button class="btn btn-pix" data-pay="pix"><svg class="pixico"><use href="#pixlogo"/></svg> Pix</button>
     </div>
     <div class="addon-nota">Pagamento único de R$ 47 — não é assinatura, não renova sozinho.</div>
   </div>
@@ -251,7 +271,7 @@
     </ul>
     <div class="pay-row">
       <button class="btn btn-valor" data-pay="cartao">💳 Cartão</button>
-      <button class="btn btn-pix" data-pay="pix">⚡ Pix</button>
+      <button class="btn btn-pix" data-pay="pix"><svg class="pixico"><use href="#pixlogo"/></svg> Pix</button>
     </div>
     <div class="addon-nota">Pagamento único de R$ 97 — não é assinatura, não renova sozinho. No <b>Completo</b> vem junto do plano por bem menos.</div>
   </div>
@@ -283,17 +303,36 @@
 
 <!-- Pix TRANSPARENTE: o QR aparece aqui mesmo, sem sair do site -->
 <div class="modal-bg" id="qr-modal">
-  <div class="modal" style="max-width:380px;text-align:center">
-    <div class="modal-title" id="qr-title">⚡ Pague com Pix</div>
-    <div class="modal-sub" id="qr-sub">Abra o app do seu banco, aponte pro QR ou cole o código. A liberação é <b>na hora</b>.</div>
-    <div id="qr-img-wrap" style="background:#fff;border-radius:14px;padding:12px;display:inline-block;margin:4px auto 12px">
-      <img id="qr-img" alt="QR Code Pix" style="width:210px;height:210px;display:block" />
+  <div class="modal qr-modal">
+    <div class="qr-head">
+      <svg class="pixico"><use href="#pixlogo"/></svg>
+      <div class="modal-title">Pague com Pix</div>
     </div>
+
+    <!-- resumo da compra: plano + valor + conta -->
+    <div class="qr-resumo">
+      <div class="qr-resumo-row"><span>Plano</span><b id="qr-plano">—</b></div>
+      <div class="qr-resumo-row"><span>Valor</span><b id="qr-valor" class="grad">—</b></div>
+      <div class="qr-resumo-row"><span>Conta</span><b id="qr-email">—</b></div>
+    </div>
+
+    <!-- passo a passo pra quem nunca usou -->
+    <ol class="qr-steps">
+      <li>Abra o <b>app do seu banco</b></li>
+      <li>Entre em <b>Pix › Pagar com QR Code</b> (ou <b>Pix Copia e Cola</b>)</li>
+      <li>Aponte a câmera pro código abaixo <b>ou cole</b> o texto copiado</li>
+      <li>Confirme — a liberação do seu acesso é <b>automática, na hora</b></li>
+    </ol>
+
+    <div id="qr-img-wrap" style="background:#fff;border-radius:14px;padding:12px;display:inline-block;margin:2px auto 14px">
+      <img id="qr-img" alt="QR Code Pix" style="width:206px;height:206px;display:block" />
+    </div>
+    <div class="qr-or">ou copie o código Pix</div>
     <div id="qr-code-box" style="display:flex;gap:8px;align-items:stretch;margin-bottom:6px">
-      <input id="qr-code" readonly style="flex:1;min-width:0;font-size:12px;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.05);color:var(--txt);overflow:hidden;text-overflow:ellipsis" />
-      <button class="btn btn-primary" id="qr-copy" style="white-space:nowrap;padding:10px 14px">Copiar</button>
+      <input id="qr-code" readonly style="flex:1;min-width:0;font-size:12px;padding:11px;border-radius:10px;border:1px solid var(--line2);background:var(--bg);color:var(--dim);overflow:hidden;text-overflow:ellipsis" />
+      <button class="btn btn-primary" id="qr-copy" style="white-space:nowrap;padding:11px 16px">Copiar</button>
     </div>
-    <div id="qr-status" style="margin:12px 0 4px;font-size:14px;color:var(--dim)">⏳ Aguardando o pagamento…</div>
+    <div id="qr-status" style="margin:14px 0 4px;font-size:14px;color:var(--dim)">⏳ Aguardando o pagamento…</div>
     <div class="modal-actions" style="justify-content:center">
       <button class="btn btn-ghost" id="qr-close">Fechar</button>
     </div>
@@ -323,7 +362,7 @@ async function pagar(plano, metodo, btn, extras){
 let qrPoll = null;
 function pararPoll(){ if (qrPoll){ clearInterval(qrPoll); qrPoll = null; } }
 function fecharQR(){ pararPoll(); document.getElementById('qr-modal').classList.remove('show'); }
-async function pagarPix2(plano, btn, extras){
+async function pagarPix2(plano, btn, extras, label){
   const txt = btn.textContent; btn.textContent = '⏳ Gerando...'; btn.disabled = true;
   try {
     const body = Object.assign({plano}, extras || {});
@@ -342,6 +381,10 @@ async function pagarPix2(plano, btn, extras){
     const $ = document.getElementById.bind(document);
     if (j.brimg) $('qr-img').src = j.brimg;
     $('qr-code').value = j.brcode;
+    // resumo: plano + valor + conta (pra pessoa conferir o que está pagando)
+    $('qr-plano').textContent = label || NOMES[plano] || 'Plano PRO';
+    $('qr-valor').textContent = brl(j.total);
+    $('qr-email').textContent = ME_EMAIL || 'sua conta';
     $('qr-status').innerHTML = '⏳ Aguardando o pagamento…';
     $('qr-status').style.color = 'var(--dim)';
     $('qr-modal').classList.add('show');
@@ -369,7 +412,11 @@ async function pagarPix2(plano, btn, extras){
 const $id = s => document.getElementById(s);
 let pixCtx = null;
 let ME_WHATS = "";   // WhatsApp salvo no cadastro (prefill do celular no Pix)
-fetch("/api/me").then(r => r.ok ? r.json() : null).then(d => { if (d) ME_WHATS = (d.whatsapp || "").replace(/\D/g, ""); }).catch(() => {});
+let ME_EMAIL = "";   // e-mail da conta — mostrado no resumo do QR
+fetch("/api/me").then(r => r.ok ? r.json() : null).then(d => { if (d){ ME_WHATS = (d.whatsapp || "").replace(/\D/g, ""); ME_EMAIL = d.email || ""; } }).catch(() => {});
+// nomes amigáveis dos planos/add-ons pro resumo do QR
+const NOMES = { mensal:'PRO Mensal', trimestral:'PRO Trimestral', semestral:'PRO Semestral', anual:'PRO Anual', valor:'Odds Erradas das Casas', middle:'Apostas de Intervalo' };
+const brl = v => 'R$ ' + Number(v || 0).toFixed(2).replace('.', ',');
 // pré-cria o customer da AbacatePay (email preenchido + cartão mais rápido no clique)
 fetch("/api/checkout/prep").catch(() => {});
 function abrirPix(plano, btn, metodo, extras){
@@ -498,7 +545,8 @@ document.querySelectorAll('[data-pay]').forEach(b=>{
     const plano = card.dataset.plano;                   // 'mensal'... ou 'valor' (add-on avulso)
     const bump = card.querySelector('[data-bump]');     // caixinha das Odds Erradas marcada?
     const extras = bump && bump.checked ? {addon:true} : {};
-    if (metodo === 'pix') pagarPix2(plano, b, extras);  // Pix transparente: QR na nossa tela (cai no modal CPF se falhar)
+    const label = (NOMES[plano] || 'Plano PRO') + (extras.addon ? ' + Completo' : '');
+    if (metodo === 'pix') pagarPix2(plano, b, extras, label);  // Pix transparente: QR na nossa tela (cai no modal CPF se falhar)
     else pagar(plano, metodo, b, extras);               // Cartão (v2) coleta CPF na tela da AbacatePay
   });
 });
