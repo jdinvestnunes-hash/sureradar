@@ -332,8 +332,11 @@ async function pagarPix2(plano, btn, extras){
     if (r.status === 401){ toast('🔒 Faça login pra assinar.'); setTimeout(()=>location.href='/login?plano='+plano, 1200); btn.textContent=txt; btn.disabled=false; return; }
     if (!r.ok || !j.brcode){
       // rede de segurança: se o transparente falhar, cai no fluxo antigo (modal CPF + redirect)
+      console.warn('pix2 falhou:', r.status, j);
+      // mostra o motivo do AbacatePay por alguns segundos (diagnóstico) antes do fallback
+      toast('⚠️ Pix instantâneo indisponível — ' + (j.detalhe || j.erro || ('HTTP '+r.status)));
       btn.textContent = txt; btn.disabled = false;
-      abrirPix(plano, btn, 'pix', extras);
+      setTimeout(()=> abrirPix(plano, btn, 'pix', extras), 3500);
       return;
     }
     const $ = document.getElementById.bind(document);

@@ -1096,10 +1096,12 @@ def checkout_pix_transparente(request: Request, payload: dict = Body(...)):
     except requests.RequestException as e:
         return JSONResponse({"erro": "falha de rede", "detalhe": str(e)[:120]}, status_code=502)
     if not r.ok:
+        print(">> pix2 AbacatePay RECUSOU:", r.status_code, "|", r.text[:400])
         return JSONResponse({"erro": "AbacatePay recusou", "detalhe": r.text[:300]}, status_code=502)
     d = (r.json() or {}).get("data") or {}
     bid, brcode, brimg = d.get("id"), d.get("brCode"), d.get("brCodeBase64")
     if not bid or not brcode:
+        print(">> pix2 resposta inesperada:", str(r.text)[:400])
         return JSONResponse({"erro": "resposta inesperada do AbacatePay",
                              "detalhe": str(d)[:200]}, status_code=502)
     auth.checkout_registrar("abacatepay", bid, user["id"], plano, p["dias"], total, "pix",
