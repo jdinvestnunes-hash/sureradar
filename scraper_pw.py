@@ -16,6 +16,7 @@ Depois que provar aqui, a gente move isso pra um servidor (VPS) que roda 24h.
 import json
 import os
 import random
+import sys
 import time
 import requests
 from playwright.sync_api import sync_playwright
@@ -52,8 +53,8 @@ FAST_SEG = 75                  # segundos entre passadas RÁPIDAS (só a página
 VALOR_ATIVO = True             # liga/desliga a passada de ODDS DE VALOR (deixe True p/ raspar valuebets)
 MIDDLE_ATIVO = True            # liga/desliga a passada de APOSTAS DE INTERVALO (middles)
 MAX_PAGINAS = 40
-MIN_PROFIT = 0.70              # PARA quando o lucro chega aqui (lista é decrescente).
-                              # FREE = 0,70–1% · PRO = 1–25% · abaixo de 0,70 ignora.
+MIN_PROFIT = 1.0               # PARA quando o lucro chega aqui (lista é decrescente).
+                              # FREE = 1–2% · PRO = 2–25% · abaixo de 1% ignora.
 HEADLESS = False               # janela visível (pra você logar). Vira True no servidor.
 
 # Raspagem — mesma lógica da extensão, roda dentro da página.
@@ -524,10 +525,17 @@ def _limpar_lock():
 def _abrir_ctx(p):
     """Abre (ou reabre) o navegador persistente e devolve (ctx, page)."""
     _limpar_lock()
+    args = ["--disable-blink-features=AutomationControlled"]
+    if sys.platform.startswith("linux"):
+        # No VPS (Linux, rodando como root) o Chromium EXIGE --no-sandbox; e
+        # --disable-dev-shm-usage evita travadas/crash por /dev/shm pequeno no
+        # servidor. No Windows nada disso entra (comportamento idêntico ao de antes).
+        args += ["--no-sandbox", "--disable-setuid-sandbox",
+                 "--disable-dev-shm-usage", "--disable-gpu"]
     ctx = p.chromium.launch_persistent_context(
         PERFIL, headless=HEADLESS,
         viewport={"width": 1280, "height": 900},
-        args=["--disable-blink-features=AutomationControlled"],
+        args=args,
     )
     page = ctx.pages[0] if ctx.pages else ctx.new_page()
     return ctx, page
@@ -552,6 +560,11 @@ def main():
         print(" ROBÔ SUREBET (Playwright) — deixe a janela aberta.")
         print("=" * 60)
         prox_funda = 0.0            # 0 = faz a FUNDA já na 1ª volta (igual antes)
+        ciclos = 0                  # nº de varreduras FUNDAS feitas nesta sessão
+        RECICLA_A_CADA = 5          # recicla o navegador a cada N fundas (~50 min):
+                                    # fecha e reabre p/ liberar a memória que o Chromium
+                                    # acumula. É o que evita a "morte silenciosa" por OOM
+                                    # (o Windows matando o processo inteiro, sem erro).
         while True:
             # BLINDAGEM: se a janela foi fechada / o navegador travou, reabre sozinho
             # em vez de ficar errando pra sempre ou derrubar o processo.
@@ -586,6 +599,21 @@ def main():
                     except Exception as e:
                         print("!! erro nas middles (surebet NÃO afetada):", str(e)[:150])
                 prox_funda = time.time() + CICLO_MIN * 60
+                ciclos += 1
+                # RECICLA o navegador de tempos em tempos pra não acumular memória
+                # (evita o OOM que mata o processo silenciosamente). O login persiste
+                # no pw_profile, então reabrir NÃO pede login de novo.
+                if ciclos % RECICLA_A_CADA == 0:
+                    print(">> reciclando o navegador (libera memória, evita OOM)...")
+                    try:
+                        ctx.close()
+                    except Exception:
+                        pass
+                    try:
+                        ctx, page = _abrir_ctx(p)
+                        print(">> navegador reciclado.")
+                    except Exception as e:
+                        print("!! falha ao reciclar o navegador:", str(e)[:150])
                 print(f">> Funda ok. Passadas RÁPIDAS a cada {FAST_SEG}s; "
                       f"próxima funda em {CICLO_MIN} min.\n")
             else:

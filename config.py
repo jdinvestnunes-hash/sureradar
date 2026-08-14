@@ -135,15 +135,15 @@ BANCA = 1000.0              # banca por entrada (cada aposta divide estes R$)
 APENAS_DUAS_CASAS = True
 
 # Faixa de lucro do GRUPO FREE (%). O grupo grátis recebe só surebets nesta
-# faixa; acima de FREE_LUCRO_MAX fica reservado (futuro grupo pago/VIP).
-FREE_LUCRO_MIN = 0.0
+# faixa; acima de FREE_LUCRO_MAX (= piso do PRO) fica reservado ao PRO.
+FREE_LUCRO_MIN = 1.0
 FREE_LUCRO_MAX = 2.0
 
 # --- Divisão dos planos no painel ---
-# FREE: vê só uma AMOSTRA de entradas de até 1% (as N mais próximas de 1%).
+# FREE: vê só uma AMOSTRA de entradas de 1% a 2% (as N mais próximas de 2%).
 # PRO:  vê TODAS as entradas com lucro > PRO_LUCRO_MIN (%).
-FREE_MAX_ENTRADAS = 25     # FREE vê as 25 primeiras de 0 a 1%
-PRO_LUCRO_MIN = 1.0001     # PRO vê TUDO acima de 1% (até o teto são de 25%)
+FREE_MAX_ENTRADAS = 25     # FREE vê as 25 primeiras de 1% a 2%
+PRO_LUCRO_MIN = 2.0001     # PRO vê TUDO acima de 2% (até o teto de 25%)
 
 # Odds Erradas (add-on avulso): o não-pagante vê a lista TODA, mas só as N de MENOR
 # valor abertas (valor real de graça) — as maiores vêm borradas, o prêmio de quem

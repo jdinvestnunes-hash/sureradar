@@ -2609,30 +2609,31 @@ def surebets(
         return vals or None
 
     # Regra de plano (trava no SERVIDOR):
-    #   FREE -> só uma AMOSTRA de entradas de até 1% (as N mais próximas de 1%).
-    #   PRO  -> todas as entradas ACIMA de 1% (as que valem a pena de verdade).
+    #   FREE -> só uma AMOSTRA de entradas de 1% a 2% (as N mais próximas de 2%).
+    #   PRO  -> todas as entradas ACIMA de 2% (as que valem a pena de verdade).
     user = _usuario(request)
     is_free = _plano_efetivo(user) == "free"
     teto = max_profit if max_profit > 0 else None
     casas, esportes = parse(bookmakers), parse(sports)
 
     if is_free:
-        # Até 1% (respeitando um teto menor, se o usuário pediu), ordenadas por
-        # lucro desc; mostra só as N primeiras (mais próximas de 1%).
-        teto_free = min(teto, 1.0) if teto is not None else 1.0
+        # Faixa 1%–2% (respeitando o filtro do usuário), ordenada por lucro desc;
+        # mostra só as N primeiras (mais próximas de 2%).
+        piso_free = max(min_profit, config.FREE_LUCRO_MIN)
+        teto_free = min(teto, config.FREE_LUCRO_MAX) if teto is not None else config.FREE_LUCRO_MAX
         resultados = feed.get_surebets(
-            min_profit=min_profit, max_profit=teto_free,
+            min_profit=piso_free, max_profit=teto_free,
             bookmakers=casas, sports=esportes,
         )[: config.FREE_MAX_ENTRADAS]
     else:
-        # PRO: piso de 1% (nunca abaixo), mas respeita um mínimo maior do filtro.
+        # PRO: piso de 2% (nunca abaixo), mas respeita um mínimo maior do filtro.
         piso = max(min_profit, config.PRO_LUCRO_MIN)
         resultados = feed.get_surebets(
             min_profit=piso, max_profit=teto,
             bookmakers=casas, sports=esportes,
         )
 
-    # Teasers para o FREE: as ENTRADAS REAIS de alto lucro (>1%) que ele NÃO vê.
+    # Teasers para o FREE: as ENTRADAS REAIS de alto lucro (>2%) que ele NÃO vê.
     # Mostradas borradas no painel para dar vontade de assinar. Sem o link
     # (não dá pra executar sem o Pro), mas com o valor real do lucro.
     locked = []
