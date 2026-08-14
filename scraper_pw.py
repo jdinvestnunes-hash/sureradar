@@ -16,6 +16,7 @@ Depois que provar aqui, a gente move isso pra um servidor (VPS) que roda 24h.
 import json
 import os
 import random
+import signal
 import sys
 import time
 import requests
@@ -48,7 +49,7 @@ MAX_PAG_MIDDLE = 6            # middles já vêm filtradas nas suas casas — po
 MAX_MIDDLE = 150              # teto de segurança
 PERFIL = "pw_profile"          # sessão do Chrome fica salva aqui (login persiste)
 CICLO_MIN = 10                 # minutos entre varreduras FUNDAS (completa: todas as págs)
-FAST_SEG = 75                  # segundos entre passadas RÁPIDAS (só a página 1 = as de
+FAST_SEG = 45                  # segundos entre passadas RÁPIDAS (só a página 1 = as de
                                # maior lucro/mais frescas). É o "quase ao vivo".
 VALOR_ATIVO = True             # liga/desliga a passada de ODDS DE VALOR (deixe True p/ raspar valuebets)
 MIDDLE_ATIVO = True            # liga/desliga a passada de APOSTAS DE INTERVALO (middles)
@@ -556,6 +557,12 @@ def _ctx_vivo(page):
 def main():
     with sync_playwright() as p:
         ctx, page = _abrir_ctx(p)
+        # SIGTERM (systemd stop/restart) -> encerra COM CALMA: vira KeyboardInterrupt
+        # e o finally fecha o navegador (ctx.close), SALVANDO a sessão no pw_profile.
+        # Sem isso o Chromium morre a seco e o próximo start pede login de novo.
+        def _sair(signum, frame):
+            raise KeyboardInterrupt
+        signal.signal(signal.SIGTERM, _sair)
         print("=" * 60)
         print(" ROBÔ SUREBET (Playwright) — deixe a janela aberta.")
         print("=" * 60)
@@ -565,69 +572,77 @@ def main():
                                     # fecha e reabre p/ liberar a memória que o Chromium
                                     # acumula. É o que evita a "morte silenciosa" por OOM
                                     # (o Windows matando o processo inteiro, sem erro).
-        while True:
-            # BLINDAGEM: se a janela foi fechada / o navegador travou, reabre sozinho
-            # em vez de ficar errando pra sempre ou derrubar o processo.
-            if not _ctx_vivo(page):
-                print("!! navegador caiu (janela fechada/travou) — reabrindo sozinho...")
-                try:
-                    ctx.close()
-                except Exception:
-                    pass
-                try:
-                    ctx, page = _abrir_ctx(p)
-                    print(">> navegador reaberto.")
-                except Exception as e:
-                    print("!! não consegui reabrir agora:", str(e)[:150], "— tento em 30s.")
-                    time.sleep(30)
-                    continue
-
-            if time.time() >= prox_funda:
-                # --- VARREDURA FUNDA (completa): surebet + valor + middle ---
-                try:
-                    uma_varredura(page, ctx)             # PRINCIPAL: surebet (todas as págs)
-                except Exception as e:
-                    print("!! erro na varredura:", str(e)[:150])
-                if VALOR_ATIVO:                          # EXTRA: odds de valor (isolada)
-                    try:
-                        uma_varredura_valor(page, ctx)
-                    except Exception as e:
-                        print("!! erro nas valuebets (surebet NÃO afetada):", str(e)[:150])
-                if MIDDLE_ATIVO and _ctx_vivo(page):     # EXTRA: apostas de intervalo (isolada)
-                    try:
-                        uma_varredura_middle(page, ctx)
-                    except Exception as e:
-                        print("!! erro nas middles (surebet NÃO afetada):", str(e)[:150])
-                prox_funda = time.time() + CICLO_MIN * 60
-                ciclos += 1
-                # RECICLA o navegador de tempos em tempos pra não acumular memória
-                # (evita o OOM que mata o processo silenciosamente). O login persiste
-                # no pw_profile, então reabrir NÃO pede login de novo.
-                if ciclos % RECICLA_A_CADA == 0:
-                    print(">> reciclando o navegador (libera memória, evita OOM)...")
+        try:
+            while True:
+                # BLINDAGEM: se a janela foi fechada / o navegador travou, reabre sozinho
+                # em vez de ficar errando pra sempre ou derrubar o processo.
+                if not _ctx_vivo(page):
+                    print("!! navegador caiu (janela fechada/travou) — reabrindo sozinho...")
                     try:
                         ctx.close()
                     except Exception:
                         pass
                     try:
                         ctx, page = _abrir_ctx(p)
-                        print(">> navegador reciclado.")
+                        print(">> navegador reaberto.")
                     except Exception as e:
-                        print("!! falha ao reciclar o navegador:", str(e)[:150])
-                print(f">> Funda ok. Passadas RÁPIDAS a cada {FAST_SEG}s; "
-                      f"próxima funda em {CICLO_MIN} min.\n")
-            else:
-                # --- PASSADA RÁPIDA (só página 1) — o "quase ao vivo" ---
-                try:
-                    uma_varredura_rapida(page, ctx)
-                except Exception as e:
-                    print("!! erro na passada rápida (surebet NÃO afetada):", str(e)[:150])
+                        print("!! não consegui reabrir agora:", str(e)[:150], "— tento em 30s.")
+                        time.sleep(30)
+                        continue
 
-            # Se o navegador morreu no meio, reabre JÁ (não espera o timer).
-            if not _ctx_vivo(page):
-                print("!! navegador morreu durante a varredura — reabrindo já.")
-                continue
-            time.sleep(FAST_SEG)
+                if time.time() >= prox_funda:
+                    # --- VARREDURA FUNDA (completa): surebet + valor + middle ---
+                    try:
+                        uma_varredura(page, ctx)             # PRINCIPAL: surebet (todas as págs)
+                    except Exception as e:
+                        print("!! erro na varredura:", str(e)[:150])
+                    if VALOR_ATIVO:                          # EXTRA: odds de valor (isolada)
+                        try:
+                            uma_varredura_valor(page, ctx)
+                        except Exception as e:
+                            print("!! erro nas valuebets (surebet NÃO afetada):", str(e)[:150])
+                    if MIDDLE_ATIVO and _ctx_vivo(page):     # EXTRA: apostas de intervalo (isolada)
+                        try:
+                            uma_varredura_middle(page, ctx)
+                        except Exception as e:
+                            print("!! erro nas middles (surebet NÃO afetada):", str(e)[:150])
+                    prox_funda = time.time() + CICLO_MIN * 60
+                    ciclos += 1
+                    # RECICLA o navegador de tempos em tempos pra não acumular memória
+                    # (evita o OOM que mata o processo silenciosamente). O login persiste
+                    # no pw_profile, então reabrir NÃO pede login de novo.
+                    if ciclos % RECICLA_A_CADA == 0:
+                        print(">> reciclando o navegador (libera memória, evita OOM)...")
+                        try:
+                            ctx.close()
+                        except Exception:
+                            pass
+                        try:
+                            ctx, page = _abrir_ctx(p)
+                            print(">> navegador reciclado.")
+                        except Exception as e:
+                            print("!! falha ao reciclar o navegador:", str(e)[:150])
+                    print(f">> Funda ok. Passadas RÁPIDAS a cada {FAST_SEG}s; "
+                          f"próxima funda em {CICLO_MIN} min.\n")
+                else:
+                    # --- PASSADA RÁPIDA (só página 1) — o "quase ao vivo" ---
+                    try:
+                        uma_varredura_rapida(page, ctx)
+                    except Exception as e:
+                        print("!! erro na passada rápida (surebet NÃO afetada):", str(e)[:150])
+
+                # Se o navegador morreu no meio, reabre JÁ (não espera o timer).
+                if not _ctx_vivo(page):
+                    print("!! navegador morreu durante a varredura — reabrindo já.")
+                    continue
+                time.sleep(FAST_SEG)
+        except KeyboardInterrupt:
+            print(">> Encerrando (SIGTERM): fechando o navegador p/ SALVAR a sessão…")
+        finally:
+            try:
+                ctx.close()   # flush dos cookies -> próximo start NÃO pede login
+            except Exception:
+                pass
 
 
 if __name__ == "__main__":
