@@ -222,6 +222,13 @@ TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "").strip()
 # Pegue o seu chat_id mandando qualquer mensagem pro bot e vendo em /api/admin/telegram-chats.
 ADMIN_TELEGRAM_CHAT_ID = os.getenv("ADMIN_TELEGRAM_CHAT_ID", "").strip()
 
+# --- GUARDIÃO do robô (vigia na nuvem: alerta de queda + comandos /ligar /desligar) ---
+# Liga o guardião (thread na Railway que fica de olho na idade do feed e escuta o bot).
+GUARDIAO_ATIVO = os.getenv("GUARDIAO_ATIVO", "1").strip() not in ("0", "false", "False", "")
+# Minutos SEM dados novos até te alertar "CAIU" no Telegram. 15 = seguro (o robô
+# atualiza a cada ~1 min, então 15 min parado é certeza de queda, sem alarme falso).
+ROBO_ALERTA_MIN = int(os.getenv("ROBO_ALERTA_MIN", "15"))
+
 # Alertas personalizados no Telegram (surebet que bate com os filtros do usuário
 # cai na DM dele). BETA: liberado só para estes e-mails (separados por vírgula).
 # Ex.: ALERTA_BETA_EMAILS=leosaper12@gmail.com

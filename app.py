@@ -46,6 +46,7 @@ import auth
 import config
 import emailer
 import feed
+import guardiao
 import lifecycle
 import meta_ads
 import notifier
@@ -142,6 +143,10 @@ async def lifespan(app):
         alertas.iniciar()             # alertas personalizados de surebet na DM (PRO)
     except Exception as e:
         print(f"!! Alertas Telegram não iniciaram: {e}")
+    try:
+        guardiao.iniciar()            # vigia na nuvem: alerta de queda + comandos /ligar /desligar
+    except Exception as e:
+        print(f"!! Guardião do robô não iniciou: {e}")
     try:                              # cria/cacheia produtos p/ o cartão parcelado ser rápido
         import threading as _th        # em thread p/ NÃO travar o boot (healthcheck do Railway)
         _th.Thread(target=_abacate_prewarm_produtos, name="abacate-prewarm", daemon=True).start()
@@ -154,6 +159,7 @@ async def lifespan(app):
     recuperacao.parar()
     tg_tracker.parar()
     alertas.parar()
+    guardiao.parar()
 
 
 app = FastAPI(title="Surebet SaaS", version="0.1.0", lifespan=lifespan)
@@ -501,6 +507,18 @@ def google_callback(request: Request, background_tasks: BackgroundTasks, code: s
     resp = RedirectResponse("/app", status_code=302)
     resp.delete_cookie("g_state", path="/")
     return _com_sessao(resp, user["id"])
+
+
+@app.get("/api/robo/estado")
+def robo_estado():
+    """Lido pelo vigia do PC a cada minuto. Só-leitura (o controle liga/desliga é
+    pelo Telegram, travado no seu chat). Diz se o robô DEVE rodar e a idade do feed
+    — o vigia usa isso pra: (a) obedecer o interruptor, (b) religar se virou zumbi."""
+    try:
+        idade = feed.status().get("idade_seg")
+    except Exception:
+        idade = None
+    return {"ligado": guardiao.robo_ligado(), "idade_seg": idade}
 
 
 @app.get("/api/health")

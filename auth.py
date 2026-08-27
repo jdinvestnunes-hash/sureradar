@@ -275,6 +275,11 @@ def init():
             entradas INTEGER DEFAULT 0,
             ultima_isca REAL DEFAULT 0,
             ultima_entrada REAL DEFAULT 0)""")
+        # KV genérico do app (persiste entre deploys). Ex.: interruptor liga/desliga
+        # do robô controlado pelo Telegram/vigia (chave 'robo_ligado').
+        c.execute("""CREATE TABLE IF NOT EXISTS app_flags(
+            chave TEXT PRIMARY KEY,
+            valor TEXT)""")
     # Migrações leves para bancos antigos: cada ALTER na SUA transação (no
     # Postgres, um erro aborta a transação inteira). Erro = coluna já existe.
     for tabela, coluna in [("checkouts", "pi TEXT"),
@@ -1323,6 +1328,33 @@ def feed_cache_set(bets):
                           (dados, agora))
     except Exception as e:
         print("!! feed_cache_set:", e)
+
+
+def flag_get(chave, default=None):
+    """Lê um flag do KV app_flags (string) — ou `default` se não existir."""
+    try:
+        with _db() as c:
+            row = c.execute(_q("SELECT valor FROM app_flags WHERE chave=?"), (chave,)).fetchone()
+        if row:
+            return row["valor"]
+    except Exception as e:
+        print("!! flag_get:", e)
+    return default
+
+
+def flag_set(chave, valor):
+    """Grava um flag no KV app_flags (persiste entre deploys)."""
+    try:
+        with _db() as c:
+            if PG:
+                c.execute(_q("""INSERT INTO app_flags(chave,valor) VALUES(?,?)
+                               ON CONFLICT (chave) DO UPDATE SET valor=EXCLUDED.valor"""),
+                          (chave, str(valor)))
+            else:
+                c.execute("INSERT OR REPLACE INTO app_flags(chave,valor) VALUES(?,?)",
+                          (chave, str(valor)))
+    except Exception as e:
+        print("!! flag_set:", e)
 
 
 # Cache das ODDS ERRADAS (valuebets) — linha id=4 da mesma tabela feed_cache.
