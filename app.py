@@ -586,6 +586,19 @@ def _plano_valido(payload):
     return plano, config.PLANOS.get(plano)
 
 
+def _preco_promo_anual(user, plano, p):
+    """Se o plano é ANUAL e a pessoa tem a janela de promo ABERTA, devolve uma cópia
+    do plano com o preço promocional (config.PROMO_ANUAL_VALOR). O SERVIDOR manda no
+    preço: o desconto só existe enquanto a janela dela estiver ativa — o front não
+    consegue forçar 397. Continua plano='anual', então o _liberar_compra entrega os
+    365 dias + os 2 add-ons de brinde normalmente."""
+    if plano == "anual" and user and auth.promo_anual_status(user["id"])["ativa"]:
+        pp = dict(p)
+        pp["valor"] = float(config.PROMO_ANUAL_VALOR)
+        return pp
+    return p
+
+
 def _quer_bump(payload, plano):
     """Marcou a caixinha do COMBO 'Completo' (Odds Erradas + Apostas de Intervalo)
     junto do plano? Só faz sentido junto de um PLANO da tabela PLANOS, e não no anual
@@ -675,6 +688,7 @@ def checkout_stripe(request: Request, payload: dict = Body(...)):
     plano, p = _plano_valido(payload)
     if not p:
         return JSONResponse({"erro": "plano inválido"}, status_code=400)
+    p = _preco_promo_anual(user, plano, p)             # Anual com desconto se a promo dela está ativa
     if not config.STRIPE_SECRET_KEY:
         return JSONResponse({"erro": "Stripe não configurado"}, status_code=503)
     # PAGAMENTO ÚNICO com parcelamento no cartão (Stripe Brasil). Mensal = à vista;
@@ -831,6 +845,7 @@ def checkout_pix(request: Request, payload: dict = Body(...)):
     plano, p = _plano_valido(payload)
     if not p:
         return JSONResponse({"erro": "plano inválido"}, status_code=400)
+    p = _preco_promo_anual(user, plano, p)             # Anual com desconto se a promo dela está ativa
     if not config.ABACATEPAY_API_KEY:
         return JSONResponse({"erro": "AbacatePay não configurado"}, status_code=503)
     # A v1 exige customer COMPLETO (name, email, cellphone, taxId/CPF). O front
@@ -1018,6 +1033,7 @@ def checkout_cartao(request: Request, payload: dict = Body(...)):
     plano, p = _plano_valido(payload)
     if not p:
         return JSONResponse({"erro": "plano inválido"}, status_code=400)
+    p = _preco_promo_anual(user, plano, p)             # Anual com desconto se a promo dela está ativa
     if not _abacate_v2_key():
         return JSONResponse({"erro": "AbacatePay não configurado"}, status_code=503)
     try:
@@ -1090,6 +1106,7 @@ def checkout_pix_transparente(request: Request, payload: dict = Body(...)):
     plano, p = _plano_valido(payload)
     if not p:
         return JSONResponse({"erro": "plano inválido"}, status_code=400)
+    p = _preco_promo_anual(user, plano, p)             # Anual com desconto se a promo dela está ativa
     if not _abacate_v2_key():
         return JSONResponse({"erro": "AbacatePay não configurado"}, status_code=503)
     bump = _quer_bump(payload, plano)
@@ -1162,6 +1179,37 @@ def checkout_prep(request: Request):
     if not user or not _abacate_v2_key():
         return {"ok": False}
     return {"ok": bool(_abacate_customer_id(user))}
+
+
+def _promo_anual_payload(st):
+    """Formata o estado da promo pro front (valores + preços já resolvidos)."""
+    return {
+        "ativa": st["ativa"],
+        "restante_seg": st["restante_seg"],
+        "de": config.PLANOS["anual"]["valor"],       # 497 (preço cheio)
+        "por": config.PROMO_ANUAL_VALOR,              # 397 (promo)
+    }
+
+
+@app.get("/api/promo/anual")
+def promo_anual_ler(request: Request):
+    """SÓ leitura — usado pelo /perfil pra mostrar o timer da promo (se ainda aberta)."""
+    user = _usuario(request)
+    if not user:
+        return {"ativa": False}
+    return _promo_anual_payload(auth.promo_anual_status(user["id"]))
+
+
+@app.post("/api/promo/anual/abrir")
+def promo_anual_abrir_ep(request: Request):
+    """Chamado quando a pessoa clica pra gerar Pix/cartão do MENSAL: abre (ou
+    reaproveita) a janela do Anual com desconto e devolve o estado pro popup.
+    Em cooldown (já pegou a promo nos últimos PROMO_ANUAL_DIAS dias) devolve inativa
+    e o front segue direto pro checkout do mensal, sem popup."""
+    user = _usuario(request)
+    if not user:
+        return {"ativa": False}
+    return _promo_anual_payload(auth.promo_anual_abrir(user["id"]))
 
 
 @app.post("/api/webhook/abacatepay")

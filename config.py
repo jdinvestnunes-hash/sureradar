@@ -263,11 +263,20 @@ SITE_URL = os.getenv("SITE_URL", "https://sureradar.site").strip()
 # Pagamento único que libera N dias de PRO (renovação manual, com aviso). Não é
 # assinatura recorrente por enquanto — casa com o modelo de dias_restantes.
 PLANOS = {
-    "mensal":     {"nome": "Pro Mensal",     "dias": 30,  "valor": 147.0},
+    "mensal":     {"nome": "Pro Mensal",     "dias": 30,  "valor": 197.0},
     "trimestral": {"nome": "Pro Trimestral", "dias": 90,  "valor": 237.0},
     "semestral":  {"nome": "Pro Semestral",  "dias": 180, "valor": 387.0},
     "anual":      {"nome": "Pro Anual",      "dias": 365, "valor": 497.0},
 }
+
+# --- PROMO ANUAL (popup no checkout do Mensal) ---
+# Quando a pessoa vai gerar Pix/cartão do MENSAL, abre uma janela-relâmpago pra
+# levar o Anual (de R$497) com desconto. O timer fica no perfil e SOBREVIVE a
+# fechar a aba (mora no banco). Só reaparece a cada PROMO_ANUAL_DIAS por pessoa.
+# O servidor manda no preço: o desconto SÓ sai enquanto a janela dela está aberta.
+PROMO_ANUAL_VALOR = float(os.getenv("PROMO_ANUAL_VALOR", "397"))   # de 497 por 397
+PROMO_ANUAL_MIN = int(os.getenv("PROMO_ANUAL_MIN", "10"))          # janela de 10 min
+PROMO_ANUAL_DIAS = int(os.getenv("PROMO_ANUAL_DIAS", "7"))         # recorre a cada 7 dias
 
 # ADD-ON "Odds Erradas das Casas" (valuebets). Vendido À PARTE do plano: como
 # ORDER BUMP no checkout (caixinha marcável) ou avulso. Pagamento único que libera

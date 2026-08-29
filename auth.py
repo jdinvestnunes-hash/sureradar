@@ -1357,6 +1357,50 @@ def flag_set(chave, valor):
         print("!! flag_set:", e)
 
 
+# ---------------------------------------------------------------------------
+# PROMO ANUAL (popup no checkout do Mensal). Guardada no KV app_flags, por
+# usuário, em duas chaves:
+#   promo_ate:<uid> -> epoch em que a janela de desconto FECHA (drive do timer)
+#   promo_ini:<uid> -> epoch da ÚLTIMA abertura (respeita a recorrência de N dias)
+# ---------------------------------------------------------------------------
+def _promo_epoch(chave):
+    try:
+        return float(flag_get(chave, 0) or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def promo_anual_status(user_id):
+    """Estado da promo (SÓ leitura). {ativa, expira, restante_seg}. 'ativa' = a
+    janela de desconto ainda está aberta (agora < promo_ate)."""
+    ate = _promo_epoch("promo_ate:%d" % int(user_id))
+    restante = int(ate - time.time())
+    return {"ativa": restante > 0, "expira": ate, "restante_seg": max(0, restante)}
+
+
+def promo_anual_abrir(user_id):
+    """Chamado quando a pessoa vai gerar Pix/cartão do MENSAL. Abre a janela do
+    Anual com desconto, respeitando as regras:
+      - se JÁ há janela ativa, devolve ela (NÃO reinicia o timer a cada clique);
+      - se a última abertura foi há menos de PROMO_ANUAL_DIAS, fica em cooldown
+        (não reabre) e devolve inativa — a pessoa segue direto pro Mensal;
+      - senão, abre uma janela nova de PROMO_ANUAL_MIN minutos.
+    Devolve o mesmo dict de promo_anual_status."""
+    import config
+    uid = int(user_id)
+    st = promo_anual_status(uid)
+    if st["ativa"]:
+        return st
+    agora = time.time()
+    ini = _promo_epoch("promo_ini:%d" % uid)
+    if ini and (agora - ini) < config.PROMO_ANUAL_DIAS * 86400:
+        return st                                   # ainda em cooldown -> sem popup
+    ate = agora + config.PROMO_ANUAL_MIN * 60
+    flag_set("promo_ini:%d" % uid, agora)
+    flag_set("promo_ate:%d" % uid, ate)
+    return promo_anual_status(uid)
+
+
 # Cache das ODDS ERRADAS (valuebets) — linha id=4 da mesma tabela feed_cache.
 # Sobrevive a redeploys igual às surebets: o feed em memória zera no restart e a
 # gente restaura no startup, então o painel nunca fica vazio depois de um deploy.

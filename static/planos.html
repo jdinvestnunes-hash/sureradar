@@ -209,7 +209,7 @@
         <button class="seg-opt on" data-plan="mensal">Mensal</button>
         <button class="seg-opt" data-plan="trimestral">Trimestral</button>
       </div>
-      <div class="price" data-price>R$ 147<small>/mês</small></div>
+      <div class="price" data-price>R$ 197<small>/mês</small></div>
       <div class="pnote" data-note>pagamento à vista</div>
       <ul>
         <li><span class="ck">✓</span> <b>TODAS as entradas — 1% a 20%+</b></li>
@@ -336,6 +336,32 @@
     <div class="modal-actions" style="justify-content:center">
       <button class="btn btn-ghost" id="qr-close">Fechar</button>
     </div>
+  </div>
+</div>
+
+<!-- POPUP da promo relâmpago do Anual (intercepta o clique de gerar Pix/cartão do Mensal) -->
+<div class="modal-bg" id="promo-modal">
+  <div class="modal" style="max-width:440px;text-align:center;border-color:rgba(255,201,77,.5);background:linear-gradient(170deg,rgba(255,201,77,.10),var(--card) 55%)">
+    <div style="font-size:12px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--gold)">🔥 Só agora · entra uma vez</div>
+    <div class="modal-title" style="margin-top:10px;font-size:23px">Antes de ir no Mensal…<br>leve o <span class="grad">Anual com desconto</span></div>
+    <p class="modal-sub" style="margin:12px 0 18px">O <b style="color:var(--text)">mesmo acesso</b> por <b style="color:var(--text)">1 ano inteiro</b> — e ainda ganha os <b style="color:var(--text)">2 add-ons de brinde</b>. Essa oferta some quando o timer zerar.</p>
+
+    <div style="display:flex;align-items:baseline;justify-content:center;gap:12px;margin-bottom:6px">
+      <span style="font-size:20px;color:var(--mute);text-decoration:line-through">R$ 497</span>
+      <span class="price grad" style="font-size:46px;margin:0">R$ 397</span>
+    </div>
+    <div class="pnote" style="text-align:center;margin-bottom:16px">💳 <b style="color:var(--dim)">12x de R$ 33</b> sem juros · <span class="save">economize R$ 100</span></div>
+
+    <div style="background:var(--bg);border:1px solid rgba(255,201,77,.4);border-radius:13px;padding:12px;margin-bottom:18px">
+      <div style="font-size:12px;color:var(--mute);text-transform:uppercase;letter-spacing:.08em;font-weight:800">Expira em</div>
+      <div id="promo-timer" style="font-family:var(--font-d);font-size:34px;font-weight:800;color:var(--gold);letter-spacing:.02em">10:00</div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <button class="btn btn-primary" id="promo-sim" style="background:linear-gradient(112deg,#ffc94d,#ffb020);color:#2a1c00">Quero o Anual por R$ 397 →</button>
+      <button class="btn btn-ghost" id="promo-nao" style="width:100%">Continuar no Mensal (R$ 197)</button>
+    </div>
+    <p style="font-size:11.5px;color:var(--mute);margin-top:12px">Se fechar, o timer continua rodando no seu <b style="color:var(--dim)">perfil</b> — dá pra voltar e pegar antes de zerar.</p>
   </div>
 </div>
 
@@ -485,7 +511,7 @@ $id('pix-go').onclick = ()=>{
 
 // ---- Seletor de período (Mensal/Trimestral · Semestral/Anual) ----
 const PLANOS = {
-  mensal:     { price:'R$ 147<small>/mês</small>',        note:'pagamento à vista', badge:'', combo:97 },
+  mensal:     { price:'R$ 197<small>/mês</small>',        note:'pagamento à vista', badge:'', combo:97 },
   trimestral: { price:'R$ 237<small>/trimestre</small>', note:'sai por <b>R$ 79/mês</b> · <span class="save">46% OFF</span> · 💳 parcele no cartão', badge:'💚 46% OFF', combo:127 },
   semestral:  { price:'R$ 387<small>/semestre</small>',  note:'sai por <b>R$ 64,50/mês</b> · <span class="save">56% OFF</span> · 💳 parcele no cartão', badge:'💚 56% OFF', combo:177 },
   anual:      { price:'R$ 497<small>/ano</small>',        note:'sai por <b>R$ 41/mês</b> · <span class="save">economize R$ 1.267</span> · 💳 <b>até 12x no cartão</b>', badge:'⭐ MAIS VANTAJOSO · 72% OFF', combo:0 },
@@ -538,6 +564,47 @@ document.querySelectorAll('.plan[data-plano]').forEach(c=> setPlano(c, c.dataset
   }
 })();
 
+function irCheckout(plano, metodo, btn, extras, label){
+  if (metodo === 'pix') pagarPix2(plano, btn, extras, label);  // Pix transparente: QR na nossa tela (cai no modal CPF se falhar)
+  else pagar(plano, metodo, btn, extras);               // Cartão (v2) coleta CPF na tela da AbacatePay
+}
+
+// ---- Popup relâmpago do Anual (aparece ao gerar Pix/cartão do MENSAL) ----
+let promoJaMostrada = false;   // 1x por sessão — não fica atazanando quem já decidiu
+let promoTimerInt = null;
+function fmtMMSS(seg){ seg=Math.max(0,seg|0); return String((seg/60)|0).padStart(2,'0')+':'+String(seg%60).padStart(2,'0'); }
+function pararPromoTimer(){ if(promoTimerInt){ clearInterval(promoTimerInt); promoTimerInt=null; } }
+function fecharPromo(){ pararPromoTimer(); $id('promo-modal').classList.remove('show'); }
+function abrirPromoModal(restante, onSim, onNao){
+  let r = restante;
+  $id('promo-timer').textContent = fmtMMSS(r);
+  pararPromoTimer();
+  promoTimerInt = setInterval(()=>{
+    r--; $id('promo-timer').textContent = fmtMMSS(r);
+    if (r <= 0) fecharPromo();                          // zerou: some a oferta (sem comprar nada)
+  }, 1000);
+  $id('promo-sim').onclick = ()=>{ fecharPromo(); onSim(); };
+  $id('promo-nao').onclick = ()=>{ fecharPromo(); if(onNao) onNao(); };
+  $id('promo-modal').classList.add('show');
+}
+$id('promo-modal').addEventListener('click', e=>{ if(e.target.id==='promo-modal') fecharPromo(); });
+
+async function tentarPromoMensal(btn, metodo, extras, label){
+  // pergunta ao servidor se a promo dela pode abrir (respeita cooldown de 7 dias)
+  const txt = btn.textContent; btn.disabled = true; btn.textContent = '⏳';
+  let st = null;
+  try { st = await fetch('/api/promo/anual/abrir', {method:'POST'}).then(r=>r.json()); } catch(e){}
+  btn.disabled = false; btn.textContent = txt;
+  if (st && st.ativa && st.restante_seg > 0){
+    promoJaMostrada = true;
+    abrirPromoModal(st.restante_seg,
+      ()=> irCheckout('anual', metodo, btn, {}, 'PRO Anual (promoção)'),   // SIM: leva o Anual, mesmo método
+      ()=> irCheckout('mensal', metodo, btn, extras, label));             // NÃO: segue no mensal como pediu
+  } else {
+    irCheckout('mensal', metodo, btn, extras, label);                     // cooldown/erro: mensal direto
+  }
+}
+
 document.querySelectorAll('[data-pay]').forEach(b=>{
   b.addEventListener('click', ()=>{
     const metodo = b.dataset.pay;                       // 'cartao' | 'pix'
@@ -546,10 +613,29 @@ document.querySelectorAll('[data-pay]').forEach(b=>{
     const bump = card.querySelector('[data-bump]');     // caixinha das Odds Erradas marcada?
     const extras = bump && bump.checked ? {addon:true} : {};
     const label = (NOMES[plano] || 'Plano PRO') + (extras.addon ? ' + Completo' : '');
-    if (metodo === 'pix') pagarPix2(plano, b, extras, label);  // Pix transparente: QR na nossa tela (cai no modal CPF se falhar)
-    else pagar(plano, metodo, b, extras);               // Cartão (v2) coleta CPF na tela da AbacatePay
+    // MENSAL: oferece o Anual com desconto ANTES (1x por sessão). O botão do Mensal
+    // NÃO trava — se ela recusar (ou estiver em cooldown), segue direto pro mensal.
+    if (plano === 'mensal' && !promoJaMostrada){ tentarPromoMensal(b, metodo, extras, label); return; }
+    irCheckout(plano, metodo, b, extras, label);
   });
 });
+
+// ---- Veio do PERFIL pelo botão "Garantir o Anual" (/planos?promo=anual): reabre o
+//      popup se a janela ainda estiver de pé; SIM rola pro card do Anual (Pix ou cartão,
+//      os dois já saem por R$397 enquanto a janela dela está aberta). ----
+(function(){
+  if (new URLSearchParams(location.search).get('promo') !== 'anual') return;
+  fetch('/api/promo/anual').then(r=>r.json()).then(st=>{
+    if (!st || !st.ativa || st.restante_seg <= 0){ toast('⌛ Sua promoção do Anual já expirou.'); return; }
+    promoJaMostrada = true;
+    const longCard = document.querySelector('.plan[data-card="long"]');
+    abrirPromoModal(st.restante_seg,
+      ()=>{
+        if (longCard){ setPlano(longCard, 'anual'); longCard.scrollIntoView({behavior:'smooth', block:'center'}); }
+        toast('🔥 Promoção ativa! É só clicar em <b>Cartão</b> ou <b>Pix</b> no Anual — já sai por R$ 397.');
+      });
+  }).catch(()=>{});
+})();
 
 // ---- Veio do painel pelo botão "Desbloquear" de um add-on ----
 //  /planos?addon=1   → Odds Erradas das Casas   ·   /planos?addon=mid → Apostas de Intervalo

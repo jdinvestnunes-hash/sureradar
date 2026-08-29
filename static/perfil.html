@@ -128,6 +128,9 @@
       <div class="days" id="days-box"></div>
     </div>
 
+    <!-- Promo relâmpago do Anual (timer que sobrevive a fechar a aba) -->
+    <div class="card full" id="promo-card" style="display:none"></div>
+
     <!-- Add-on: Odds Erradas das Casas (comprado à parte do plano) -->
     <div class="card full" id="addon-card"></div>
 
@@ -175,7 +178,7 @@ async function load(){
   try {
     const _p = new URLSearchParams(location.search);
     if (_p.get("pago") === "1" && window.gtag) {
-      const _val = (d.dias != null && d.dias > 60) ? 497.0 : 147.0; // anual vs mensal
+      const _val = (d.dias != null && d.dias > 60) ? 497.0 : 197.0; // anual vs mensal
       gtag('event', 'conversion', {
         'send_to': 'AW-17915571478/_s7-CK2V6sscEJba595C',
         'value': _val, 'currency': 'BRL',
@@ -313,7 +316,7 @@ async function load(){
       </ul>
       <button class="btn btn-primary" id="up-anual">Assinar Pro Anual — R$ 497/ano (economize 72%)</button>
       <div style="height:10px"></div>
-      <button class="btn btn-ghost" id="up-mensal" style="width:100%">Assinar Pro Mensal — R$ 147/mês</button>
+      <button class="btn btn-ghost" id="up-mensal" style="width:100%">Assinar Pro Mensal — R$ 197/mês</button>
       <p style="font-size:12px;color:var(--mute);margin-top:12px;text-align:center">🔒 Pagamento seguro · Garantia de 7 dias</p>`;
     // Vão pra tela de planos (com Cartão/Pix). Já rola pro plano escolhido.
     $("#up-anual").onclick = ()=>location.href="/planos#anual";
@@ -399,8 +402,38 @@ $("#tk-send").onclick = async ()=>{
 };
 
 $("#sair").onclick = async e => { e.preventDefault(); await fetch("/api/logout",{method:"POST"}); location.href="/login"; };
+// ---------- Promo relâmpago do Anual: timer que sobrevive a fechar a aba ----------
+let _promoInt = null;
+async function loadPromo(){
+  let st = null;
+  try { st = await fetch("/api/promo/anual").then(r=>r.json()); } catch { return; }
+  const card = $("#promo-card");
+  if (!st || !st.ativa || st.restante_seg <= 0){ card.style.display = "none"; return; }
+  const mmss = s => { s=Math.max(0,s|0); return String((s/60)|0).padStart(2,"0")+":"+String(s%60).padStart(2,"0"); };
+  card.style.display = "";
+  card.style.background = "linear-gradient(160deg,rgba(255,201,77,.12),var(--card) 60%)";
+  card.style.borderColor = "rgba(255,201,77,.5)";
+  card.innerHTML = `
+    <div style="font-size:11.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#ffc94d">🔥 Sua promoção do Anual está aberta</div>
+    <div style="display:flex;align-items:baseline;gap:12px;margin:12px 0 4px;flex-wrap:wrap">
+      <span style="font-size:18px;color:var(--mute);text-decoration:line-through">R$ 497</span>
+      <span style="font-family:var(--font-d);font-size:34px;font-weight:800;color:#ffc94d">R$ 397</span>
+      <span style="font-size:13px;color:var(--dim)">💳 12x de R$ 33 sem juros · +2 add-ons de brinde</span>
+    </div>
+    <p style="color:var(--dim);font-size:13.5px;margin:6px 0 14px">Expira em <b id="promo-cd" style="color:var(--text);font-variant-numeric:tabular-nums">${mmss(st.restante_seg)}</b> — depois volta ao preço normal.</p>
+    <button class="btn btn-primary" style="width:100%;background:linear-gradient(112deg,#ffc94d,#ffb020);color:#2a1c00" onclick="location.href='/planos?promo=anual'">Garantir o Anual por R$ 397 →</button>`;
+  let r = st.restante_seg;
+  if (_promoInt) clearInterval(_promoInt);
+  _promoInt = setInterval(()=>{
+    r--; const el = $("#promo-cd");
+    if (r <= 0 || !el){ clearInterval(_promoInt); _promoInt=null; card.style.display="none"; return; }
+    el.textContent = mmss(r);
+  }, 1000);
+}
+
 load();
 loadTickets();
+loadPromo();
 </script>
 </body>
 </html>
