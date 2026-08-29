@@ -523,10 +523,45 @@ def _limpar_lock():
             pass
 
 
+# ANTI-ANTI-SCRAPING: o surebet EMBARALHA os nomes dos eventos (vira anagrama,
+# ex.: "Real Madrid" -> "Aerl Maddri") quando acha que a aba está SEM FOCO /
+# ESCONDIDA — proteção contra robô. Como o robô roda em SEGUNDO PLANO (janela
+# atrás de outras), ele caía nessa e mandava nomes embaralhados pro painel.
+# Este script força a página a SEMPRE se achar visível e com foco, e engole os
+# eventos de blur/visibilitychange. Roda ANTES de qualquer script do site, em
+# toda navegação (add_init_script no contexto).
+_JS_SEMPRE_VISIVEL = r"""
+(() => {
+  const fixar = (obj, chave, valor) => {
+    try { Object.defineProperty(obj, chave, {configurable: true, get: () => valor}); } catch (e) {}
+  };
+  fixar(document, 'hidden', false);
+  fixar(document, 'visibilityState', 'visible');
+  fixar(document, 'webkitHidden', false);
+  fixar(document, 'webkitVisibilityState', 'visible');
+  try { document.hasFocus = () => true; } catch (e) {}
+  const engolir = ['visibilitychange', 'webkitvisibilitychange', 'mozvisibilitychange',
+                   'msvisibilitychange', 'blur'];
+  for (const ev of engolir) {
+    try { window.addEventListener(ev, e => e.stopImmediatePropagation(), true); } catch (e) {}
+    try { document.addEventListener(ev, e => e.stopImmediatePropagation(), true); } catch (e) {}
+  }
+})();
+"""
+
+
 def _abrir_ctx(p):
     """Abre (ou reabre) o navegador persistente e devolve (ctx, page)."""
     _limpar_lock()
-    args = ["--disable-blink-features=AutomationControlled"]
+    args = [
+        "--disable-blink-features=AutomationControlled",
+        # Impedem o Chromium de marcar a janela como "em segundo plano/oculta"
+        # quando ela está atrás de outras — é isso que fazia o surebet embaralhar.
+        "--disable-backgrounding-occluded-windows",
+        "--disable-renderer-backgrounding",
+        "--disable-background-timer-throttling",
+        "--disable-features=CalculateNativeWinOcclusion",
+    ]
     if sys.platform.startswith("linux"):
         # No VPS (Linux, rodando como root) o Chromium EXIGE --no-sandbox; e
         # --disable-dev-shm-usage evita travadas/crash por /dev/shm pequeno no
@@ -538,6 +573,11 @@ def _abrir_ctx(p):
         viewport={"width": 1280, "height": 900},
         args=args,
     )
+    # Aplica o "sempre visível" em TODA página/navegação deste contexto.
+    try:
+        ctx.add_init_script(_JS_SEMPRE_VISIVEL)
+    except Exception:
+        pass
     page = ctx.pages[0] if ctx.pages else ctx.new_page()
     return ctx, page
 
