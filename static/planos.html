@@ -60,11 +60,12 @@
     .btn-pix{background:rgba(50,188,173,.12);color:#3fd6c4;border:1px solid rgba(50,188,173,.5)}
     .pixico{width:16px;height:16px;fill:currentColor;flex-shrink:0}
     .btn-pix .pixico{width:17px;height:17px}
-    /* seletor de período (Mensal/Trimestral e Semestral/Anual) */
+    /* seletor de período (Mensal/Trimestral · Anual) */
     .seg{display:flex;gap:4px;background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:4px;margin-bottom:16px}
     .seg-opt{flex:1;border:none;background:none;color:var(--dim);font-weight:700;font-size:12.5px;padding:8px 6px;border-radius:999px;cursor:pointer;font-family:var(--font-b);transition:.15s}
     .seg-opt.on{background:var(--grad);color:#052015}
     .seg-opt:not(.on):hover{color:var(--text)}
+    .seg-solo .seg-opt{cursor:default}
 
     /* ---- Order bump: caixinha das "Odds Erradas das Casas" dentro do card do plano ---- */
     .bump{display:flex;gap:11px;align-items:flex-start;cursor:pointer;margin-bottom:12px;padding:13px 14px;border-radius:14px;background:rgba(169,139,255,.09);border:1px dashed rgba(169,139,255,.5);transition:.15s}
@@ -173,12 +174,11 @@
       <div class="payback">&nbsp;</div>
     </div>
 
-    <!-- LONGO: Semestral / Anual (padrão Anual) -->
+    <!-- LONGO: Anual -->
     <div class="plan pop" data-card="long" data-plano="anual">
       <div class="badge" data-badge>⭐ MAIS VANTAJOSO · 72% OFF</div>
-      <div class="seg">
-        <button class="seg-opt" data-plan="semestral">Semestral</button>
-        <button class="seg-opt on" data-plan="anual">Anual</button>
+      <div class="seg seg-solo">
+        <button class="seg-opt on" data-plan="anual">Anual · 1 ano</button>
       </div>
       <div class="price" data-price>R$ 497<small>/ano</small></div>
       <div class="pnote" data-note>sai por <b>R$ 41/mês</b> · <span class="save">economize R$ 1.267</span> · 💳 <b>até 12x no cartão</b></div>
@@ -441,7 +441,7 @@ let ME_WHATS = "";   // WhatsApp salvo no cadastro (prefill do celular no Pix)
 let ME_EMAIL = "";   // e-mail da conta — mostrado no resumo do QR
 fetch("/api/me").then(r => r.ok ? r.json() : null).then(d => { if (d){ ME_WHATS = (d.whatsapp || "").replace(/\D/g, ""); ME_EMAIL = d.email || ""; } }).catch(() => {});
 // nomes amigáveis dos planos/add-ons pro resumo do QR
-const NOMES = { mensal:'PRO Mensal', trimestral:'PRO Trimestral', semestral:'PRO Semestral', anual:'PRO Anual', valor:'Odds Erradas das Casas', middle:'Apostas de Intervalo' };
+const NOMES = { mensal:'PRO Mensal', trimestral:'PRO Trimestral', anual:'PRO Anual', valor:'Odds Erradas das Casas', middle:'Apostas de Intervalo' };
 const brl = v => 'R$ ' + Number(v || 0).toFixed(2).replace('.', ',');
 // pré-cria o customer da AbacatePay (email preenchido + cartão mais rápido no clique)
 fetch("/api/checkout/prep").catch(() => {});
@@ -509,11 +509,10 @@ $id('pix-go').onclick = ()=>{
   pagar(pixCtx.plano, pixCtx.metodo, pixCtx.btn, Object.assign({cpf, celular: cel}, pixCtx.extras));
 };
 
-// ---- Seletor de período (Mensal/Trimestral · Semestral/Anual) ----
+// ---- Seletor de período (Mensal/Trimestral · Anual) ----
 const PLANOS = {
   mensal:     { price:'R$ 197<small>/mês</small>',        note:'pagamento à vista', badge:'', combo:97 },
-  trimestral: { price:'R$ 237<small>/trimestre</small>', note:'sai por <b>R$ 79/mês</b> · <span class="save">46% OFF</span> · 💳 parcele no cartão', badge:'💚 46% OFF', combo:127 },
-  semestral:  { price:'R$ 387<small>/semestre</small>',  note:'sai por <b>R$ 64,50/mês</b> · <span class="save">56% OFF</span> · 💳 parcele no cartão', badge:'💚 56% OFF', combo:177 },
+  trimestral: { price:'R$ 317<small>/trimestre</small>', note:'sai por <b>R$ 106/mês</b> · <span class="save">46% OFF</span> · 💳 parcele no cartão', badge:'💚 46% OFF', combo:127 },
   anual:      { price:'R$ 497<small>/ano</small>',        note:'sai por <b>R$ 41/mês</b> · <span class="save">economize R$ 1.267</span> · 💳 <b>até 12x no cartão</b>', badge:'⭐ MAIS VANTAJOSO · 72% OFF', combo:0 },
 };
 function setPlano(card, key){
@@ -533,8 +532,8 @@ function setPlano(card, key){
     bumpL.style.display = anual ? 'none' : '';
     const cb = bumpL.querySelector('[data-bump]');
     if (cb && anual) cb.checked = false;
-    // Combo "Completo" custa +R$ por plano (mensal 97 · tri 127 · sem 177). Avulso
-    // seria R$ 47 + R$ 97 = R$ 144, então 97 pelos dois já é desconto forte.
+    // Combo "Completo" custa +R$ por plano (mensal 97 · tri 127). Avulso seria
+    // R$ 47 + R$ 97 = R$ 144, então o combo pelos dois já é desconto forte.
     const title = bumpL.querySelector('[data-bumptitle]');
     if (title) title.textContent = '🚀 Completo — Odds Erradas + Apostas de Intervalo · +R$ ' + (p.combo || 0);
   }

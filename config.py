@@ -264,8 +264,7 @@ SITE_URL = os.getenv("SITE_URL", "https://sureradar.site").strip()
 # assinatura recorrente por enquanto — casa com o modelo de dias_restantes.
 PLANOS = {
     "mensal":     {"nome": "Pro Mensal",     "dias": 30,  "valor": 197.0},
-    "trimestral": {"nome": "Pro Trimestral", "dias": 90,  "valor": 237.0},
-    "semestral":  {"nome": "Pro Semestral",  "dias": 180, "valor": 387.0},
+    "trimestral": {"nome": "Pro Trimestral", "dias": 90,  "valor": 317.0},
     "anual":      {"nome": "Pro Anual",      "dias": 365, "valor": 497.0},
 }
 
@@ -291,9 +290,9 @@ ADDON_MIDDLE = {"nome": "Apostas de Intervalo", "dias": 30, "valor": 97.0}
 # COMBO "Completo" = plano + os DOIS add-ons (Odds Erradas + Apostas de Intervalo)
 # no MESMO checkout, por um EXTRA promocional (bem menor que os R$47+R$97 avulsos) e
 # válido pelos MESMOS dias do plano. É o "pulo do gato" do checkout. Por plano:
-#   mensal +50 (=197) · trimestral +80 (=317) · semestral +130 (=517) · anual +0.
+#   mensal +97 · trimestral +127 · anual +0 (soma no valor do plano).
 # No ANUAL os dois já vêm de BRINDE (extra 0) — ver _liberar_compra no auth.py.
-COMBO_EXTRA = {"mensal": 97.0, "trimestral": 127.0, "semestral": 177.0, "anual": 0.0}
+COMBO_EXTRA = {"mensal": 97.0, "trimestral": 127.0, "anual": 0.0}
 
 STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "").strip()
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "").strip()

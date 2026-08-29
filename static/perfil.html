@@ -269,10 +269,10 @@ async function load(){
       : "";
     // upgrade: mostra os planos MAIORES que o atual (os dias sempre SOMAM). Detecta o
     // plano atual pelo pagamento mais recente; se não achar, assume mensal (mostra todos).
+    // semestral segue no ORDER só p/ detectar quem comprou no passado (não vendemos mais).
     const ORDER = {mensal:1, trimestral:2, semestral:3, anual:4};
     const UP = {
-      trimestral: {nome:"Trimestral", preco:"R$ 237", extra:"3 meses"},
-      semestral:  {nome:"Semestral",  preco:"R$ 387", extra:"6 meses · 56% OFF"},
+      trimestral: {nome:"Trimestral", preco:"R$ 317", extra:"3 meses · 46% OFF"},
       anual:      {nome:"Anual",       preco:"R$ 497", extra:"1 ano · só R$ 41/mês"},
     };
     const _ts = v => (v==null?0:(typeof v==="number"?v:(Date.parse(v)||0)));
@@ -280,7 +280,7 @@ async function load(){
     (d.pagamentos||[]).slice().sort((a,b)=>_ts(b.criado)-_ts(a.criado)).some(pg=>{
       if (ORDER[pg.plano]) { atual = pg.plano; return true; } return false;
     });
-    const opts = ["trimestral","semestral","anual"].filter(k => ORDER[k] > (ORDER[atual]||1));
+    const opts = ["trimestral","anual"].filter(k => ORDER[k] > (ORDER[atual]||1));
     const upgrade = opts.length ? `
       <div style="margin-top:18px;background:linear-gradient(135deg,rgba(46,230,168,.10),rgba(56,212,245,.08));border:1px solid rgba(46,230,168,.4);border-radius:14px;padding:16px 18px">
         <div style="font-weight:800;font-size:15px">🚀 Fazer upgrade do seu plano</div>

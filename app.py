@@ -692,7 +692,7 @@ def checkout_stripe(request: Request, payload: dict = Body(...)):
     if not config.STRIPE_SECRET_KEY:
         return JSONResponse({"erro": "Stripe não configurado"}, status_code=503)
     # PAGAMENTO ÚNICO com parcelamento no cartão (Stripe Brasil). Mensal = à vista;
-    # Trimestral/Semestral/Anual PODEM PARCELAR (a Stripe mostra as parcelas conforme
+    # Trimestral/Anual PODEM PARCELAR (a Stripe mostra as parcelas conforme
     # o valor e o cartão, até 12x). O acesso dura p["dias"] e expira (a régua de
     # e-mail chama pra recomprar). Pix segue pagamento único à parte.
     parcelar = plano != "mensal"
@@ -980,7 +980,7 @@ def _abacate_prewarm_produtos():
     except requests.RequestException:
         pass
     # planos + add-ons avulsos (Odds Erradas / Apostas de Intervalo) + os produtos do
-    # COMBO por plano (mensal/trimestral/semestral) — tudo pronto no boot.
+    # COMBO por plano (mensal/trimestral) — tudo pronto no boot.
     combos = [("combo-" + k, _combo_produto(k)) for k in config.PLANOS
               if k != "anual" and _combo_extra(k) > 0]
     for plano, p in (list(config.PLANOS.items())
@@ -1025,7 +1025,7 @@ def _abacate_customer_id(user):
 def checkout_cartao(request: Request, payload: dict = Body(...)):
     """Checkout no CARTÃO com PARCELAMENTO (AbacatePay API v2). Pagamento único; o
     cliente escolhe as parcelas na própria tela da AbacatePay (Mensal 1x / Trimestral
-    3x / Semestral 6x / Anual 12x). A página v2 já coleta CPF + dados do cartão, então
+    3x / Anual 12x). A página v2 já coleta CPF + dados do cartão, então
     aqui NÃO pedimos CPF. Libera o PRO no webhook checkout.completed."""
     user = _usuario(request)
     if not user:
