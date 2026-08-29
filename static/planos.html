@@ -515,6 +515,10 @@ const PLANOS = {
   trimestral: { price:'R$ 317<small>/trimestre</small>', note:'sai por <b>R$ 106/mês</b> · <span class="save">46% OFF</span> · 💳 parcele no cartão', badge:'💚 46% OFF', combo:127 },
   anual:      { price:'R$ 497<small>/ano</small>',        note:'sai por <b>R$ 41/mês</b> · <span class="save">economize R$ 1.267</span> · 💳 <b>até 12x no cartão</b>', badge:'⭐ MAIS VANTAJOSO · 72% OFF', combo:0 },
 };
+// Enquanto a janela-relâmpago da pessoa está aberta, o card do Anual mostra o
+// preço COM desconto (R$397) + um contador. Preenchido por carregarPromoAnual().
+let promoAnual = null;         // {ativa, restante_seg, de, por} quando de pé
+let promoCardCdInt = null;     // interval do contador no card
 function setPlano(card, key){
   const p = PLANOS[key]; if(!p) return;
   card.dataset.plano = key;
@@ -538,12 +542,60 @@ function setPlano(card, key){
     if (title) title.textContent = '🚀 Completo — Odds Erradas + Apostas de Intervalo · +R$ ' + (p.combo || 0);
   }
   if (bumpF) bumpF.style.display = anual ? '' : 'none';
+  // Promo ativa: repinta o Anual com o preço com desconto + contador ao vivo.
+  if (anual && promoAnual && promoAnual.ativa) aplicarPromoAnualCard(card);
+}
+// Repinta o card do Anual com o preço promocional (R$397) e um contador que,
+// ao zerar, volta o card pro preço cheio. Usa o restante_seg vindo do servidor.
+function aplicarPromoAnualCard(card){
+  const de = promoAnual.de || 497, por = promoAnual.por || 397;
+  const mes = Math.round(por / 12);                    // 397/12 ≈ 33
+  card.querySelector('[data-price]').innerHTML =
+    '<span style="font-size:.46em;color:var(--mute);text-decoration:line-through;font-weight:700;margin-right:9px">R$ ' + de + '</span>'
+    + 'R$ ' + por + '<small>/ano</small>';
+  card.querySelector('[data-note]').innerHTML =
+    '🔥 <b style="color:var(--gold)">Seu desconto está ativo</b> · de <s style="color:var(--mute)">R$ ' + de + '</s> por <b style="color:var(--text)">R$ ' + por + '</b>'
+    + ' · 💳 12x de R$ ' + mes + ' · <b style="color:var(--gold)">expira em <span id="promo-card-cd">--:--</span></b>';
+  const badge = card.querySelector('[data-badge]');
+  if (badge){ badge.innerHTML = '🔥 PROMOÇÃO ATIVA · economize R$ ' + (de - por); badge.style.display=''; }
+  if (promoCardCdInt) clearInterval(promoCardCdInt);
+  let r = promoAnual.restante_seg | 0;
+  const tick = ()=>{
+    const el = document.getElementById('promo-card-cd');
+    if (el) el.textContent = fmtMMSS(r);
+    if (r <= 0){                                        // zerou: volta pro preço cheio
+      clearInterval(promoCardCdInt); promoCardCdInt = null; promoAnual = null;
+      setPlano(card, 'anual');
+      return;
+    }
+    r--;
+  };
+  tick();
+  promoCardCdInt = setInterval(tick, 1000);
+}
+// Pergunta ao servidor se a janela da pessoa está aberta; se sim, guarda o estado
+// e repinta o card do Anual com desconto. Devolve o estado (ou null).
+async function carregarPromoAnual(){
+  try{
+    const st = await fetch('/api/promo/anual').then(r=> r.ok ? r.json() : null);
+    if (st && st.ativa && st.restante_seg > 0){
+      promoAnual = st;
+      const lc = document.querySelector('.plan[data-card="long"]');
+      if (lc && lc.dataset.plano === 'anual') setPlano(lc, 'anual');
+      return st;
+    }
+  }catch(e){}
+  promoAnual = null;
+  return null;
 }
 document.querySelectorAll('.seg-opt').forEach(opt=>{
   opt.addEventListener('click', ()=> setPlano(opt.closest('.plan'), opt.dataset.plan));
 });
 // Sincroniza o estado inicial (o card longo abre no Anual → já mostra "incluído").
 document.querySelectorAll('.plan[data-plano]').forEach(c=> setPlano(c, c.dataset.plano));
+// Se a pessoa (logada) tem uma janela de promo aberta, o card do Anual já nasce
+// com o desconto de R$397 + contador — coerente com o preço que o servidor cobra.
+carregarPromoAnual();
 
 // ---- Upgrade (vem do /perfil com ?plano=X&upgrade=1): pré-seleciona e avisa ----
 (function(){
@@ -596,6 +648,9 @@ async function tentarPromoMensal(btn, metodo, extras, label){
   btn.disabled = false; btn.textContent = txt;
   if (st && st.ativa && st.restante_seg > 0){
     promoJaMostrada = true;
+    promoAnual = st;                                    // janela aberta: o card do Anual já passa a mostrar R$397
+    const lc = document.querySelector('.plan[data-card="long"]');
+    if (lc && lc.dataset.plano === 'anual') setPlano(lc, 'anual');
     abrirPromoModal(st.restante_seg,
       ()=> irCheckout('anual', metodo, btn, {}, 'PRO Anual (promoção)'),   // SIM: leva o Anual, mesmo método
       ()=> irCheckout('mensal', metodo, btn, extras, label));             // NÃO: segue no mensal como pediu
@@ -624,8 +679,9 @@ document.querySelectorAll('[data-pay]').forEach(b=>{
 //      os dois já saem por R$397 enquanto a janela dela está aberta). ----
 (function(){
   if (new URLSearchParams(location.search).get('promo') !== 'anual') return;
-  fetch('/api/promo/anual').then(r=>r.json()).then(st=>{
-    if (!st || !st.ativa || st.restante_seg <= 0){ toast('⌛ Sua promoção do Anual já expirou.'); return; }
+  // carregarPromoAnual já pinta o card do Anual com R$397 se a janela estiver aberta.
+  carregarPromoAnual().then(st=>{
+    if (!st){ toast('⌛ Sua promoção do Anual já expirou.'); return; }
     promoJaMostrada = true;
     const longCard = document.querySelector('.plan[data-card="long"]');
     abrirPromoModal(st.restante_seg,
