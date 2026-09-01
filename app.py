@@ -534,6 +534,11 @@ def health(fb: int = 0, venda: int = 0):
     # Diagnóstico de config (só True/False, nunca o valor do segredo).
     sk = config.STRIPE_SECRET_KEY
     abk = config.ABACATEPAY_API_KEY
+    # A chave que REALMENTE gera o Pix (transparente) e o cartão parcelado é a v2,
+    # com fallback pra v1. Se ela for 'dev', o QR é de SANDBOX e os bancos recusam
+    # (erro QR124E "instituição recebedora não conseguiu processar") — por isso
+    # reportamos o modo DELA aqui, não só o da v1.
+    v2k = _abacate_v2_key()
     info["pagamentos"] = {
         "stripe_key": bool(sk),
         "stripe_webhook": bool(config.STRIPE_WEBHOOK_SECRET),
@@ -543,6 +548,10 @@ def health(fb: int = 0, venda: int = 0):
         "abacatepay_webhook": bool(config.ABACATEPAY_WEBHOOK_SECRET),
         "abacatepay_mode": ("prod" if abk.startswith("abc_prod_") else
                             "dev" if abk.startswith("abc_dev_") else "?"),
+        # >>> a que importa pro Pix/QR: <<<
+        "abacatepay_v2_setada": bool(config.ABACATEPAY_V2_API_KEY),
+        "pix_key_mode": ("prod" if v2k.startswith("abc_prod_") else
+                         "dev" if v2k.startswith("abc_dev_") else "?"),
     }
     info["email"] = {
         "resend_key": bool(config.RESEND_API_KEY),
