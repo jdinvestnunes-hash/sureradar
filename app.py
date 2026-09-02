@@ -2349,20 +2349,31 @@ def _evento_lixo(teams):
 
 
 def _time_do_desc(desc):
-    """Tira o nome do time do balão (desc) da perna — o balão NÃO é embaralhado.
-    Ex.: '... escanteios time Djurgårdens IF' -> 'Djurgårdens IF'."""
+    """Tira o nome do time/participante do balão (desc) da perna — o balão NÃO é
+    embaralhado pelo anti-robô. Cobre os padrões vistos no surebet:
+      • sufixo: '... faltas time OGC Nice', '... participante Frances Tiafoe'
+      • prefixo: 'Kasimpasa vence - escanteios', 'Dundee United vence com handicap...'
+    Devolve '' quando o balão não cita nenhum time (ex.: total de partida)."""
     s = (desc or "").strip()
     if not s:
         return ""
-    achado = ""
     low = s.lower()
-    for kw in (" time ", " equipe ", " team ", "vitória de ", "vitoria de "):
+    # 1) nome DEPOIS da palavra-chave (pega o último = o mais à direita)
+    for kw in (" time ", " equipe ", " team ", " participante ", " jogador ",
+               "vitória de ", "vitoria de "):
         i = low.rfind(kw)
         if i >= 0:
             cand = s[i + len(kw):].strip(" .·-/")
             if cand:
-                achado = cand
-    return achado
+                return cand
+    # 2) nome ANTES de 'vence/ganha/avança' (fica no começo do balão)
+    for kw in (" vence", " ganha", " avança", " avanca"):
+        i = low.find(kw)
+        if i > 0:
+            cand = s[:i].strip(" .·-/")
+            if cand:
+                return cand
+    return ""
 
 
 def _evento_reconstruido(legs):
