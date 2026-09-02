@@ -32,8 +32,13 @@ except Exception:
 
 
 def _salvar_cache():
+    # Gravação ATÔMICA: escreve num .tmp e troca de uma vez. Como salvamos parcial
+    # (a cada N links) e o arquivo tem dezenas de MB, um kill no meio de um write
+    # direto poderia deixar o cache corrompido -> perderíamos TODOS os links.
     try:
-        json.dump(LINK_CACHE, open(CACHE_FILE, "w", encoding="utf-8"))
+        tmp = CACHE_FILE + ".tmp"
+        json.dump(LINK_CACHE, open(tmp, "w", encoding="utf-8"))
+        os.replace(tmp, CACHE_FILE)
     except Exception:
         pass
 
@@ -188,12 +193,18 @@ def resolver_todos(ctx, bets):
     if faltam:
         print(f"   resolvendo {len(faltam)} link(s) novo(s) das casas… (cache: {len(LINK_CACHE)})")
     pg = ctx.new_page()
+    resolvidos = 0
     try:
         for b in bets:
             for leg in b.get("legs", []):
                 if leg.get("link"):
+                    antes = len(LINK_CACHE)
                     r = resolver_link(ctx, pg, leg["link"])
                     leg["link"] = r if (r and not _e_surebet(r)) else None
+                    if len(LINK_CACHE) > antes:          # resolveu um link NOVO
+                        resolvidos += 1
+                        if resolvidos % 40 == 0:         # salva parcial: se morrer no meio, não perde o backlog já feito
+                            _salvar_cache()
     finally:
         pg.close()
     if faltam:
@@ -535,16 +546,37 @@ _JS_SEMPRE_VISIVEL = r"""
   const fixar = (obj, chave, valor) => {
     try { Object.defineProperty(obj, chave, {configurable: true, get: () => valor}); } catch (e) {}
   };
-  fixar(document, 'hidden', false);
-  fixar(document, 'visibilityState', 'visible');
-  fixar(document, 'webkitHidden', false);
-  fixar(document, 'webkitVisibilityState', 'visible');
+  // Trava as flags de visibilidade tanto na INSTÂNCIA (document) quanto no
+  // PROTÓTIPO (Document.prototype) — algumas detecções leem o getter direto do
+  // protótipo pra furar o override só-de-instância.
+  const alvos = [document];
+  try { alvos.push(Document.prototype); } catch (e) {}
+  try { const pr = Object.getPrototypeOf(document); if (pr && alvos.indexOf(pr) < 0) alvos.push(pr); } catch (e) {}
+  for (const t of alvos) {
+    fixar(t, 'hidden', false);
+    fixar(t, 'visibilityState', 'visible');
+    fixar(t, 'webkitHidden', false);
+    fixar(t, 'webkitVisibilityState', 'visible');
+    fixar(t, 'wasDiscarded', false);
+  }
   try { document.hasFocus = () => true; } catch (e) {}
+  try { Document.prototype.hasFocus = () => true; } catch (e) {}
+  // Engole os eventos que sinalizam "perdi o foco/fiquei escondido" (captura,
+  // stopImmediatePropagation) — pega addEventListener E handlers via propriedade.
   const engolir = ['visibilitychange', 'webkitvisibilitychange', 'mozvisibilitychange',
-                   'msvisibilitychange', 'blur'];
+                   'msvisibilitychange', 'blur', 'focusout', 'pagehide', 'freeze'];
+  const parar = (e) => { try { e.stopImmediatePropagation(); } catch (_) {} };
   for (const ev of engolir) {
-    try { window.addEventListener(ev, e => e.stopImmediatePropagation(), true); } catch (e) {}
-    try { document.addEventListener(ev, e => e.stopImmediatePropagation(), true); } catch (e) {}
+    try { window.addEventListener(ev, parar, true); } catch (e) {}
+    try { document.addEventListener(ev, parar, true); } catch (e) {}
+  }
+  // Neutraliza handlers atribuídos por propriedade (ex.: document.onvisibilitychange = fn):
+  // o get devolve null e o set é no-op, então o site nunca registra o embaralhador.
+  for (const t of [window, document]) {
+    for (const p of ['onblur', 'onvisibilitychange', 'onwebkitvisibilitychange',
+                     'onpagehide', 'onfreeze']) {
+      try { Object.defineProperty(t, p, {configurable: true, get: () => null, set: () => {} }); } catch (e) {}
+    }
   }
 })();
 """

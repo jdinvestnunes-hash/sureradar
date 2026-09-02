@@ -2337,6 +2337,45 @@ def _split_teams(teams):
     return teams.strip(), ""
 
 
+# Nunca deixar VAZAR o placeholder/anúncio do surebet.com pro painel (aparece quando o
+# anti-robô do surebet embaralha/esconde o título do evento). O balão da aposta (desc)
+# NÃO é embaralhado, então dá pra reconstruir o nome real de lá.
+_LIXO_EVENTO = ("surebet.com", "professional betting", "check the full version")
+
+
+def _evento_lixo(teams):
+    t = (teams or "").strip().lower()
+    return (not t) or any(m in t for m in _LIXO_EVENTO)
+
+
+def _time_do_desc(desc):
+    """Tira o nome do time do balão (desc) da perna — o balão NÃO é embaralhado.
+    Ex.: '... escanteios time Djurgårdens IF' -> 'Djurgårdens IF'."""
+    s = (desc or "").strip()
+    if not s:
+        return ""
+    achado = ""
+    low = s.lower()
+    for kw in (" time ", " equipe ", " team ", "vitória de ", "vitoria de "):
+        i = low.rfind(kw)
+        if i >= 0:
+            cand = s[i + len(kw):].strip(" .·-/")
+            if cand:
+                achado = cand
+    return achado
+
+
+def _evento_reconstruido(legs):
+    """Monta 'Time A – Time B' pelos balões (desc) quando o título veio embaralhado/
+    placeholder. Se só achar 1 time (mercados de time único), devolve ele sozinho."""
+    nomes = []
+    for l in legs:
+        nm = _time_do_desc(l.get("desc", ""))
+        if nm and nm not in nomes:
+            nomes.append(nm)
+    return " – ".join(nomes[:2])
+
+
 _MKT_SUBS = [
     ("classificações", "classificação"), ("classificação", "classificação"),
     ("TE + DP", "prorrogação + pênaltis"), ("TE+DP", "prorrogação + pênaltis"),
@@ -2391,6 +2430,8 @@ def _converter_raspagem(records):
         banca = config.BANCA
         margem = sum(1.0 / o for o in odds)
         teams = max((l.get("teams", "") for l in legs), key=len)
+        if _evento_lixo(teams):                 # título embaralhado/placeholder do surebet:
+            teams = _evento_reconstruido(legs)  # reconstrói pelo balão; nunca vaza 'surebet.com'
         t1, t2 = _split_teams(teams)
         pernas = []
         for l, o in zip(legs, odds):
