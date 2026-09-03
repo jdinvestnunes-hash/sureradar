@@ -2376,15 +2376,73 @@ def _time_do_desc(desc):
     return ""
 
 
-def _evento_reconstruido(legs):
-    """Monta 'Time A – Time B' pelos balões (desc) quando o título veio embaralhado/
-    placeholder. Se só achar 1 time (mercados de time único), devolve ele sozinho."""
+def _time_valido(nm):
+    """Descarta placeholders que às vezes vêm no balão em vez do nome real:
+    número solto ('1'/'2'), 'Time 1', 'Equipe 2', 'Casa'/'Fora', ou muito curto."""
+    t = (nm or "").strip().lower()
+    if len(t) < 3:
+        return False
+    if re.fullmatch(r"(time|equipe|team|jogador|participante|casa|fora)?\s*\d*", t):
+        return False
+    return True
+
+
+def _times_dos_baloes(legs):
+    """Lista os times reais citados nos balões (desc) das pernas — o balão NÃO é
+    embaralhado pelo anti-robô, então serve de fonte de verdade pro nome. Deduplica
+    variações do mesmo time (ex.: 'Blackburn' vs 'Blackburn Rovers' -> fica o maior)."""
     nomes = []
     for l in legs:
         nm = _time_do_desc(l.get("desc", ""))
-        if nm and nm not in nomes:
+        if not nm or not _time_valido(nm):
+            continue
+        k = _cmp_key(nm)
+        if not k:
+            continue
+        dup = False
+        for i, ja in enumerate(nomes):
+            kj = _cmp_key(ja)
+            if k == kj or k in kj or kj in k:   # mesmo time (um é prefixo do outro)
+                if len(nm) > len(ja):
+                    nomes[i] = nm             # fica com o nome mais completo
+                dup = True
+                break
+        if not dup:
             nomes.append(nm)
-    return " – ".join(nomes[:2])
+    return nomes
+
+
+def _evento_reconstruido(legs):
+    """Monta 'Time A – Time B' pelos balões (desc) quando o título veio embaralhado/
+    placeholder. Se só achar 1 time (mercados de time único), devolve ele sozinho."""
+    return " – ".join(_times_dos_baloes(legs)[:2])
+
+
+def _cmp_key(s):
+    """Normaliza p/ comparação: sem acento, minúsculo, só letras/números."""
+    import unicodedata
+    base = unicodedata.normalize("NFKD", (s or ""))
+    base = "".join(c for c in base if not unicodedata.combining(c))
+    return re.sub(r"[^a-z0-9]", "", base.lower())
+
+
+def _melhor_evento(teams, legs):
+    """Escolhe o melhor nome do evento. O título do surebet vem embaralhado (anagrama)
+    quando o throttle está ativo — ex.: 'Nsniathpoaiak – ...' no lugar de 'Panathinaikos'.
+    O balão (desc) NÃO é embaralhado, então:
+      • título vazio/placeholder  -> reconstrói pelo balão;
+      • título aparentemente sadio -> só mantém se ALGUM time do balão aparece nele;
+        se nenhum aparecer, o título está embaralhado -> troca pelo do balão.
+    Quando o balão não cita time (ex.: 'Gols: Sim', 'Ambos marcam'), mantém o que veio."""
+    nomes = _times_dos_baloes(legs)
+    recon = " – ".join(nomes[:2])
+    if _evento_lixo(teams):
+        return recon or teams
+    if nomes:
+        tk = _cmp_key(teams)
+        if not any(_cmp_key(n) and _cmp_key(n) in tk for n in nomes):
+            return recon or teams   # título não confere com o balão => embaralhado
+    return teams
 
 
 _MKT_SUBS = [
@@ -2539,8 +2597,9 @@ def _converter_raspagem(records):
         if not (0 < prof <= config.MAX_LUCRO_SANO):
             continue   # sem lucro sadio nem calculado -> descarta (anomalia real)
         teams = max((l.get("teams", "") for l in legs), key=len)
-        if _evento_lixo(teams):                 # título embaralhado/placeholder do surebet:
-            teams = _evento_reconstruido(legs)  # reconstrói pelo balão; nunca vaza 'surebet.com'
+        # título do surebet vem embaralhado (anagrama) sob throttle -> confere/reconstrói
+        # pelo balão (desc), que não é embaralhado.
+        teams = _melhor_evento(teams, legs)
         t1, t2 = _split_teams(teams)
         pernas = []
         for l, o in zip(legs, odds):
