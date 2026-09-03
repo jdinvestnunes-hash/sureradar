@@ -48,19 +48,32 @@ SAAS_MIDDLE = SAAS.replace("/api/ingest", "/api/ingest-middle") # APOSTAS DE INT
 URL_LISTA = "https://pt.surebet.com/surebets"
 URL_VALOR = "https://pt.surebet.com/valuebets"                  # aba "Apostas de valor"
 URL_MIDDLE = "https://pt.surebet.com/middles"                   # aba "Apostas de intervalo"
-MAX_PAG_VALOR = 6              # valuebets já vêm filtradas nas suas casas — poucas págs
+MAX_PAG_VALOR = 5              # valuebets já vêm filtradas nas suas casas — poucas págs
 MAX_VALOR = 150               # teto de segurança
-MAX_PAG_MIDDLE = 6            # middles já vêm filtradas nas suas casas — poucas págs
+MAX_PAG_MIDDLE = 5            # middles já vêm filtradas nas suas casas — poucas págs
 MAX_MIDDLE = 150              # teto de segurança
 PERFIL = "pw_profile"          # sessão do Chrome fica salva aqui (login persiste)
 CICLO_MIN = 10                 # minutos entre varreduras FUNDAS (completa: todas as págs)
 FAST_SEG = 45                  # segundos entre passadas RÁPIDAS (só a página 1 = as de
                                # maior lucro/mais frescas). É o "quase ao vivo".
+FAST_ATIVO = False             # MODO MANSO: só a FUNDA de CICLO_MIN em CICLO_MIN. As rápidas
+                               # de 45s cheiram a robô (dispararam o throttle) — desligadas.
+                               # Volte a True se um dia quiser o "quase ao vivo" de novo.
 VALOR_ATIVO = True             # liga/desliga a passada de ODDS DE VALOR (deixe True p/ raspar valuebets)
 MIDDLE_ATIVO = True            # liga/desliga a passada de APOSTAS DE INTERVALO (middles)
-MAX_PAGINAS = 40
+MAX_PAGINAS = 20               # TETO de segurança (raro chegar aqui). O corte real é a
+                               # regra abaixo: PRO nas 1as págs + completa o FREE e para.
 MIN_PROFIT = 1.0               # PARA quando o lucro chega aqui (lista é decrescente).
                               # FREE = 1–2% · PRO = 2–25% · abaixo de 1% ignora.
+# --- Regra de corte das SUREBETS (leve, mas nunca deixa o FREE vazio) ---
+# 1) Págs 1..PRO_PAGS: pega TUDO (o topo = as de maior lucro = PRO).
+# 2) Depois da pág PRO_PAGS: desce SÓ pra completar a faixa FREE (1–2%), pegando
+#    FREE_ALVO surebets (prioriza as de ~2%; se faltar, completa com as de 1%).
+# 3) Para quando junta FREE_ALVO do FREE (ou quando o lucro cai abaixo de 1%).
+PRO_PAGS = 5                   # nº de páginas do topo que alimentam o PRO
+FREE_ALVO = 10                 # quantas surebets da faixa FREE (1–2%) garantir
+FREE_MIN = 1.0                 # piso da faixa FREE (= FREE_LUCRO_MIN do backend)
+FREE_MAX = 2.0                 # teto da faixa FREE (= FREE_LUCRO_MAX do backend)
 HEADLESS = False               # janela visível (pra você logar). Vira True no servidor.
 
 # Raspagem — mesma lógica da extensão, roda dentro da página.
@@ -475,22 +488,39 @@ def uma_varredura(page, ctx):
             break
         page.wait_for_timeout(1000)
         recs = page.evaluate(JS_RASPAR)
-        # só interessa lucro >= MIN_PROFIT (0,70). Lista decrescente: quando
+        # só interessa lucro >= MIN_PROFIT (1,0). Lista decrescente: quando
         # aparecer algo abaixo disso, chegamos no fim útil (raspagem COMPLETA).
         chegou_piso = any(r.get("profit", 99) < MIN_PROFIT for r in recs)
-        novos = 0
+        novos = 0        # realmente adicionados (respeita PRO/FREE)
+        brutos = 0       # ids novos vistos na página (detecta fim real da lista)
         for r in recs:
-            if r.get("profit", 0) >= MIN_PROFIT and r.get("id") and r["id"] not in vistos:
-                vistos.add(r["id"])
-                todos.append(r)
-                novos += 1
+            rid = r.get("id")
+            if not (r.get("profit", 0) >= MIN_PROFIT and rid and rid not in vistos):
+                continue
+            brutos += 1
+            eh_free = FREE_MIN <= r.get("profit", 0) <= FREE_MAX
+            # Depois das PRO_PAGS páginas do topo, só completa a faixa FREE (1–2%):
+            # ignora o PRO extra do fundo (marca como visto pra não recontar).
+            if pag >= PRO_PAGS and not eh_free:
+                vistos.add(rid)
+                continue
+            vistos.add(rid)
+            todos.append(r)
+            novos += 1
         pag += 1
-        print(f"   página {pag}: {len(recs)} na tela, {novos} úteis (acumulado {len(todos)})")
+        free_ct = sum(1 for r in todos if FREE_MIN <= r.get("profit", 0) <= FREE_MAX)
+        print(f"   página {pag}: {len(recs)} na tela, {novos} úteis "
+              f"(acum {len(todos)} · FREE 1–2%: {free_ct}/{FREE_ALVO})")
         if chegou_piso:
             print(f"   chegou no piso de {MIN_PROFIT}% — raspagem completa.")
             completo = True
             break
-        if pag > 1 and novos == 0:
+        # PRO já garantido (>= PRO_PAGS págs) E FREE completo -> para aqui (leve).
+        if pag >= PRO_PAGS and free_ct >= FREE_ALVO:
+            print(f"   PRO (págs 1–{PRO_PAGS}) + {free_ct} do FREE (1–2%) — suficiente, parando.")
+            completo = True
+            break
+        if pag > 1 and brutos == 0:
             print("   fim (sem novidade).")
             completo = True
             break
@@ -674,6 +704,12 @@ def main():
 
                 if time.time() >= prox_funda:
                     # --- VARREDURA FUNDA (completa): surebet + valor + middle ---
+                    # Agenda a PRÓXIMA já AQUI (início), não no fim: assim o intervalo de
+                    # CICLO_MIN é contado do começo de uma funda ao começo da próxima —
+                    # batimento honesto de 10 em 10 min. Se a funda passar de CICLO_MIN
+                    # (ex.: resolução de links longa), prox_funda já expirou e a próxima
+                    # roda na hora, sem esticar o ciclo.
+                    prox_funda = time.time() + CICLO_MIN * 60
                     try:
                         uma_varredura(page, ctx)             # PRINCIPAL: surebet (todas as págs)
                     except Exception as e:
@@ -688,7 +724,6 @@ def main():
                             uma_varredura_middle(page, ctx)
                         except Exception as e:
                             print("!! erro nas middles (surebet NÃO afetada):", str(e)[:150])
-                    prox_funda = time.time() + CICLO_MIN * 60
                     ciclos += 1
                     # RECICLA o navegador de tempos em tempos pra não acumular memória
                     # (evita o OOM que mata o processo silenciosamente). O login persiste
@@ -704,9 +739,13 @@ def main():
                             print(">> navegador reciclado.")
                         except Exception as e:
                             print("!! falha ao reciclar o navegador:", str(e)[:150])
-                    print(f">> Funda ok. Passadas RÁPIDAS a cada {FAST_SEG}s; "
-                          f"próxima funda em {CICLO_MIN} min.\n")
-                else:
+                    if FAST_ATIVO:
+                        print(f">> Funda ok. Passadas RÁPIDAS a cada {FAST_SEG}s; "
+                              f"próxima funda em {CICLO_MIN} min.\n")
+                    else:
+                        print(f">> Funda ok (MODO MANSO: sem rápidas). "
+                              f"Próxima funda em {CICLO_MIN} min.\n")
+                elif FAST_ATIVO:
                     # --- PASSADA RÁPIDA (só página 1) — o "quase ao vivo" ---
                     try:
                         uma_varredura_rapida(page, ctx)
@@ -717,7 +756,12 @@ def main():
                 if not _ctx_vivo(page):
                     print("!! navegador morreu durante a varredura — reabrindo já.")
                     continue
-                time.sleep(FAST_SEG)
+                # Modo manso: dorme até a próxima funda (acorda no máx. a cada 60s pra
+                # notar se o navegador caiu). Com rápidas ligadas, espera FAST_SEG.
+                if FAST_ATIVO:
+                    time.sleep(FAST_SEG)
+                else:
+                    time.sleep(max(5.0, min(prox_funda - time.time(), 60.0)))
         except KeyboardInterrupt:
             print(">> Encerrando (SIGTERM): fechando o navegador p/ SALVAR a sessão…")
         finally:

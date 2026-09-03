@@ -13,6 +13,7 @@ venv/
 *.crdownload
 
 pw_profile/
+pw_profile_*/
 scraper_pw log
 link_cache.json
 
@@ -20,3 +21,5 @@ link_cache.json
 scraper.log
 scraper.err.log
 vigia.log
+*.out.log
+vigia.err.log
