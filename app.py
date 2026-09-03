@@ -2422,8 +2422,97 @@ def _mercado_legivel(code, t1="", t2=""):
     return resto
 
 
+# ---------------------------------------------------------------------------
+# Recuperação da CASA quando o anti-robô do surebet mascara o nome visível
+# ("XXX" ou o anúncio "surebet.com – Professional betting"). O slug real da casa
+# continua no href do evento (parâmetro odds=...:SLUG:...;...), que NÃO é
+# embaralhado — então dá pra deduzir e colocar o nome bonito de volta.
+# ---------------------------------------------------------------------------
+_CASA_FALLBACK = {
+    "betano": "Betano", "betano_br": "Betano (BR)", "betanobr": "Betano (BR)",
+    "superbet": "Superbet", "superbet_br": "Superbet (BR)",
+    "novibet": "Novibet", "novibet_br": "Novibet (BR)",
+    "betsson": "Betsson", "betsson_br": "Betsson (BR)",
+    "sporty_bet_br": "SportyBet (BR)", "sportybet": "SportyBet",
+    "sportybet_br": "SportyBet (BR)",
+    "stake": "Stake", "stake_bet_br": "Stake (BR)", "stakebr": "Stake (BR)",
+    "bet365": "bet365", "pinnacle": "Pinnacle", "betfair": "Betfair",
+    "kto": "KTO", "vaidebet": "Vaidebet", "estrelabet": "Estrelabet",
+    "mcgames": "McGames", "br4bet": "BR4bet", "pixbet": "Pixbet",
+    "betnacional": "Betnacional", "esportivabet": "Esportiva Bet",
+    "betfast": "BetFast", "bateubet": "BateuBet", "faz1bet": "Faz1Bet",
+    "aposta_ganha": "Aposta Ganha", "lottoland": "Lottoland",
+    "parimatch": "Parimatch", "1xbet": "1xBet", "betmgm": "BetMGM",
+}
+
+_CASA_MASCARA = ("surebet.com", "professional betting", "check the full version")
+
+
+def _casa_mascarada(nome):
+    """True quando o surebet ESCONDEU a casa (anti-robô): 'XXX', vazio ou o anúncio."""
+    t = (nome or "").strip().lower()
+    return (not t) or set(t) <= {"x"} or any(m in t for m in _CASA_MASCARA)
+
+
+def _slug_do_href(href, idx):
+    """Extrai o slug da casa do href do evento (não embaralhado). O parâmetro odds=
+    traz um segmento por perna, separados por ';'; dentro, campos por ':' com o slug
+    da casa na posição 3. 'idx' é a ordem da perna no registro."""
+    if not href:
+        return ""
+    try:
+        from urllib.parse import unquote, urlparse, parse_qs
+        odds = unquote(parse_qs(urlparse(href).query).get("odds", [""])[0])
+        segs = [s for s in odds.split(";") if s]
+        if isinstance(idx, int) and 0 <= idx < len(segs):
+            campos = segs[idx].split(":")
+            if len(campos) > 3 and campos[3].strip():
+                return campos[3].strip().lower()
+    except Exception:
+        pass
+    return ""
+
+
+def _bonito_do_slug(slug):
+    """Nome apresentável a partir do slug quando não achamos o nome bonito em lugar
+    nenhum. 'sporty_bet_br' -> 'Sporty Bet (BR)'."""
+    s = (slug or "").strip()
+    if not s:
+        return ""
+    br = s.endswith("_br")
+    if br:
+        s = s[:-3]
+    palavras = [p.capitalize() if not p.isdigit() else p for p in s.split("_") if p]
+    bonito = " ".join(palavras)
+    return f"{bonito} (BR)" if br else bonito
+
+
+def _resolver_casa(slug, nome_vis, aprendido):
+    """Nome bonito da casa. Se o surebet mascarou a visível, deduz pelo slug do href:
+    1) pernas LIMPAS do mesmo lote, 2) mapa de fábrica, 3) catálogo já aprendido,
+    4) o próprio slug 'aportuguesado'. Se veio limpa, devolve como está."""
+    nome_vis = (nome_vis or "").strip()
+    if not _casa_mascarada(nome_vis):
+        return nome_vis
+    if slug:
+        return (aprendido.get(slug) or _CASA_FALLBACK.get(slug)
+                or CASAS_CAT.get(slug) or _bonito_do_slug(slug))
+    return nome_vis or "Casa"
+
+
 def _converter_raspagem(records):
     """Converte os registros raspados do DOM da surebet.com no contrato do painel."""
+    # Aprende slug(href) -> nome bonito das pernas que vieram LIMPAS neste lote, pra
+    # recuperar a casa das pernas que o surebet mascarou ("XXX"/anúncio).
+    aprendido = {}
+    for r in records:
+        for l in r.get("legs", []):
+            nm = (l.get("bookmaker") or "").strip()
+            if _casa_mascarada(nm):
+                continue
+            sl = _slug_do_href(l.get("ev_href") or r.get("ev_href"), l.get("idx", -1))
+            if sl:
+                aprendido.setdefault(sl, nm)
     contratos = []
     for r in records:
         legs = r.get("legs", [])
@@ -2450,13 +2539,16 @@ def _converter_raspagem(records):
             code = l.get("market", "")
             # descrição legível: usa o balão do surebet se veio; senão traduz o código
             desc = (l.get("desc") or "").strip() or _mercado_legivel(code, t1, t2)
+            # casa: se o surebet mascarou o nome, deduz o nome bonito pelo slug do href
+            slug_casa = _slug_do_href(l.get("ev_href") or r.get("ev_href"), l.get("idx", -1))
+            nome_casa = _resolver_casa(slug_casa, l.get("bookmaker", ""), aprendido)
             pernas.append({
                 "outcome": code,
                 "desc": desc,
                 "odd": round(o, 3),
-                "bookmaker": _slug(l.get("bookmaker", "")),
-                "bookmaker_label": l.get("bookmaker", ""),
-                "bookmaker_type": _tipo_casa(l.get("bookmaker", "")),
+                "bookmaker": _slug(nome_casa),
+                "bookmaker_label": nome_casa,
+                "bookmaker_type": _tipo_casa(nome_casa),
                 "stake_pct": round(stake / banca * 100, 1),
                 "stake_brl": round(stake, 2),
                 "link": _link_casa(l.get("link")),   # só link da casa; nunca surebet.com

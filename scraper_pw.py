@@ -86,10 +86,12 @@ JS_RASPAR = r"""
     let desc = tip(ab) || tip(co);
     return { bookmaker: nome, market: co?co.textContent.trim():"", odd, desc: (desc||"").trim(),
       teams: ev?((ev.querySelector("a")||ev).textContent||"").trim():"", sport,
-      link: vl?vl.href:null };
+      link: vl?vl.href:null, ev_href: ev?((ev.querySelector("a")||{}).href||null):null };
   }).filter(Boolean);
+  legs.forEach((l,i)=> l.idx = i);
+  const evA = rec.querySelector(".event a");
   return { id: rec.dataset.id, profit: parseFloat(rec.dataset.profit) || 0,
-    start: parseInt(rec.dataset.startAt) || 0, legs };
+    start: parseInt(rec.dataset.startAt) || 0, legs, ev_href: evA?evA.href:null };
 }).filter(r => r.legs.length === 2)
 """
 
@@ -145,10 +147,12 @@ JS_RASPAR_MIDDLE = r"""
     let desc = tip(ab) || tip(co);
     return { bookmaker: nome, market: co?co.textContent.trim():"", odd, desc: (desc||"").trim(),
       teams: ev?((ev.querySelector("a")||ev).textContent||"").trim():"", sport,
-      link: vl?vl.href:null };
+      link: vl?vl.href:null, ev_href: ev?((ev.querySelector("a")||{}).href||null):null };
   }).filter(Boolean);
+  legs.forEach((l,i)=> l.idx = i);
+  const evA = rec.querySelector(".event a");
   return { id: rec.dataset.id, profit: parseFloat(rec.dataset.profit) || 0,
-    start: parseInt(rec.dataset.startAt) || 0, legs };
+    start: parseInt(rec.dataset.startAt) || 0, legs, ev_href: evA?evA.href:null };
 }).filter(r => r.legs.length === 2)
 """
 
@@ -507,16 +511,22 @@ def uma_varredura(page, ctx):
         except Exception:
             print("   página seguinte não carregou (parcial — envio como merge).")
             break
-    # resolve os links das casas (redirect surebet -> URL final) antes de enviar
+    # COMPLETO -> snapshot (substitui, remove as que sumiram). PARCIAL -> merge.
+    modo = "snapshot" if completo else "merge"
+    # POSTA OS NOMES JÁ (sem esperar os links): resolver centenas de redirects leva
+    # ~20 min e o cliente ficaria vendo o painel velho/embaralhado esse tempo todo.
+    # 1ª postagem = nomes na hora (links ainda do surebet -> o servidor zera com
+    # _link_casa, botão fica desligado); depois resolvo e reposto com os links.
+    print(f">> Varredura {'COMPLETA' if completo else 'PARCIAL'}: {len(todos)} apostas em {pag} pág. — enviando nomes JÁ ({modo}).")
+    enviar(todos, modo)
+    # agora resolve os links das casas (redirect surebet -> URL final) e reposta
     if todos:
         try:
             resolver_todos(ctx, todos)
+            print(f">> Links resolvidos — repostando com os links ({modo}).")
+            enviar(todos, modo)
         except Exception as e:
             print("   !! erro ao resolver links:", str(e)[:100])
-    # COMPLETO -> snapshot (substitui, remove as que sumiram). PARCIAL -> merge.
-    modo = "snapshot" if completo else "merge"
-    print(f">> Varredura {'COMPLETA' if completo else 'PARCIAL'}: {len(todos)} apostas em {pag} pág. — enviando ({modo}).")
-    enviar(todos, modo)
     # volta pra página 1 (não altera filtro)
     try:
         page.goto(URL_LISTA, wait_until="domcontentloaded", timeout=30000)
