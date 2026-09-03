@@ -2437,11 +2437,11 @@ def _melhor_evento(teams, legs):
     nomes = _times_dos_baloes(legs)
     recon = " – ".join(nomes[:2])
     if _evento_lixo(teams):
-        return recon or teams
+        return recon   # NUNCA vaza 'surebet.com – Professional betting'; vazio se o balão não citar time
     if nomes:
         tk = _cmp_key(teams)
         if not any(_cmp_key(n) and _cmp_key(n) in tk for n in nomes):
-            return recon or teams   # título não confere com o balão => embaralhado
+            return recon or teams   # título não confere com o balão => embaralhado (anagrama, não é lixo)
     return teams
 
 
