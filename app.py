@@ -2524,11 +2524,20 @@ def _converter_raspagem(records):
             continue
         if any(o <= 1 for o in odds):
             continue
-        prof = round(float(r.get("profit", 0)), 2)
-        if not (0 < prof <= config.MAX_LUCRO_SANO):
-            continue   # descarta anomalias (escanteios bugados de 30-400%)
         banca = config.BANCA
         margem = sum(1.0 / o for o in odds)
+        # LUCRO calculado das PRÓPRIAS odds (verdade do arb: 1/margem - 1). NÃO depende
+        # do data-profit do surebet, que o anti-robô às vezes ZERA no throttle — sem
+        # isto o painel fica sem apostas mesmo com odds boas na tela. Usa o do site
+        # quando ele vem sadio; senão cai pro calculado, pra a aposta não sumir.
+        prof_calc = round((1.0 / margem - 1.0) * 100, 2) if margem > 0 else 0.0
+        try:
+            prof_site = round(float(r.get("profit", 0) or 0), 2)
+        except (TypeError, ValueError):
+            prof_site = 0.0
+        prof = prof_site if (0 < prof_site <= config.MAX_LUCRO_SANO) else prof_calc
+        if not (0 < prof <= config.MAX_LUCRO_SANO):
+            continue   # sem lucro sadio nem calculado -> descarta (anomalia real)
         teams = max((l.get("teams", "") for l in legs), key=len)
         if _evento_lixo(teams):                 # título embaralhado/placeholder do surebet:
             teams = _evento_reconstruido(legs)  # reconstrói pelo balão; nunca vaza 'surebet.com'
