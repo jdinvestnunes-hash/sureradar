@@ -2872,8 +2872,11 @@ def ingest(request: Request, payload: dict = Body(...)):
             feed.snapshot_acima(contratos, piso, quando=quando)
     else:
         feed.merge_surebets(contratos, quando=quando)
-    if contratos:
-        feed.marcar_ingest()
+    # Robo VIVO = postou (mesmo 0 contratos: com a regra "sem link nao entra" e conta
+    # sem acesso aos links, o snapshot vem vazio de proposito). Sem isto o feed
+    # envelhecia, o painel dizia "offline", o vigia matava por zumbi e o guardiao
+    # alertava CAIU com o robo rodando normal (04/09).
+    feed.marcar_ingest()
 
     # Casas / esportes / faixa de lucro ESPELHAM TODO o feed vivo (não só este
     # ingest, que é parcial).
