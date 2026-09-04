@@ -16,7 +16,7 @@ $ESTADO_URL = "https://sureradar.site/api/robo/estado"
 # ACIMA do pior caso legítimo (após uma queda longa o robô leva ~12 min resolvendo
 # centenas de links das casas antes de mandar o 1º painel) — assim NÃO reinicia no
 # meio de uma recuperação normal, só quando realmente travou.
-$LIMITE_ZUMBI_SEG = 3600   # 45 min: ciclo do robo agora e de 30 min (CICLO_MIN) + folga
+$LIMITE_ZUMBI_SEG = 3600   # 60 min: ciclo do robo e sorteado entre 15 e 45 min (CICLO_FAIXA_MIN) + folga
 # Janela de GRACA depois de (re)subir o robo: durante ela o vigia NAO mata por
 # zumbi, pra dar tempo do robo fazer a 1a varredura e postar o 1o painel (~12 min).
 # Sem isso o vigia matava o robo a cada 60s no meio da varredura -> ele nunca
