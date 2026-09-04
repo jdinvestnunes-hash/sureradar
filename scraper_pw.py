@@ -236,8 +236,16 @@ def resolver_link(ctx, pg, nav_url):
     # jardel 04/09 pediu que seja a navegacao normal do navegador.
     antes = list(ctx.pages)       # pra detectar se a casa abriu em ABA NOVA (popup)
     erro = ""
+    # Referer = a pagina de listagem de onde o link veio (e o que um clique manda).
+    # Sem Referer o /nav/ do surebet devolve "Pagina nao encontrada" (04/09).
+    if "/nav/valuebet" in nav_url:
+        origem = URL_VALOR
+    elif "/nav/middle" in nav_url:
+        origem = URL_MIDDLE
+    else:
+        origem = URL_LISTA
     try:
-        pg.goto(nav_url, wait_until="domcontentloaded", timeout=25000)
+        pg.goto(nav_url, referer=origem, wait_until="domcontentloaded", timeout=25000)
         pg.wait_for_timeout(1500)
     except Exception as e:        # site da casa pesado/timeout: a URL pode ja ter trocado
         erro = str(e).splitlines()[0][:90] if str(e) else "erro"
