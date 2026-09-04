@@ -204,7 +204,7 @@ CATALOGO_TTL_SEG = 6 * 3600    # 6 horas
 # que o robô parou e mostra o aviso "reconferindo as apostas". O ciclo real do
 # robô é ~13-14 min (raspagem + envio), então 20 min dá folga pra não dar
 # falso-alarme entre ciclos, e ainda avisa ANTES do feed expirar (25 min).
-ROBO_OFFLINE_SEG = 1200        # 20 minutos sem raspagem -> avisa que está offline
+ROBO_OFFLINE_SEG = 2280        # 38 min sem raspagem -> avisa offline (ciclo do robô = 30 min; feed expira aos 40)
 
 # Guarda de segurança: se os créditos restantes na API caírem abaixo disto,
 # o agendador PARA sozinho para não zerar sua conta.
@@ -232,7 +232,7 @@ PROMO_CANAL_ATIVO = os.getenv("PROMO_CANAL_ATIVO", "0").strip() not in ("0", "fa
 GUARDIAO_ATIVO = os.getenv("GUARDIAO_ATIVO", "1").strip() not in ("0", "false", "False", "")
 # Minutos SEM dados novos até te alertar "CAIU" no Telegram. 15 = seguro (o robô
 # atualiza a cada ~1 min, então 15 min parado é certeza de queda, sem alarme falso).
-ROBO_ALERTA_MIN = int(os.getenv("ROBO_ALERTA_MIN", "15"))
+ROBO_ALERTA_MIN = int(os.getenv("ROBO_ALERTA_MIN", "40"))   # robô em ciclo de 30 min (04/09)
 
 # Alertas personalizados no Telegram (surebet que bate com os filtros do usuário
 # cai na DM dele). BETA: liberado só para estes e-mails (separados por vírgula).

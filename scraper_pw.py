@@ -53,8 +53,9 @@ MAX_VALOR = 50                # teto de segurança (modo manso)
 MAX_PAG_MIDDLE = 2            # middles: só 2 págs por ciclo (modo manso — menos carga)
 MAX_MIDDLE = 50               # teto de segurança (modo manso)
 PERFIL = "pw_profile"          # sessão do Chrome fica salva aqui (login persiste)
-CICLO_MIN = 12                 # minutos entre varreduras FUNDAS. NÃO passar de ~15: o vigia
-                               # mata por zumbi com feed parado > 20 min (LIMITE_ZUMBI_SEG).
+CICLO_MIN = 30                 # minutos entre varreduras FUNDAS (decisão do jardel 04/09).
+                               # Se mudar, ajuste junto: vigia LIMITE_ZUMBI_SEG (45 min),
+                               # feed._EXPIRY_SEG e config.ROBO_OFFLINE_SEG (40 min), ROBO_ALERTA_MIN.
 FAST_SEG = 45                  # segundos entre passadas RÁPIDAS (só a página 1 = as de
                                # maior lucro/mais frescas). É o "quase ao vivo".
 FAST_ATIVO = False             # MODO MANSO: só a FUNDA de CICLO_MIN em CICLO_MIN. As rápidas
@@ -62,8 +63,9 @@ FAST_ATIVO = False             # MODO MANSO: só a FUNDA de CICLO_MIN em CICLO_M
                                # Volte a True se um dia quiser o "quase ao vivo" de novo.
 VALOR_ATIVO = True             # liga/desliga a passada de ODDS DE VALOR (deixe True p/ raspar valuebets)
 MIDDLE_ATIVO = True            # liga/desliga a passada de APOSTAS DE INTERVALO (middles)
-MAX_PAGINAS = 20               # TETO de segurança (raro chegar aqui). O corte real é a
-                               # regra abaixo: PRO nas 1as págs + completa o FREE e para.
+MAX_PAGINAS = 2                # SÓ AS 2 PRIMEIRAS PÁGINAS (decisão do jardel 04/09): alimenta o
+                               # PRO e para. Não desce mais atrás da faixa FREE (1–2%) — o FREE
+                               # só recebe o que por acaso estiver nessas 2 págs.
 MIN_PROFIT = 1.0               # PARA quando o lucro chega aqui (lista é decrescente).
                               # FREE = 1–2% · PRO = 2–25% · abaixo de 1% ignora.
 # --- Regra de corte das SUREBETS (leve, mas nunca deixa o FREE vazio) ---
@@ -182,8 +184,8 @@ def _e_surebet(u):
 # surebet + valuebets + middles. O que não couber fica pro próximo ciclo (o cache
 # guarda o que já foi resolvido, então o backlog escoa devagar e nunca se perde).
 LINKS_POR_CICLO = 15           # máx. de links NOVOS (não cacheados) tentados por funda
-                               # (pior caso 15 × ~50s ≈ 12 min, cabe no limite de zumbi do vigia)
-LINK_PAUSA_SEG = (6.0, 14.0)   # pausa (min, máx) entre uma resolução e a próxima
+                               # (pior caso 15 × ~60s ≈ 15 min, cabe folgado no ciclo de 30)
+LINK_PAUSA_SEG = (10.0, 25.0)  # pausa (min, máx) entre uma resolução e a próxima
 _ORC = {"restam": 0}           # orçamento vivo do ciclo atual (zerado em cada funda)
 
 
@@ -340,7 +342,7 @@ def uma_varredura_valor(page, ctx):
             break
         id_antes = page.evaluate(
             "() => { const r=document.querySelector('tbody.valuebet_record'); return r?r.dataset.id:''; }")
-        time.sleep(6.0 + random.random() * 6.0)   # ritmo manso entre páginas
+        time.sleep(15.0 + random.random() * 15.0)  # clique bem aos poucos (15–30s)
         try:
             link.click()
             page.wait_for_function(
@@ -438,7 +440,7 @@ def uma_varredura_middle(page, ctx):
             break
         id_antes = page.evaluate(
             "() => { const r=document.querySelector('tbody.middle_record'); return r?r.dataset.id:''; }")
-        time.sleep(6.0 + random.random() * 6.0)   # ritmo manso entre páginas
+        time.sleep(15.0 + random.random() * 15.0)  # clique bem aos poucos (15–30s)
         try:
             link.click()
             page.wait_for_function(
@@ -558,6 +560,10 @@ def uma_varredura(page, ctx):
             print("   fim (sem novidade).")
             completo = True
             break
+        if pag >= MAX_PAGINAS:
+            print(f"   {MAX_PAGINAS} página(s) — teto do modo manso, parando (snapshot).")
+            completo = True
+            break
         # próxima página: CLICA no "próximo »" e espera a lista TROCAR
         link = page.query_selector("a:has-text('próximo'), a:has-text('Próximo'), a:has-text('next')")
         if not link:
@@ -566,7 +572,7 @@ def uma_varredura(page, ctx):
             break
         id_antes = page.evaluate(
             "() => { const r=document.querySelector('tbody.surebet_record'); return r?r.dataset.id:''; }")
-        time.sleep(6.0 + random.random() * 6.0)   # ritmo manso entre páginas (6–12s)
+        time.sleep(15.0 + random.random() * 15.0)  # clique bem aos poucos (15–30s entre páginas)
         try:
             link.click()
             page.wait_for_function(
