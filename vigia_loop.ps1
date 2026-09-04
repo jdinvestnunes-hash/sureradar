@@ -17,6 +17,14 @@ $ESTADO_URL = "https://sureradar.site/api/robo/estado"
 # centenas de links das casas antes de mandar o 1º painel) — assim NÃO reinicia no
 # meio de uma recuperação normal, só quando realmente travou.
 $LIMITE_ZUMBI_SEG = 1200
+# Janela de GRACA depois de (re)subir o robo: durante ela o vigia NAO mata por
+# zumbi, pra dar tempo do robo fazer a 1a varredura e postar o 1o painel (~12 min).
+# Sem isso o vigia matava o robo a cada 60s no meio da varredura -> ele nunca
+# terminava -> feed nunca atualizava -> matava de novo (death loop). 900s (15 min)
+# fica ACIMA dos ~12 min do pior caso.
+$GRACA_POS_START_SEG = 900
+# "ha muito tempo": deixa a 1a acao (subir/reiniciar) livre no start do vigia.
+$script:ultimoStart = (Get-Date).AddSeconds(-100000)
 
 function Get-Scraper {
     Get-CimInstance Win32_Process -Filter "Name='python.exe'" |
@@ -37,6 +45,7 @@ function Start-Robo($motivo) {
         -WorkingDirectory $dir `
         -RedirectStandardOutput "$dir\scraper.log" `
         -RedirectStandardError  "$dir\scraper.err.log"
+    $script:ultimoStart = Get-Date   # zera a janela de graca: nao matar por zumbi ja no proximo tick
     "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - robo SUBIU pelo vigia ($motivo)." |
         Out-File -FilePath "$dir\vigia.log" -Append -Encoding utf8
 }
@@ -68,9 +77,17 @@ while ($true) {
             if (-not $proc) {
                 Start-Robo "processo ausente"
             } elseif (($null -ne $idade) -and ($idade -gt $LIMITE_ZUMBI_SEG)) {
-                # Zumbi: vivo mas o painel está velho -> mata e sobe de novo.
-                Stop-Robo
-                Start-Robo ("zumbi: feed parado ha " + [int]$idade + "s")
+                # Zumbi: vivo mas o painel está velho. SÓ mata se já passou a janela de
+                # graça desde o último start — senão o robô ainda está fazendo a 1ª
+                # varredura (que leva ~12 min) e matá-lo agora recomeça o loop do zero.
+                $desdeStart = ((Get-Date) - $script:ultimoStart).TotalSeconds
+                if ($desdeStart -gt $GRACA_POS_START_SEG) {
+                    Stop-Robo
+                    Start-Robo ("zumbi: feed parado ha " + [int]$idade + "s")
+                } else {
+                    "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - feed velho ($([int]$idade)s) mas dentro da graca ($([int]$desdeStart)s/$GRACA_POS_START_SEG s) - aguardando 1a varredura." |
+                        Out-File -FilePath "$dir\vigia.log" -Append -Encoding utf8
+                }
             }
         }
     } catch { }

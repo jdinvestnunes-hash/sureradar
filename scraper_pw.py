@@ -48,12 +48,13 @@ SAAS_MIDDLE = SAAS.replace("/api/ingest", "/api/ingest-middle") # APOSTAS DE INT
 URL_LISTA = "https://pt.surebet.com/surebets"
 URL_VALOR = "https://pt.surebet.com/valuebets"                  # aba "Apostas de valor"
 URL_MIDDLE = "https://pt.surebet.com/middles"                   # aba "Apostas de intervalo"
-MAX_PAG_VALOR = 5              # valuebets já vêm filtradas nas suas casas — poucas págs
-MAX_VALOR = 150               # teto de segurança
-MAX_PAG_MIDDLE = 5            # middles já vêm filtradas nas suas casas — poucas págs
-MAX_MIDDLE = 150              # teto de segurança
+MAX_PAG_VALOR = 2              # valuebets: só 2 págs por ciclo (modo manso — menos carga)
+MAX_VALOR = 50                # teto de segurança (modo manso)
+MAX_PAG_MIDDLE = 2            # middles: só 2 págs por ciclo (modo manso — menos carga)
+MAX_MIDDLE = 50               # teto de segurança (modo manso)
 PERFIL = "pw_profile"          # sessão do Chrome fica salva aqui (login persiste)
-CICLO_MIN = 10                 # minutos entre varreduras FUNDAS (completa: todas as págs)
+CICLO_MIN = 12                 # minutos entre varreduras FUNDAS. NÃO passar de ~15: o vigia
+                               # mata por zumbi com feed parado > 20 min (LIMITE_ZUMBI_SEG).
 FAST_SEG = 45                  # segundos entre passadas RÁPIDAS (só a página 1 = as de
                                # maior lucro/mais frescas). É o "quase ao vivo".
 FAST_ATIVO = False             # MODO MANSO: só a FUNDA de CICLO_MIN em CICLO_MIN. As rápidas
@@ -70,8 +71,8 @@ MIN_PROFIT = 1.0               # PARA quando o lucro chega aqui (lista é decres
 # 2) Depois da pág PRO_PAGS: desce SÓ pra completar a faixa FREE (1–2%), pegando
 #    FREE_ALVO surebets (prioriza as de ~2%; se faltar, completa com as de 1%).
 # 3) Para quando junta FREE_ALVO do FREE (ou quando o lucro cai abaixo de 1%).
-PRO_PAGS = 5                   # nº de páginas do topo que alimentam o PRO
-FREE_ALVO = 10                 # quantas surebets da faixa FREE (1–2%) garantir
+PRO_PAGS = 2                   # nº de páginas do topo que alimentam o PRO (era 5; modo manso)
+FREE_ALVO = 6                  # quantas surebets da faixa FREE (1–2%) garantir (era 10)
 FREE_MIN = 1.0                 # piso da faixa FREE (= FREE_LUCRO_MIN do backend)
 FREE_MAX = 2.0                 # teto da faixa FREE (= FREE_LUCRO_MAX do backend)
 HEADLESS = False               # janela visível (pra você logar). Vira True no servidor.
@@ -174,6 +175,33 @@ def _e_surebet(u):
     return bool(u) and "surebet.com" in u
 
 
+# --- RITMO da resolução de links (a parte que mais pesa no site) ---------------
+# Antes: resolvia TODOS os links novos em rajada (centenas de redirects seguidos,
+# sem pausa) — foi isso que disparou o throttle. Agora: um de cada vez, com pausa
+# entre um e outro, e um ORÇAMENTO de links novos por ciclo compartilhado entre
+# surebet + valuebets + middles. O que não couber fica pro próximo ciclo (o cache
+# guarda o que já foi resolvido, então o backlog escoa devagar e nunca se perde).
+LINKS_POR_CICLO = 15           # máx. de links NOVOS (não cacheados) tentados por funda
+                               # (pior caso 15 × ~50s ≈ 12 min, cabe no limite de zumbi do vigia)
+LINK_PAUSA_SEG = (6.0, 14.0)   # pausa (min, máx) entre uma resolução e a próxima
+_ORC = {"restam": 0}           # orçamento vivo do ciclo atual (zerado em cada funda)
+
+
+def orcamento_novo_ciclo():
+    """Chamado no INÍCIO de cada funda: recarrega o orçamento de links novos."""
+    _ORC["restam"] = LINKS_POR_CICLO
+
+
+def _tem_orcamento():
+    return _ORC["restam"] > 0
+
+
+def _gastar_orcamento():
+    """Conta 1 tentativa de link novo e faz a pausa 'um de cada vez'."""
+    _ORC["restam"] -= 1
+    time.sleep(random.uniform(*LINK_PAUSA_SEG))
+
+
 def resolver_link(ctx, pg, nav_url):
     """Segue o redirect do surebet (com a sessão logada) até a URL final da casa.
     Rápido via request (redirects HTTP); se travar em surebet (redirect via JS),
@@ -182,6 +210,9 @@ def resolver_link(ctx, pg, nav_url):
         return nav_url
     if nav_url in LINK_CACHE:
         return LINK_CACHE[nav_url]
+    if not _tem_orcamento():      # acabou a cota deste ciclo: fica pro próximo
+        return None
+    _gastar_orcamento()           # conta a tentativa (mesmo se falhar) + pausa
     final = nav_url
     try:
         resp = ctx.request.get(nav_url, max_redirects=20, timeout=15000)
@@ -208,7 +239,8 @@ def resolver_todos(ctx, bets):
     faltam = [leg for b in bets for leg in b.get("legs", [])
               if _e_surebet(leg.get("link")) and leg["link"] not in LINK_CACHE]
     if faltam:
-        print(f"   resolvendo {len(faltam)} link(s) novo(s) das casas… (cache: {len(LINK_CACHE)})")
+        print(f"   resolvendo {min(len(faltam), _ORC['restam'])} de {len(faltam)} link(s) novo(s) "
+              f"das casas, um por vez (cota do ciclo: {_ORC['restam']} · cache: {len(LINK_CACHE)})")
     pg = ctx.new_page()
     resolvidos = 0
     try:
@@ -262,7 +294,8 @@ def resolver_todos_valor(ctx, recs):
     botão 'ABRIR NA CASA' morto."""
     faltam = [r for r in recs if _e_surebet(r.get("link")) and r["link"] not in LINK_CACHE]
     if faltam:
-        print(f"   valuebets: resolvendo {len(faltam)} link(s) novo(s) das casas…")
+        print(f"   valuebets: resolvendo até {min(len(faltam), _ORC['restam'])} de {len(faltam)} "
+              f"link(s) novo(s), um por vez (cota restante: {_ORC['restam']})")
     pg = ctx.new_page()
     try:
         for r in recs:
@@ -307,7 +340,7 @@ def uma_varredura_valor(page, ctx):
             break
         id_antes = page.evaluate(
             "() => { const r=document.querySelector('tbody.valuebet_record'); return r?r.dataset.id:''; }")
-        time.sleep(2.0 + random.random() * 2)
+        time.sleep(6.0 + random.random() * 6.0)   # ritmo manso entre páginas
         try:
             link.click()
             page.wait_for_function(
@@ -357,7 +390,8 @@ def resolver_todos_middle(ctx, recs):
     faltam = [g for r in recs for g in r.get("legs", [])
               if _e_surebet(g.get("link")) and g["link"] not in LINK_CACHE]
     if faltam:
-        print(f"   middles: resolvendo {len(faltam)} link(s) novo(s) das casas…")
+        print(f"   middles: resolvendo até {min(len(faltam), _ORC['restam'])} de {len(faltam)} "
+              f"link(s) novo(s), um por vez (cota restante: {_ORC['restam']})")
     pg = ctx.new_page()
     try:
         for r in recs:
@@ -404,7 +438,7 @@ def uma_varredura_middle(page, ctx):
             break
         id_antes = page.evaluate(
             "() => { const r=document.querySelector('tbody.middle_record'); return r?r.dataset.id:''; }")
-        time.sleep(2.0 + random.random() * 2)
+        time.sleep(6.0 + random.random() * 6.0)   # ritmo manso entre páginas
         try:
             link.click()
             page.wait_for_function(
@@ -532,7 +566,7 @@ def uma_varredura(page, ctx):
             break
         id_antes = page.evaluate(
             "() => { const r=document.querySelector('tbody.surebet_record'); return r?r.dataset.id:''; }")
-        time.sleep(2.5 + random.random() * 2.5)   # ritmo humano
+        time.sleep(6.0 + random.random() * 6.0)   # ritmo manso entre páginas (6–12s)
         try:
             link.click()
             page.wait_for_function(
@@ -710,6 +744,7 @@ def main():
                     # (ex.: resolução de links longa), prox_funda já expirou e a próxima
                     # roda na hora, sem esticar o ciclo.
                     prox_funda = time.time() + CICLO_MIN * 60
+                    orcamento_novo_ciclo()                   # cota de links novos deste ciclo
                     try:
                         uma_varredura(page, ctx)             # PRINCIPAL: surebet (todas as págs)
                     except Exception as e:
