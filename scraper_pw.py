@@ -234,16 +234,38 @@ def resolver_link(ctx, pg, nav_url):
     # NAVEGA de verdade na aba (mesmo caminho de um clique no link: surebet ->
     # redirect -> casa). Antes usava ctx.request.get (pedido direto, sem navegar);
     # jardel 04/09 pediu que seja a navegacao normal do navegador.
+    antes = list(ctx.pages)       # pra detectar se a casa abriu em ABA NOVA (popup)
+    erro = ""
     try:
         pg.goto(nav_url, wait_until="domcontentloaded", timeout=25000)
         pg.wait_for_timeout(1500)
-    except Exception:
-        pass                      # site da casa pesado/timeout: a URL pode ja ter trocado
+    except Exception as e:        # site da casa pesado/timeout: a URL pode ja ter trocado
+        erro = str(e).splitlines()[0][:90] if str(e) else "erro"
+    candidatos = []
     try:
-        if not _e_surebet(pg.url):
-            final = pg.url
+        candidatos.append(pg.url)
     except Exception:
         pass
+    novas = [p for p in ctx.pages if p not in antes]
+    for p in novas:               # casa abriu em aba nova: pega a URL dela e fecha
+        try:
+            p.wait_for_load_state("domcontentloaded", timeout=8000)
+        except Exception:
+            pass
+        try:
+            candidatos.append(p.url)
+        except Exception:
+            pass
+        try:
+            p.close()
+        except Exception:
+            pass
+    for u in candidatos:          # so vale URL http(s) de fora do surebet (about:blank NAO)
+        if u and u.startswith("http") and not _e_surebet(u):
+            final = u
+            break
+    if _e_surebet(final) and erro:
+        print(f"      link nao resolveu ({erro})")
     try:                          # "fecha" a pagina da casa: volta pra aba em branco
         pg.goto("about:blank", timeout=5000)
     except Exception:
