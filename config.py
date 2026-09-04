@@ -222,6 +222,11 @@ TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "").strip()
 # Pegue o seu chat_id mandando qualquer mensagem pro bot e vendo em /api/admin/telegram-chats.
 ADMIN_TELEGRAM_CHAT_ID = os.getenv("ADMIN_TELEGRAM_CHAT_ID", "").strip()
 
+# Posts automáticos de ENTRADAS no canal/grupo (promo.py). DESLIGADO por padrão
+# enquanto o surebet.com embaralha os nomes dos times — as entradas saíam erradas.
+# Religa pondo PROMO_CANAL_ATIVO=1 no .env/Railway quando os nomes voltarem certos.
+PROMO_CANAL_ATIVO = os.getenv("PROMO_CANAL_ATIVO", "0").strip() not in ("0", "false", "False", "")
+
 # --- GUARDIÃO do robô (vigia na nuvem: alerta de queda + comandos /ligar /desligar) ---
 # Liga o guardião (thread na Railway que fica de olho na idade do feed e escuta o bot).
 GUARDIAO_ATIVO = os.getenv("GUARDIAO_ATIVO", "1").strip() not in ("0", "false", "False", "")
