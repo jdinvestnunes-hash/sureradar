@@ -370,7 +370,7 @@ def uma_varredura_valor(page, ctx):
             page.wait_for_selector("tbody.valuebet_record", timeout=15000)
         except Exception:
             break
-        recs = page.evaluate(JS_RASPAR_VALOR)
+        recs = _evaluate_retry(page, JS_RASPAR_VALOR, sel="tbody.valuebet_record, tbody")
         novos = 0
         for r in recs:
             key = (r.get("casa"), r.get("event"), r.get("mercado"), r.get("odd"))
@@ -469,7 +469,7 @@ def uma_varredura_middle(page, ctx):
             page.wait_for_selector("tbody.middle_record", timeout=15000)
         except Exception:
             break
-        recs = page.evaluate(JS_RASPAR_MIDDLE)
+        recs = _evaluate_retry(page, JS_RASPAR_MIDDLE, sel="tbody.middle_record, tbody")
         novos = 0
         for r in recs:
             key = r.get("id") or tuple(sorted((g.get("bookmaker", ""), g.get("market", ""))
@@ -556,6 +556,25 @@ def uma_varredura_rapida(page, ctx):
     enviar(uteis, modo="snapshot_acima")
 
 
+def _evaluate_retry(page, js, arg=None, sel="tbody.surebet_record", tentativas=3):
+    """page.evaluate tolerante ao AUTO-REFRESH do surebet: se a pagina navegou no
+    meio ("Execution context was destroyed"), espera a tabela voltar e tenta de novo.
+    Sem isso uma varredura inteira era perdida (04/09)."""
+    ultimo = None
+    for _ in range(tentativas):
+        try:
+            return page.evaluate(js, arg) if arg is not None else page.evaluate(js)
+        except Exception as e:
+            ultimo = e
+            try:
+                page.wait_for_load_state("domcontentloaded", timeout=15000)
+                page.wait_for_selector(sel, timeout=15000)
+                page.wait_for_timeout(1500)
+            except Exception:
+                pass
+    raise ultimo
+
+
 def uma_varredura(page, ctx):
     page.goto(URL_LISTA, wait_until="domcontentloaded", timeout=60000)
     if not esperar_login(page):
@@ -570,7 +589,7 @@ def uma_varredura(page, ctx):
             print("   sem registros nesta página (fim ou bloqueio).")
             break
         page.wait_for_timeout(1000)
-        recs = page.evaluate(JS_RASPAR)
+        recs = _evaluate_retry(page, JS_RASPAR)
         # só interessa lucro >= MIN_PROFIT (1,0). Lista decrescente: quando
         # aparecer algo abaixo disso, chegamos no fim útil (raspagem COMPLETA).
         chegou_piso = any(r.get("profit", 99) < MIN_PROFIT for r in recs)
@@ -617,9 +636,12 @@ def uma_varredura(page, ctx):
             print("   fim (sem página seguinte).")
             completo = True
             break
-        id_antes = page.evaluate(
-            "() => { const r=document.querySelector('tbody.surebet_record'); return r?r.dataset.id:''; }")
         time.sleep(15.0 + random.random() * 15.0)  # clique bem aos poucos (15–30s entre páginas)
+        # re-acha o "proximo" DEPOIS da pausa: o surebet auto-atualiza a lista e o
+        # handle antigo fica invalido (04/09: "Execution context was destroyed").
+        link = page.query_selector("a:has-text('próximo'), a:has-text('Próximo'), a:has-text('next')") or link
+        id_antes = _evaluate_retry(page,
+            "() => { const r=document.querySelector('tbody.surebet_record'); return r?r.dataset.id:''; }")
         try:
             link.click()
             page.wait_for_function(
