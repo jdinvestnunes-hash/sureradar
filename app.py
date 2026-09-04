@@ -2561,6 +2561,26 @@ def _resolver_casa(slug, nome_vis, aprendido):
     return nome_vis or "Casa"
 
 
+def _nome_confiavel(teams_raw, teams_final, legs):
+    """True quando o nome do evento e CONFIAVEL (regra jardel 04/09: sem nome certo
+    nao entra no painel). Sinais de throttle/anti-robo: titulo lixo ('surebet.com -
+    Professional betting'), casa mascarada ('XXX'/anuncio) ou titulo que nao confere
+    com os times do balao. Nesses casos so aceita se o balao CONFIRMOU o nome."""
+    final = (teams_final or "").strip()
+    if not final or _evento_lixo(final):
+        return False
+    nomes = _times_dos_baloes(legs)
+    tk = _cmp_key(final)
+    confirmado = bool(nomes) and any(_cmp_key(n) and _cmp_key(n) in tk for n in nomes)
+    if confirmado:
+        return True
+    if nomes:                      # balao cita time e o titulo nao bate -> anagrama
+        return False
+    suspeito = _evento_lixo(teams_raw) or any(
+        _casa_mascarada((l.get("bookmaker") or "").strip()) for l in legs)
+    return not suspeito            # sem sinal de throttle e sem como conferir: aceita
+
+
 def _converter_raspagem(records):
     """Converte os registros raspados do DOM da surebet.com no contrato do painel."""
     # Aprende slug(href) -> nome bonito das pernas que vieram LIMPAS neste lote, pra
@@ -2599,10 +2619,12 @@ def _converter_raspagem(records):
         prof = prof_site if (0 < prof_site <= config.MAX_LUCRO_SANO) else prof_calc
         if not (0 < prof <= config.MAX_LUCRO_SANO):
             continue   # sem lucro sadio nem calculado -> descarta (anomalia real)
-        teams = max((l.get("teams", "") for l in legs), key=len)
+        teams_raw = max((l.get("teams", "") for l in legs), key=len)
         # título do surebet vem embaralhado (anagrama) sob throttle -> confere/reconstrói
         # pelo balão (desc), que não é embaralhado.
-        teams = _melhor_evento(teams, legs)
+        teams = _melhor_evento(teams_raw, legs)
+        if not _nome_confiavel(teams_raw, teams, legs):
+            continue   # regra 04/09: nome embaralhado/sem confirmacao NAO entra no painel
         t1, t2 = _split_teams(teams)
         pernas = []
         for l, o in zip(legs, odds):
@@ -2624,6 +2646,8 @@ def _converter_raspagem(records):
                 "stake_brl": round(stake, 2),
                 "link": _link_casa(l.get("link")),   # só link da casa; nunca surebet.com
             })
+        if any(not p["link"] for p in pernas):
+            continue   # regra 04/09: sem link da casa em TODAS as pernas NAO entra no painel
         sport = _norm_sport(legs[0].get("sport", ""))
         if sport == "?":   # raspagem sem esporte: tenta deduzir pelo mercado
             sport = _inferir_sport([l.get("market", "") for l in legs]) or "?"
@@ -2691,6 +2715,9 @@ def ingest_valor(request: Request, payload: dict = Body(...)):
             event = (r.get("event") or "").strip()
             mercado = (r.get("mercado") or "").strip()
             casa = (r.get("casa") or "").strip()
+            link_casa = _link_casa(r.get("link"))
+            if not link_casa or not event or _evento_lixo(event) or _casa_mascarada(casa):
+                continue   # regra 04/09: sem link da casa ou nome certo NAO entra
             itens.append({
                 # id estável (evento|mercado|casa) pro merge por id no valor_feed:
                 # a MESMA odd que reaparece atualiza no lugar (renova preço + tempo),
@@ -2709,7 +2736,7 @@ def ingest_valor(request: Request, payload: dict = Body(...)):
                 # painel mostra pro cliente entender de onde sai a "odd justa"
                 "prob": round(prob if prob > 0 else (100.0 / justa if justa > 0 else 0), 1),
                 "stake": r.get("stake") or 2,
-                "link": _link_casa(r.get("link")),
+                "link": link_casa,
             })
         except (TypeError, ValueError):
             continue
@@ -2769,6 +2796,8 @@ def ingest_middle(request: Request, payload: dict = Body(...)):
                 t = (g.get("teams") or "").strip()
                 if len(t) > len(event):
                     event = t
+            if any(not g["link"] for g in legs) or not event or _evento_lixo(event)                     or any(_casa_mascarada(g["casa"]) for g in legs):
+                continue   # regra 04/09: sem link nas 2 pernas ou nome certo NAO entra
             # id estável: o do surebet quando existe, senão evento+casas+mercados
             iid = (r.get("id") or "").strip() or (
                 event + "|" + "|".join(f"{g['casa']}:{g['mercado']}" for g in legs)).lower()

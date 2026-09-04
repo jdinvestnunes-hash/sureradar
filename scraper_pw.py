@@ -413,7 +413,8 @@ def uma_varredura_valor(page, ctx):
         resolver_todos_valor(ctx, todos)
     except Exception as e:
         print("   !! valuebets: falha ao resolver links:", str(e)[:100])
-    com_link = sum(1 for r in todos if r.get("link"))
+    todos = [r for r in todos if _link_ok(r.get("link"))]   # regra 04/09: sem link nao envia
+    com_link = len(todos)
     print(f">> Valuebets: {len(todos)} odds de valor em {pag} pág. "
           f"({com_link} com link da casa) — enviando.")
     enviar_valor(todos)
@@ -513,6 +514,7 @@ def uma_varredura_middle(page, ctx):
         resolver_todos_middle(ctx, todos)
     except Exception as e:
         print("   !! middles: falha ao resolver links:", str(e)[:100])
+    todos = [r for r in todos if _aposta_com_link(r)]        # regra 04/09: sem link nao envia
     com_link = sum(1 for r in todos for g in r.get("legs", []) if g.get("link"))
     print(f">> Middles: {len(todos)} apostas de intervalo em {pag} pág. "
           f"({com_link} pernas com link da casa) — enviando.")
@@ -568,6 +570,15 @@ def uma_varredura_rapida(page, ctx):
         print("   !! rápida: erro ao resolver links:", str(e)[:80])
     print(f">> Passada RÁPIDA (pág 1): {len(uteis)} apostas — enviando (snapshot_acima).")
     enviar(uteis, modo="snapshot_acima")
+
+
+def _link_ok(u):
+    return bool(u) and str(u).startswith("http") and not _e_surebet(u)
+
+
+def _aposta_com_link(r):
+    legs = r.get("legs") or []
+    return bool(legs) and all(_link_ok(g.get("link")) for g in legs)
 
 
 def _evaluate_retry(page, js, arg=None, sel="tbody.surebet_record", tentativas=3):
@@ -670,16 +681,18 @@ def uma_varredura(page, ctx):
     # ~20 min e o cliente ficaria vendo o painel velho/embaralhado esse tempo todo.
     # 1ª postagem = nomes na hora (links ainda do surebet -> o servidor zera com
     # _link_casa, botão fica desligado); depois resolvo e reposto com os links.
-    print(f">> Varredura {'COMPLETA' if completo else 'PARCIAL'}: {len(todos)} apostas em {pag} pág. — enviando nomes JÁ ({modo}).")
-    enviar(todos, modo)
-    # agora resolve os links das casas (redirect surebet -> URL final) e reposta
+    # REGRA 04/09 (jardel): NAO manda mais "nomes JA" sem link. Resolve os links
+    # primeiro e so envia as apostas com link da casa em TODAS as pernas (o servidor
+    # ainda confere o nome e descarta o embaralhado).
+    print(f">> Varredura {'COMPLETA' if completo else 'PARCIAL'}: {len(todos)} apostas em {pag} pág. — resolvendo links antes de enviar.")
     if todos:
         try:
             resolver_todos(ctx, todos)
-            print(f">> Links resolvidos — repostando com os links ({modo}).")
-            enviar(todos, modo)
         except Exception as e:
             print("   !! erro ao resolver links:", str(e)[:100])
+        prontas = [r for r in todos if _aposta_com_link(r)]
+        print(f">> {len(prontas)} de {len(todos)} apostas com link em todas as pernas — enviando ({modo}).")
+        enviar(prontas, modo)
     # volta pra página 1 (não altera filtro)
     try:
         page.goto(URL_LISTA, wait_until="domcontentloaded", timeout=30000)
