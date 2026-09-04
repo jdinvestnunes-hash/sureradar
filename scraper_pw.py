@@ -186,7 +186,10 @@ def _e_surebet(u):
 LINKS_POR_CICLO = 15           # máx. de links NOVOS (não cacheados) tentados por funda
                                # (pior caso 15 × ~60s ≈ 15 min, cabe folgado no ciclo de 30)
 LINK_PAUSA_SEG = (10.0, 25.0)  # pausa (min, máx) entre uma resolução e a próxima
-_ORC = {"restam": 0}           # orçamento vivo do ciclo atual (zerado em cada funda)
+LINKS_RESERVA_VM = 5           # dessa cota, quantos ficam GUARDADOS pra valuebets+middles
+                               # (as surebets param em LINKS_POR_CICLO - 5; sem isso elas
+                               # comiam a cota toda e middles sem link o painel descarta)
+_ORC = {"restam": 0, "piso": 0}  # orçamento vivo do ciclo atual (zerado em cada funda)
 
 
 def orcamento_novo_ciclo():
@@ -195,7 +198,7 @@ def orcamento_novo_ciclo():
 
 
 def _tem_orcamento():
-    return _ORC["restam"] > 0
+    return _ORC["restam"] > _ORC["piso"]
 
 
 def _gastar_orcamento():
@@ -241,10 +244,12 @@ def resolver_todos(ctx, bets):
     faltam = [leg for b in bets for leg in b.get("legs", [])
               if _e_surebet(leg.get("link")) and leg["link"] not in LINK_CACHE]
     if faltam:
-        print(f"   resolvendo {min(len(faltam), _ORC['restam'])} de {len(faltam)} link(s) novo(s) "
-              f"das casas, um por vez (cota do ciclo: {_ORC['restam']} · cache: {len(LINK_CACHE)})")
+        cota = max(0, _ORC['restam'] - LINKS_RESERVA_VM)
+        print(f"   resolvendo {min(len(faltam), cota)} de {len(faltam)} link(s) novo(s) "
+              f"das casas, um por vez (cota: {cota}, +{LINKS_RESERVA_VM} guardados p/ valor/middle · cache: {len(LINK_CACHE)})")
     pg = ctx.new_page()
     resolvidos = 0
+    _ORC["piso"] = LINKS_RESERVA_VM      # surebets não passam da reserva das valuebets/middles
     try:
         for b in bets:
             for leg in b.get("legs", []):
@@ -257,6 +262,7 @@ def resolver_todos(ctx, bets):
                         if resolvidos % 40 == 0:         # salva parcial: se morrer no meio, não perde o backlog já feito
                             _salvar_cache()
     finally:
+        _ORC["piso"] = 0
         pg.close()
     if faltam:
         _salvar_cache()
