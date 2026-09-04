@@ -322,16 +322,31 @@ def resolver_todos(ctx, bets):
 INGEST_TOKEN = os.getenv("INGEST_TOKEN", "").strip()   # mesmo valor do Railway
 
 
+def _post_com_retry(url, payload, rotulo, tentativas=3, espera=(15, 30)):
+    """POST no painel com NOVA TENTATIVA: um timeout/queda passageira da rede ou do
+    Railway não pode jogar fora um ciclo inteiro (15-45 min até o próximo)."""
+    headers = {"X-Ingest-Token": INGEST_TOKEN} if INGEST_TOKEN else {}
+    ultimo = None
+    for i in range(tentativas):
+        try:
+            return requests.post(url, json=payload, headers=headers, timeout=25)
+        except Exception as e:
+            ultimo = e
+            if i + 1 < tentativas:
+                pausa = espera[min(i, len(espera) - 1)]
+                print(f"   !! erro ao enviar {rotulo} (tent. {i+1}/{tentativas}): "
+                      f"{str(e)[:90]} — tentando de novo em {pausa}s")
+                time.sleep(pausa)
+    print(f"   !! erro ao enviar {rotulo} (desisti após {tentativas} tent.):", str(ultimo)[:120])
+    return None
+
+
 def enviar(records, modo="merge"):
     if not records:
         return
-    headers = {"X-Ingest-Token": INGEST_TOKEN} if INGEST_TOKEN else {}
-    try:
-        r = requests.post(SAAS, json={"records": records, "modo": modo},
-                          headers=headers, timeout=25)
+    r = _post_com_retry(SAAS, {"records": records, "modo": modo}, "painel")
+    if r is not None:
         print(f"   -> enviadas {len(records)} ao painel ({modo}, HTTP {r.status_code})")
-    except Exception as e:
-        print("   !! erro ao enviar:", e)
 
 
 def enviar_valor(records):
@@ -339,12 +354,9 @@ def enviar_valor(records):
     if not records:
         print("   valuebets: nada pra enviar.")
         return
-    headers = {"X-Ingest-Token": INGEST_TOKEN} if INGEST_TOKEN else {}
-    try:
-        r = requests.post(SAAS_VALOR, json={"records": records}, headers=headers, timeout=25)
+    r = _post_com_retry(SAAS_VALOR, {"records": records}, "valuebets")
+    if r is not None:
         print(f"   -> {len(records)} odds de valor enviadas (HTTP {r.status_code})")
-    except Exception as e:
-        print("   !! erro ao enviar valuebets:", str(e)[:100])
 
 
 def resolver_todos_valor(ctx, recs):
@@ -438,12 +450,9 @@ def enviar_middle(records):
         print("   middles: nada pra enviar.")
         return
     records = _sem_nan(records)
-    headers = {"X-Ingest-Token": INGEST_TOKEN} if INGEST_TOKEN else {}
-    try:
-        r = requests.post(SAAS_MIDDLE, json={"records": records}, headers=headers, timeout=25)
+    r = _post_com_retry(SAAS_MIDDLE, {"records": records}, "middles")
+    if r is not None:
         print(f"   -> {len(records)} apostas de intervalo enviadas (HTTP {r.status_code})")
-    except Exception as e:
-        print("   !! erro ao enviar middles:", str(e)[:100])
 
 
 def resolver_todos_middle(ctx, recs):
