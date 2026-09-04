@@ -48,10 +48,10 @@ SAAS_MIDDLE = SAAS.replace("/api/ingest", "/api/ingest-middle") # APOSTAS DE INT
 URL_LISTA = "https://pt.surebet.com/surebets"
 URL_VALOR = "https://pt.surebet.com/valuebets"                  # aba "Apostas de valor"
 URL_MIDDLE = "https://pt.surebet.com/middles"                   # aba "Apostas de intervalo"
-MAX_PAG_VALOR = 2              # valuebets: só 2 págs por ciclo (modo manso — menos carga)
-MAX_VALOR = 50                # teto de segurança (modo manso)
-MAX_PAG_MIDDLE = 2            # middles: só 2 págs por ciclo (modo manso — menos carga)
-MAX_MIDDLE = 50               # teto de segurança (modo manso)
+MAX_PAG_VALOR = 1              # valuebets: só a 1ª página (os 10 primeiros cabem nela)
+MAX_VALOR = 10                # SÓ AS 10 PRIMEIRAS odds de valor (decisão do jardel 04/09)
+MAX_PAG_MIDDLE = 1            # middles: só a 1ª página (os 10 primeiros cabem nela)
+MAX_MIDDLE = 10               # SÓ AS 10 PRIMEIRAS apostas de intervalo (decisão do jardel 04/09)
 PERFIL = "pw_profile"          # sessão do Chrome fica salva aqui (login persiste)
 CICLO_MIN = 30                 # minutos entre varreduras FUNDAS (decisão do jardel 04/09).
                                # Se mudar, ajuste junto: vigia LIMITE_ZUMBI_SEG (45 min),
@@ -331,6 +331,8 @@ def uma_varredura_valor(page, ctx):
         novos = 0
         for r in recs:
             key = (r.get("casa"), r.get("event"), r.get("mercado"), r.get("odd"))
+            if len(todos) >= MAX_VALOR:
+                break
             if r.get("odd", 0) > 1 and key not in vistos:
                 vistos.add(key); todos.append(r); novos += 1
         pag += 1
@@ -429,6 +431,8 @@ def uma_varredura_middle(page, ctx):
         for r in recs:
             key = r.get("id") or tuple(sorted((g.get("bookmaker", ""), g.get("market", ""))
                                               for g in r.get("legs", [])))
+            if len(todos) >= MAX_MIDDLE:
+                break
             if key not in vistos:
                 vistos.add(key); todos.append(r); novos += 1
         pag += 1
