@@ -264,8 +264,14 @@ def resolver_link(ctx, pg, nav_url):
         if u and u.startswith("http") and not _e_surebet(u):
             final = u
             break
-    if _e_surebet(final) and erro:
-        print(f"      link nao resolveu ({erro})")
+    if _e_surebet(final):         # diagnostico: ONDE a navegacao parou (04/09)
+        try:
+            titulo = (pg.title() or "")[:50]
+        except Exception:
+            titulo = "?"
+        parou = (candidatos[0] if candidatos else "?")[:90]
+        extras = " | abas novas: " + ", ".join(u[:60] for u in candidatos[1:]) if len(candidatos) > 1 else ""
+        print(f"      link nao resolveu: parou em {parou} [{titulo}]{(' erro: ' + erro) if erro else ''}{extras}")
     try:                          # "fecha" a pagina da casa: volta pra aba em branco
         pg.goto("about:blank", timeout=5000)
     except Exception:
