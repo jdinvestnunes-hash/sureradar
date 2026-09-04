@@ -128,8 +128,18 @@ def _ler_comandos():
 
 # ----------------------------- Alerta de queda -------------------------------
 
+def _em_pausa_noturna():
+    """True na janela de pausa do robo (horario de Brasilia) + 20 min de folga."""
+    from datetime import datetime, timezone, timedelta
+    agora = datetime.now(timezone(timedelta(hours=-3)))
+    m = agora.hour * 60 + agora.minute
+    return config.ROBO_PAUSA_INI_H * 60 <= m < config.ROBO_PAUSA_FIM_H * 60 + 20
+
+
 def _checar_queda():
     global _caiu_avisado
+    if _em_pausa_noturna():        # robo parado de proposito (00h-06h) -> nao alerta
+        return
     if not robo_ligado():          # desligado de propósito -> não alerta
         _caiu_avisado = False
         return

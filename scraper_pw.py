@@ -193,12 +193,20 @@ LINK_PAUSA_SEG = (10.0, 25.0)  # pausa (min, máx) entre uma resolução e a pr�
 LINKS_RESERVA_VM = 5           # dessa cota, quantos ficam GUARDADOS pra valuebets+middles
                                # (as surebets param em LINKS_POR_CICLO - 5; sem isso elas
                                # comiam a cota toda e middles sem link o painel descarta)
+PAUSA_NOTURNA = (0, 6)         # (hora ini, hora fim) LOCAL do PC: 00h-06h SEM varreduras (jardel 04/09).
+                               # O vigia (vigia_loop.ps1) e o guardiao (guardiao.py) conhecem a mesma
+                               # janela pra nao reiniciar/alertar durante a noite.
 _ORC = {"restam": 0, "piso": 0}  # orçamento vivo do ciclo atual (zerado em cada funda)
 
 
 def orcamento_novo_ciclo():
     """Chamado no INÍCIO de cada funda: recarrega o orçamento de links novos."""
     _ORC["restam"] = LINKS_POR_CICLO
+
+
+def _em_pausa_noturna():
+    h = time.localtime().tm_hour
+    return PAUSA_NOTURNA[0] <= h < PAUSA_NOTURNA[1]
 
 
 def _tem_orcamento():
@@ -223,20 +231,23 @@ def resolver_link(ctx, pg, nav_url):
         return None
     _gastar_orcamento()           # conta a tentativa (mesmo se falhar) + pausa
     final = nav_url
+    # NAVEGA de verdade na aba (mesmo caminho de um clique no link: surebet ->
+    # redirect -> casa). Antes usava ctx.request.get (pedido direto, sem navegar);
+    # jardel 04/09 pediu que seja a navegacao normal do navegador.
     try:
-        resp = ctx.request.get(nav_url, max_redirects=20, timeout=15000)
-        if resp.url and not _e_surebet(resp.url):
-            final = resp.url
+        pg.goto(nav_url, wait_until="domcontentloaded", timeout=25000)
+        pg.wait_for_timeout(1500)
+    except Exception:
+        pass                      # site da casa pesado/timeout: a URL pode ja ter trocado
+    try:
+        if not _e_surebet(pg.url):
+            final = pg.url
     except Exception:
         pass
-    if _e_surebet(final):   # ainda no surebet -> resolve via navegação (JS redirect)
-        try:
-            pg.goto(nav_url, wait_until="domcontentloaded", timeout=20000)
-            pg.wait_for_timeout(1500)
-            if not _e_surebet(pg.url):
-                final = pg.url
-        except Exception:
-            pass
+    try:                          # "fecha" a pagina da casa: volta pra aba em branco
+        pg.goto("about:blank", timeout=5000)
+    except Exception:
+        pass
     if _e_surebet(final):   # NÃO resolveu: não vaza link do surebet; tenta de novo depois
         return None
     LINK_CACHE[nav_url] = final
@@ -733,6 +744,7 @@ def main():
         print(" ROBÔ SUREBET (Playwright) — deixe a janela aberta.")
         print("=" * 60)
         prox_funda = 0.0            # 0 = faz a FUNDA já na 1ª volta (igual antes)
+        em_pausa = False            # True enquanto estiver na PAUSA_NOTURNA
         ciclos = 0                  # nº de varreduras FUNDAS feitas nesta sessão
         RECICLA_A_CADA = 5          # recicla o navegador a cada N fundas (~50 min):
                                     # fecha e reabre p/ liberar a memória que o Chromium
@@ -756,6 +768,16 @@ def main():
                         time.sleep(30)
                         continue
 
+                if _em_pausa_noturna():
+                    if not em_pausa:
+                        print(f">> PAUSA NOTURNA ({PAUSA_NOTURNA[0]:02d}h-{PAUSA_NOTURNA[1]:02d}h): sem varreduras ate as {PAUSA_NOTURNA[1]:02d}h.")
+                        em_pausa = True
+                    prox_funda = time.time()     # ao acordar, faz a funda na hora
+                    time.sleep(60)
+                    continue
+                if em_pausa:
+                    print(">> fim da pausa noturna - retomando as varreduras.")
+                    em_pausa = False
                 if time.time() >= prox_funda:
                     # --- VARREDURA FUNDA (completa): surebet + valor + middle ---
                     # Agenda a PRÓXIMA já AQUI (início), não no fim: assim o intervalo de

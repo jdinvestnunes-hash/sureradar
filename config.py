@@ -232,6 +232,10 @@ PROMO_CANAL_ATIVO = os.getenv("PROMO_CANAL_ATIVO", "0").strip() not in ("0", "fa
 GUARDIAO_ATIVO = os.getenv("GUARDIAO_ATIVO", "1").strip() not in ("0", "false", "False", "")
 # Minutos SEM dados novos até te alertar "CAIU" no Telegram. 15 = seguro (o robô
 # atualiza a cada ~1 min, então 15 min parado é certeza de queda, sem alarme falso).
+# Pausa noturna do robo (horario de Brasilia): das 00h ate as 06h ele nao raspa de
+# proposito (decisao 04/09). O guardiao nao alerta "CAIU" nessa janela (+20 min).
+ROBO_PAUSA_INI_H = int(os.getenv("ROBO_PAUSA_INI_H", "0"))
+ROBO_PAUSA_FIM_H = int(os.getenv("ROBO_PAUSA_FIM_H", "6"))
 ROBO_ALERTA_MIN = int(os.getenv("ROBO_ALERTA_MIN", "55"))   # robô em ciclo de 30 min (04/09)
 
 # Alertas personalizados no Telegram (surebet que bate com os filtros do usuário

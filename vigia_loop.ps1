@@ -23,6 +23,10 @@ $LIMITE_ZUMBI_SEG = 3600   # 60 min: ciclo do robo e sorteado entre 15 e 45 min 
 # terminava -> feed nunca atualizava -> matava de novo (death loop). 900s (15 min)
 # fica ACIMA dos ~12 min do pior caso.
 $GRACA_POS_START_SEG = 900
+# PAUSA NOTURNA do robo (scraper_pw.py PAUSA_NOTURNA = 00h-06h): o robo fica vivo mas
+# NAO raspa, entao o feed envelhece de proposito. Nessa janela (ate 06:20, pra dar
+# tempo da 1a varredura do dia postar) o vigia NAO mata por zumbi.
+$PAUSA_FIM_MIN = 6*60 + 20
 # "ha muito tempo": deixa a 1a acao (subir/reiniciar) livre no start do vigia.
 $script:ultimoStart = (Get-Date).AddSeconds(-100000)
 
@@ -76,7 +80,7 @@ while ($true) {
         } else {
             if (-not $proc) {
                 Start-Robo "processo ausente"
-            } elseif (($null -ne $idade) -and ($idade -gt $LIMITE_ZUMBI_SEG)) {
+            } elseif (($null -ne $idade) -and ($idade -gt $LIMITE_ZUMBI_SEG) -and ((Get-Date).TimeOfDay.TotalMinutes -ge $PAUSA_FIM_MIN)) {
                 # Zumbi: vivo mas o painel está velho. SÓ mata se já passou a janela de
                 # graça desde o último start — senão o robô ainda está fazendo a 1ª
                 # varredura (que leva ~12 min) e matá-lo agora recomeça o loop do zero.
