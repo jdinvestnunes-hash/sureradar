@@ -53,7 +53,11 @@ MAX_VALOR = 10                # SÓ AS 10 PRIMEIRAS odds de valor (decisão do j
 MAX_PAG_MIDDLE = 1            # middles: só a 1ª página (os 10 primeiros cabem nela)
 MAX_MIDDLE = 10               # SÓ AS 10 PRIMEIRAS apostas de intervalo (decisão do jardel 04/09)
 PERFIL = "pw_profile"          # sessão do Chrome fica salva aqui (login persiste)
-CICLO_MIN = 30                 # minutos entre varreduras FUNDAS (decisão do jardel 04/09).
+CICLO_FAIXA_MIN = (15, 45)     # intervalo REAL entre fundas: sorteado a cada funda entre 15 e 45 min
+                               # (jardel 04/09: nao bater sempre de 30 em 30). Se mudar o TETO, ajuste
+                               # junto: vigia LIMITE_ZUMBI_SEG (60 min), feed._EXPIRY_SEG (55),
+                               # config.ROBO_OFFLINE_SEG (52), ROBO_ALERTA_MIN (55).
+CICLO_MIN = 30                 # so referencia (mensagens/doc); minutos entre varreduras FUNDAS (decisão do jardel 04/09).
                                # Se mudar, ajuste junto: vigia LIMITE_ZUMBI_SEG (45 min),
                                # feed._EXPIRY_SEG e config.ROBO_OFFLINE_SEG (40 min), ROBO_ALERTA_MIN.
 FAST_SEG = 45                  # segundos entre passadas RÁPIDAS (só a página 1 = as de
@@ -759,7 +763,8 @@ def main():
                     # batimento honesto de 10 em 10 min. Se a funda passar de CICLO_MIN
                     # (ex.: resolução de links longa), prox_funda já expirou e a próxima
                     # roda na hora, sem esticar o ciclo.
-                    prox_funda = time.time() + CICLO_MIN * 60
+                    espera_min = random.uniform(*CICLO_FAIXA_MIN)   # sorteia o intervalo desta vez
+                    prox_funda = time.time() + espera_min * 60
                     orcamento_novo_ciclo()                   # cota de links novos deste ciclo
                     try:
                         uma_varredura(page, ctx)             # PRINCIPAL: surebet (todas as págs)
@@ -792,10 +797,10 @@ def main():
                             print("!! falha ao reciclar o navegador:", str(e)[:150])
                     if FAST_ATIVO:
                         print(f">> Funda ok. Passadas RÁPIDAS a cada {FAST_SEG}s; "
-                              f"próxima funda em {CICLO_MIN} min.\n")
+                              f"próxima funda em {espera_min:.0f} min (sorteado 15-45).\n")
                     else:
                         print(f">> Funda ok (MODO MANSO: sem rápidas). "
-                              f"Próxima funda em {CICLO_MIN} min.\n")
+                              f"Próxima funda em {espera_min:.0f} min (sorteado 15-45).\n")
                 elif FAST_ATIVO:
                     # --- PASSADA RÁPIDA (só página 1) — o "quase ao vivo" ---
                     try:

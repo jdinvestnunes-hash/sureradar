@@ -49,7 +49,7 @@ _bets: dict = {}
 # normal (aposta que saiu da conta) é IMEDIATA, no snapshot da próxima raspagem.
 # Tem que ser MAIOR que o ciclo do robô (~12 min) senão a aposta some antes da
 # próxima raspagem chegar (bug do "sumiu antes dos 10 min").
-_EXPIRY_SEG = 2400            # 40 min sem NENHUMA raspagem -> aí sim limpa (ciclo do robô = 30 min)
+_EXPIRY_SEG = 3300            # 55 min (ciclo sorteado 15-45) sem NENHUMA raspagem -> aí sim limpa (ciclo do robô = 30 min)
 _ultima_atualizacao: str = None
 _ultima_ts: float = 0          # unix time da última atualização (p/ o timer)
 _ingest_ts: float = 0          # unix time do último INGEST REAL (extensão/conta)
