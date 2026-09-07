@@ -143,7 +143,7 @@ FREE_LUCRO_MAX = 2.0
 # FREE: vê só uma AMOSTRA de entradas de 1% a 2% (as N mais próximas de 2%).
 # PRO:  vê TODAS as entradas com lucro > PRO_LUCRO_MIN (%).
 FREE_MAX_ENTRADAS = 25     # FREE vê as 25 primeiras de 1% a 2%
-PRO_LUCRO_MIN = 2.0001     # PRO vê TUDO acima de 2% (até o teto de 25%)
+PRO_LUCRO_MIN = 5.0        # PRO vê TUDO de 5% pra cima (jardel 07/09; era 2.0001 = acima de 2%)
 
 # Odds Erradas (add-on avulso): o não-pagante vê a lista TODA, mas só as N de MENOR
 # valor abertas (valor real de graça) — as maiores vêm borradas, o prêmio de quem

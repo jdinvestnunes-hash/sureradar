@@ -2932,7 +2932,7 @@ def surebets(
 
     # Regra de plano (trava no SERVIDOR):
     #   FREE -> só uma AMOSTRA de entradas de 1% a 2% (as N mais próximas de 2%).
-    #   PRO  -> todas as entradas ACIMA de 2% (as que valem a pena de verdade).
+    #   PRO  -> todas as entradas de PRO_LUCRO_MIN (5%) pra cima (as que valem a pena de verdade).
     user = _usuario(request)
     is_free = _plano_efetivo(user) == "free"
     teto = max_profit if max_profit > 0 else None
@@ -2948,7 +2948,7 @@ def surebets(
             bookmakers=casas, sports=esportes,
         )[: config.FREE_MAX_ENTRADAS]
     else:
-        # PRO: piso de 2% (nunca abaixo), mas respeita um mínimo maior do filtro.
+        # PRO: piso de PRO_LUCRO_MIN (5%, nunca abaixo), mas respeita um mínimo maior do filtro.
         piso = max(min_profit, config.PRO_LUCRO_MIN)
         resultados = feed.get_surebets(
             min_profit=piso, max_profit=teto,

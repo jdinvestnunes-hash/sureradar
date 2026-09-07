@@ -81,6 +81,10 @@ PRO_PAGS = 2                   # nº de páginas do topo que alimentam o PRO (er
 FREE_ALVO = 6                  # quantas surebets da faixa FREE (1–2%) garantir (era 10)
 FREE_MIN = 1.0                 # piso da faixa FREE (= FREE_LUCRO_MIN do backend)
 FREE_MAX = 2.0                 # teto da faixa FREE (= FREE_LUCRO_MAX do backend)
+PRO_MIN = 5.0                  # piso do PRO (= PRO_LUCRO_MIN do backend). A cota de links
+                               # do ciclo só é gasta em apostas >= PRO_MIN ou na faixa FREE;
+                               # o que fica entre 2% e 5% ninguém vê no painel, então não
+                               # vale um link (jardel 07/09: "5% pra cima no PRO").
 HEADLESS = False               # janela visível (pra você logar). Vira True no servidor.
 
 # Raspagem — mesma lógica da extensão, roda dentro da página.
@@ -290,8 +294,19 @@ def resolver_link(ctx, pg, nav_url):
     return final
 
 
+def _vale_link(b):
+    """Só gasta cota de link em aposta que ALGUÉM vai ver: PRO (>= PRO_MIN) ou FREE (1–2%)."""
+    p = b.get("profit", 0) or 0
+    return p >= PRO_MIN or FREE_MIN <= p <= FREE_MAX
+
+
 def resolver_todos(ctx, bets):
-    """Resolve os links de todas as pernas (usa cache; só resolve os novos)."""
+    """Resolve os links de todas as pernas (usa cache; só resolve os novos).
+    Apostas fora das faixas (entre FREE_MAX e PRO_MIN) ficam sem link e não são enviadas."""
+    fora = sum(1 for b in bets if not _vale_link(b))
+    bets = [b for b in bets if _vale_link(b)]
+    if fora:
+        print(f"   {fora} aposta(s) entre {FREE_MAX:g}% e {PRO_MIN:g}% ignoradas (ninguém vê) — cota vai pras de {PRO_MIN:g}%+")
     faltam = [leg for b in bets for leg in b.get("legs", [])
               if _e_surebet(leg.get("link")) and leg["link"] not in LINK_CACHE]
     if faltam:
