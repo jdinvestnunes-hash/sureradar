@@ -371,7 +371,7 @@
 const toast = (html) => { const t=document.getElementById('toast'); t.innerHTML=html; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),5000); };
 
 async function pagar(plano, metodo, btn, extras){
-  const ep = metodo === 'cartao' ? '/api/checkout/cartao' : '/api/checkout/pix';
+  const ep = metodo === 'cartao' ? '/api/checkout/stripe' : '/api/checkout/pix';
   const txt = btn.textContent; btn.textContent = '⏳ Gerando...'; btn.disabled = true;
   try {
     const body = Object.assign({plano}, extras || {});
