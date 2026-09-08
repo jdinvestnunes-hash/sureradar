@@ -119,13 +119,10 @@ async def lifespan(app):
         print(f"!! Falha ao restaurar feed do cache: {e}")
 
     pipeline.iniciar_agendador()
-    if getattr(config, "PROMO_CANAL_ATIVO", False):
-        try:
-            promo.iniciar()           # fluxo de marketing no grupo do Telegram
-        except Exception as e:
-            print(f"!! Promo Telegram não iniciou: {e}")
-    else:
-        print(">> Promo do canal DESLIGADA (PROMO_CANAL_ATIVO=0) — nomes embaralhados.")
+    try:
+        promo.iniciar()               # fluxo de marketing no grupo (self-gate: PROMO_ATIVO)
+    except Exception as e:
+        print(f"!! Promo Telegram não iniciou: {e}")
     try:
         lifecycle.iniciar()           # fluxo de nutrição por e-mail (nudges pró)
     except Exception as e:
