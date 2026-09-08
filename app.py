@@ -521,8 +521,35 @@ def robo_estado():
     return {"ligado": guardiao.robo_ligado(), "idade_seg": idade}
 
 
+def _probe_stripe_metodo(metodo):
+    """Cria uma Checkout Session de R$5 só pra ver se o Stripe ACEITA o método
+    (card/pix) nesta conta. NÃO cobra ninguém — a sessão expira sozinha. Diagnóstico
+    temporário da migração do AbacatePay."""
+    if not config.STRIPE_SECRET_KEY:
+        return {"ok": False, "erro": "Stripe não configurado"}
+    data = {
+        "mode": "payment",
+        "success_url": config.SITE_URL + "/perfil?pago=1",
+        "cancel_url": config.SITE_URL + "/planos",
+        "payment_method_types[0]": metodo,
+        "line_items[0][quantity]": "1",
+        "line_items[0][price_data][currency]": "brl",
+        "line_items[0][price_data][unit_amount]": "500",
+        "line_items[0][price_data][product_data][name]": "Probe " + metodo,
+    }
+    try:
+        r = requests.post("https://api.stripe.com/v1/checkout/sessions", data=data,
+                          auth=(config.STRIPE_SECRET_KEY, ""), timeout=15)
+    except requests.RequestException as e:
+        return {"ok": False, "erro": str(e)[:150]}
+    if r.ok:
+        return {"ok": True, "id": r.json().get("id")}
+    e = (r.json() or {}).get("error", {})
+    return {"ok": False, "code": e.get("code"), "msg": (e.get("message") or r.text)[:220]}
+
+
 @app.get("/api/health")
-def health(fb: int = 0, venda: int = 0):
+def health(fb: int = 0, venda: int = 0, probe_pix: int = 0):
     """Diagnóstico: qual banco está em uso e se a conexão funciona (sem expor segredos)."""
     info = {"db_type": "postgres" if auth.PG else "sqlite", "db_ok": False}
     try:
@@ -569,6 +596,11 @@ def health(fb: int = 0, venda: int = 0):
                                    "Se você recebeu isso, os avisos de venda estão "
                                    "funcionando! ✅ Toda venda vai cair aqui.")
         info["telegram"]["teste_venda_enviado"] = bool(ok)
+    # Probe TEMPORÁRIO da migração AbacatePay->Stripe: ?probe_pix=1 tenta criar
+    # sessões Stripe de card e pix (R$5, não cobra) e diz se a conta aceita.
+    if probe_pix:
+        info["probe_stripe"] = {"card": _probe_stripe_metodo("card"),
+                                "pix": _probe_stripe_metodo("pix")}
     # Facebook Ads: só faz a chamada real à API do Meta com ?fb=1 (não expõe o gasto).
     info["facebook"] = {"configurado": meta_ads.configurado()}
     if fb and meta_ads.configurado():
