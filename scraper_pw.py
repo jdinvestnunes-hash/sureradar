@@ -191,9 +191,13 @@ def _e_surebet(u):
 # entre um e outro, e um ORÇAMENTO de links novos por ciclo compartilhado entre
 # surebet + valuebets + middles. O que não couber fica pro próximo ciclo (o cache
 # guarda o que já foi resolvido, então o backlog escoa devagar e nunca se perde).
-LINKS_POR_CICLO = 15           # máx. de links NOVOS (não cacheados) tentados por funda
-                               # (pior caso 15 × ~60s ≈ 15 min, cabe folgado no ciclo de 30)
+LINKS_POR_CICLO = 25           # máx. de links NOVOS (não cacheados) tentados por funda
+                               # (era 15; jardel 08/09 pediu mais entradas no PRO -> 20 p/ surebets
+                               # + 5 guardados p/ valor/middle. Pior caso 25 × ~40s ≈ 17 min)
 LINK_PAUSA_SEG = (10.0, 25.0)  # pausa (min, máx) entre uma resolução e a próxima
+LINKS_RESERVA_TG = 4           # dessa cota, quantos vão PRIMEIRO pras apostas de 2–5% (só o
+                               # Telegram usa essa faixa; 4 links ≈ 2 entradas completas por ciclo,
+                               # o grupo posta 1 a cada 80-100 min). O que sobrar volta pro PRO.
 LINKS_RESERVA_VM = 5           # dessa cota, quantos ficam GUARDADOS pra valuebets+middles
                                # (as surebets param em LINKS_POR_CICLO - 5; sem isso elas
                                # comiam a cota toda e middles sem link o painel descarta)
@@ -294,39 +298,77 @@ def resolver_link(ctx, pg, nav_url):
     return final
 
 
-def _vale_link(b):
-    """Só gasta cota de link em aposta que ALGUÉM vai ver: PRO (>= PRO_MIN) ou FREE (1–2%)."""
+def _faltando(b):
+    """Quantos links NOVOS (surebet, fora do cache) esta aposta ainda precisa."""
+    return sum(1 for leg in b.get("legs", [])
+               if _e_surebet(leg.get("link")) and leg["link"] not in LINK_CACHE)
+
+
+def _faixa(b):
+    """0 = PRO (>= PRO_MIN) · 1 = FREE (1–2%) · 2 = Telegram (entre FREE_MAX e PRO_MIN) · 3 = fora."""
     p = b.get("profit", 0) or 0
-    return p >= PRO_MIN or FREE_MIN <= p <= FREE_MAX
+    if p >= PRO_MIN:
+        return 0
+    if FREE_MIN <= p <= FREE_MAX:
+        return 1
+    if FREE_MAX < p < PRO_MIN:
+        return 2
+    return 3
+
+
+def _resolver_lista(ctx, pg, bets):
+    """Resolve as pernas das apostas na ORDEM dada (para sozinho quando a cota acaba)."""
+    novos = 0
+    for b in bets:
+        for leg in b.get("legs", []):
+            if leg.get("link"):
+                antes = len(LINK_CACHE)
+                r = resolver_link(ctx, pg, leg["link"])
+                leg["link"] = r if (r and not _e_surebet(r)) else None
+                if len(LINK_CACHE) > antes:          # resolveu um link NOVO
+                    novos += 1
+                    if novos % 40 == 0:              # salva parcial: se morrer no meio, não perde o backlog já feito
+                        _salvar_cache()
+    return novos
 
 
 def resolver_todos(ctx, bets):
     """Resolve os links de todas as pernas (usa cache; só resolve os novos).
-    Apostas fora das faixas (entre FREE_MAX e PRO_MIN) ficam sem link e não são enviadas."""
-    fora = sum(1 for b in bets if not _vale_link(b))
-    bets = [b for b in bets if _vale_link(b)]
-    if fora:
-        print(f"   {fora} aposta(s) entre {FREE_MAX:g}% e {PRO_MIN:g}% ignoradas (ninguém vê) — cota vai pras de {PRO_MIN:g}%+")
-    faltam = [leg for b in bets for leg in b.get("legs", [])
-              if _e_surebet(leg.get("link")) and leg["link"] not in LINK_CACHE]
+
+    Ordem de gasto da cota (jardel 08/09):
+      1) até LINKS_RESERVA_TG links nas apostas de 2–5% (faixa do grupo do Telegram),
+         começando pelas que precisam de MENOS links novos;
+      2) o resto da cota (menos a reserva de valor/middle) nas de PRO_MIN+ e depois
+         nas da faixa FREE — também das que faltam menos links pras que faltam mais,
+         pra completar o MÁXIMO de apostas por link gasto.
+    Aposta que ficar sem link em alguma perna não é enviada (regra efd63ec)."""
+    grupos = {0: [], 1: [], 2: [], 3: []}
+    for b in bets:
+        grupos[_faixa(b)].append(b)
+    for g in grupos.values():
+        g.sort(key=_faltando)                 # menos links faltando primeiro (0 = de graça)
+    tg = grupos[2]
+    resto = grupos[0] + grupos[1]
+    faltam = sum(_faltando(b) for b in bets)
     if faltam:
-        cota = max(0, _ORC['restam'] - LINKS_RESERVA_VM)
-        print(f"   resolvendo {min(len(faltam), cota)} de {len(faltam)} link(s) novo(s) "
-              f"das casas, um por vez (cota: {cota}, +{LINKS_RESERVA_VM} guardados p/ valor/middle · cache: {len(LINK_CACHE)})")
+        cota = max(0, _ORC["restam"] - LINKS_RESERVA_VM)
+        print(f"   resolvendo {min(faltam, cota)} de {faltam} link(s) novo(s) das casas, um por vez "
+              f"(cota: {cota} = até {LINKS_RESERVA_TG} p/ {len(tg)} aposta(s) de {FREE_MAX:g}–{PRO_MIN:g}% [Telegram] "
+              f"+ resto p/ {len(grupos[0])} de {PRO_MIN:g}%+ e {len(grupos[1])} FREE · "
+              f"+{LINKS_RESERVA_VM} guardados p/ valor/middle · cache: {len(LINK_CACHE)})")
     pg = ctx.new_page()
-    resolvidos = 0
-    _ORC["piso"] = LINKS_RESERVA_VM      # surebets não passam da reserva das valuebets/middles
     try:
-        for b in bets:
+        # fase 1: faixa do Telegram, com teto de LINKS_RESERVA_TG links
+        _ORC["piso"] = max(LINKS_RESERVA_VM, _ORC["restam"] - LINKS_RESERVA_TG)
+        _resolver_lista(ctx, pg, tg)
+        # fase 2: PRO + FREE até a reserva de valor/middle (sobra da fase 1 entra aqui)
+        _ORC["piso"] = LINKS_RESERVA_VM
+        _resolver_lista(ctx, pg, resto)
+        # fora das faixas (abaixo de FREE_MIN): só usa o que já está no cache, não gasta cota
+        for b in grupos[3]:
             for leg in b.get("legs", []):
                 if leg.get("link"):
-                    antes = len(LINK_CACHE)
-                    r = resolver_link(ctx, pg, leg["link"])
-                    leg["link"] = r if (r and not _e_surebet(r)) else None
-                    if len(LINK_CACHE) > antes:          # resolveu um link NOVO
-                        resolvidos += 1
-                        if resolvidos % 40 == 0:         # salva parcial: se morrer no meio, não perde o backlog já feito
-                            _salvar_cache()
+                    leg["link"] = LINK_CACHE.get(leg["link"]) if _e_surebet(leg["link"]) else leg["link"]
     finally:
         _ORC["piso"] = 0
         pg.close()
