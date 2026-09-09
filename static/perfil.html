@@ -298,6 +298,25 @@ async function load(){
     });
     const bg = $("#btn-gerenciar");
     if (bg) bg.onclick = async ()=>{
+      // Cartão Asaas: cancela na hora (para de cobrar), mantendo o acesso até vencer.
+      if (d.assinatura_provider === "asaas"){
+        const ate = d.expira ? (" Seu Pro continua ativo até " + data_br(d.expira) + ".") : "";
+        if (!confirm("Cancelar a assinatura do cartão? Não faremos mais cobranças nas próximas renovações." + ate)) return;
+        bg.textContent = "⏳ Cancelando..."; bg.disabled = true;
+        try {
+          const r = await fetch("/api/assinatura/cancelar",{method:"POST"});
+          const j = await r.json().catch(()=>({}));
+          if (r.ok && j.ok){
+            const ate2 = j.expira ? data_br(j.expira) : (d.expira ? data_br(d.expira) : "o fim do período pago");
+            alert("✅ Assinatura cancelada. Você não será mais cobrado — seu Pro continua até " + ate2 + ".");
+            location.reload(); return;
+          }
+          alert(j.erro || "Não foi possível cancelar agora.");
+        } catch { alert("Erro de conexão."); }
+        bg.textContent = "Gerenciar / cancelar assinatura"; bg.disabled = false;
+        return;
+      }
+      // Stripe (assinaturas antigas): abre o portal hospedado.
       bg.textContent = "⏳ Abrindo..."; bg.disabled = true;
       try {
         const r = await fetch("/api/assinatura/portal",{method:"POST"});

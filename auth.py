@@ -1116,6 +1116,20 @@ def assinatura_cancelar(sub_id):
     return dict(row)
 
 
+def assinatura_marcar_cancelada(sub_id):
+    """Cancela a assinatura SEM tirar o PRO na hora: para de renovar, mas o acesso
+    vence naturalmente quando `plano_expira` passa (a pessoa fica com o que já pagou).
+    Usado no cancelamento pelo próprio usuário (Asaas) e quando o Asaas avisa que a
+    assinatura foi encerrada/inativada."""
+    with _db() as c:
+        row = c.execute(_q("SELECT * FROM assinaturas WHERE sub_id=?"), (sub_id,)).fetchone()
+        if not row:
+            return None
+        c.execute(_q("UPDATE assinaturas SET status='cancelada' WHERE sub_id=?"), (sub_id,))
+    print(f">> ASSINATURA cancelada (mantém acesso até vencer): user {row['user_id']}")
+    return dict(row)
+
+
 def checkout_revogar_por_pi(pi):
     """Estorno/chargeback: acha o checkout pago com esse payment_intent e TIRA o
     PRO da pessoa (volta pra free). Idempotente."""

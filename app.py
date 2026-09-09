@@ -781,6 +781,36 @@ def assinatura_portal(request: Request):
     return {"url": r.json().get("url")}
 
 
+@app.post("/api/assinatura/cancelar")
+def assinatura_cancelar_ep(request: Request):
+    """Cancela a assinatura de CARTÃO do Asaas: para de cobrar (DELETE /subscriptions),
+    mas o acesso continua até o fim do período já pago (o PRO vence sozinho). Só age
+    na assinatura do PRÓPRIO usuário; assinatura antiga do Stripe usa o portal."""
+    user = _usuario(request)
+    if not user:
+        return JSONResponse({"erro": "não autenticado"}, status_code=401)
+    a = auth.assinatura_do_user(user["id"])
+    if not a:
+        return JSONResponse({"erro": "sem assinatura ativa"}, status_code=400)
+    if a.get("provider") != "asaas":
+        return JSONResponse({"erro": "use o portal", "portal": True}, status_code=400)
+    sub_id = a.get("sub_id")
+    if not config.ASAAS_API_KEY or not sub_id:
+        return JSONResponse({"erro": "Asaas não configurado"}, status_code=503)
+    try:
+        r = requests.delete(config.ASAAS_BASE_URL + "/subscriptions/" + str(sub_id),
+                            headers=_asaas_hdr(), timeout=20)
+    except requests.RequestException as e:
+        return JSONResponse({"erro": "falha de rede", "detalhe": str(e)[:120]}, status_code=502)
+    # 404 = já não existe lá (ok, seguimos e marcamos cancelada localmente).
+    if not r.ok and r.status_code != 404:
+        print(">> asaas cancelar assinatura RECUSOU:", r.status_code, "|", r.text[:300])
+        return JSONResponse({"erro": "Asaas recusou", "detalhe": r.text[:200]}, status_code=502)
+    auth.assinatura_marcar_cancelada(sub_id)
+    return {"ok": True, "expira": user.get("plano_expira"),
+            "dias": auth.dias_restantes(user)}
+
+
 @app.post("/api/webhook/stripe")
 async def webhook_stripe(request: Request):
     body = await request.body()
@@ -1492,9 +1522,10 @@ async def webhook_asaas(request: Request):
     print(">> webhook asaas:", evento, "| pay:", pay_id, "| sub:", sub_id,
           "| ref:", ref, "| status:", pay.get("status"))
 
-    # Assinatura encerrada/inativada no Asaas -> tira o PRO.
+    # Assinatura encerrada/inativada no Asaas -> para de renovar, mas mantém o acesso
+    # até o fim do período já pago (o PRO vence sozinho quando plano_expira passa).
     if evento in ("SUBSCRIPTION_DELETED", "SUBSCRIPTION_INACTIVATED") and sub_id:
-        auth.assinatura_cancelar(sub_id)
+        auth.assinatura_marcar_cancelada(sub_id)
         return {"ok": True}
 
     # Estorno / chargeback / pagamento removido -> revoga o acesso daquela cobrança.
@@ -1701,6 +1732,7 @@ def perfil_dados(request: Request):
     if not user:
         return JSONResponse({"erro": "não autenticado"}, status_code=401)
     dias = auth.dias_restantes(user)
+    assin = auth.assinatura_do_user(user["id"])
     return {
         "nome": user["nome"], "email": user["email"], "plano": user["plano"],
         "dias": dias,
@@ -1708,7 +1740,8 @@ def perfil_dados(request: Request):
         "aviso_renovar": _aviso_renovar(dias),
         "admin": _admin_email(user),
         "whatsapp": user.get("whatsapp") or "",
-        "tem_assinatura": bool(auth.assinatura_do_user(user["id"])),
+        "tem_assinatura": bool(assin),
+        "assinatura_provider": assin.get("provider") if assin else None,
         "pagamentos": auth.listar_pagamentos(user["id"]),
         # add-on das Odds Erradas (comprado à parte do plano)
         "valor_dias": auth.valor_dias_restantes(user),
