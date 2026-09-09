@@ -195,9 +195,10 @@ LINKS_POR_CICLO = 25           # máx. de links NOVOS (não cacheados) tentados 
                                # (era 15; jardel 08/09 pediu mais entradas no PRO -> 20 p/ surebets
                                # + 5 guardados p/ valor/middle. Pior caso 25 × ~40s ≈ 17 min)
 LINK_PAUSA_SEG = (10.0, 25.0)  # pausa (min, máx) entre uma resolução e a próxima
-LINKS_RESERVA_TG = 4           # dessa cota, quantos vão PRIMEIRO pras apostas de 2–5% (só o
-                               # Telegram usa essa faixa; 4 links ≈ 2 entradas completas por ciclo,
-                               # o grupo posta 1 a cada 80-100 min). O que sobrar volta pro PRO.
+TG_MIN, TG_MAX = 5.0, 7.0      # faixa que o grupo grátis do Telegram posta (jardel 09/09; era 2–5%)
+LINKS_RESERVA_TG = 4           # dessa cota, quantos vão PRIMEIRO pras apostas de TG_MIN–TG_MAX
+                               # (4 links ≈ 2 entradas completas por ciclo, o grupo posta 1 a cada
+                               # 80-100 min). O que sobrar volta pro resto do PRO.
 LINKS_RESERVA_VM = 5           # dessa cota, quantos ficam GUARDADOS pra valuebets+middles
                                # (as surebets param em LINKS_POR_CICLO - 5; sem isso elas
                                # comiam a cota toda e middles sem link o painel descarta)
@@ -305,14 +306,15 @@ def _faltando(b):
 
 
 def _faixa(b):
-    """0 = PRO (>= PRO_MIN) · 1 = FREE (1–2%) · 2 = Telegram (entre FREE_MAX e PRO_MIN) · 3 = fora."""
+    """2 = Telegram (TG_MIN–TG_MAX, resolvidas primeiro) · 0 = resto do PRO (>= PRO_MIN) ·
+    1 = FREE (1–2%) · 3 = fora (só cache, não gasta cota)."""
     p = b.get("profit", 0) or 0
+    if TG_MIN <= p <= TG_MAX:
+        return 2
     if p >= PRO_MIN:
         return 0
     if FREE_MIN <= p <= FREE_MAX:
         return 1
-    if FREE_MAX < p < PRO_MIN:
-        return 2
     return 3
 
 
@@ -336,7 +338,7 @@ def resolver_todos(ctx, bets):
     """Resolve os links de todas as pernas (usa cache; só resolve os novos).
 
     Ordem de gasto da cota (jardel 08/09):
-      1) até LINKS_RESERVA_TG links nas apostas de 2–5% (faixa do grupo do Telegram),
+      1) até LINKS_RESERVA_TG links nas apostas de TG_MIN–TG_MAX (faixa do grupo do Telegram),
          começando pelas que precisam de MENOS links novos;
       2) o resto da cota (menos a reserva de valor/middle) nas de PRO_MIN+ e depois
          nas da faixa FREE — também das que faltam menos links pras que faltam mais,
@@ -353,7 +355,7 @@ def resolver_todos(ctx, bets):
     if faltam:
         cota = max(0, _ORC["restam"] - LINKS_RESERVA_VM)
         print(f"   resolvendo {min(faltam, cota)} de {faltam} link(s) novo(s) das casas, um por vez "
-              f"(cota: {cota} = até {LINKS_RESERVA_TG} p/ {len(tg)} aposta(s) de {FREE_MAX:g}–{PRO_MIN:g}% [Telegram] "
+              f"(cota: {cota} = até {LINKS_RESERVA_TG} p/ {len(tg)} aposta(s) de {TG_MIN:g}–{TG_MAX:g}% [Telegram] "
               f"+ resto p/ {len(grupos[0])} de {PRO_MIN:g}%+ e {len(grupos[1])} FREE · "
               f"+{LINKS_RESERVA_VM} guardados p/ valor/middle · cache: {len(LINK_CACHE)})")
     pg = ctx.new_page()

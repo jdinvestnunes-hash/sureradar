@@ -34,9 +34,9 @@ INTERVALO_MAX_MIN = int(getattr(config, "TELEGRAM_POST_MAX_MIN", 50))
 
 def _sortear_intervalo():
     return random.randint(INTERVALO_MIN_MIN, INTERVALO_MAX_MIN) * 60
-# Faixa de lucro das entradas do canal (amostra grátis, completa): 2% a 5%
-# (jardel 08/09; era 2–4%). O robô guarda 4 links/ciclo só pra essa faixa.
-FAIXA_NORMAL = (2.0, 5.0)
+# Faixa de lucro das entradas do canal (amostra grátis, completa): 5% a 7%
+# (jardel 09/09; era 2–5%). O robô guarda 4 links/ciclo só pra essa faixa.
+FAIXA_NORMAL = (5.0, 7.0)
 # Teto de entradas normais por dia (segurança; com ~80-100 min cai em ~9-10).
 MAX_ENTRADAS_DIA = 15
 # Iscas PRO: entradas de alto lucro (8-12%), só times + %, 2x/dia.
@@ -349,7 +349,7 @@ def postar_isca():
         f"— ganhe quem ganhar, sem risco.\n"
         f"Em <b>1-2 entradas</b> dessas você já tira o investimento do PRO "
         f"(R$ {PRO_MENSAL}). O resto é <b>lucro no bolso</b>. 💸\n\n"
-        f"No grátis você vê até 5%. No PRO, essas de 8%, 10%, 12%+ chegam na hora. 👇\n"
+        f"No grátis você vê até 7%. No PRO, essas de 8%, 10%, 12%+ chegam na hora. 👇\n"
         f"👉 {config.SITE_URL}/cadastro"
     )
     notifier.enviar_texto(msg)
@@ -445,10 +445,10 @@ def _loop():
                                 _estado["ultima_isca"] = agora
                                 postou_isca = True
                                 _salvar_estado()
-                        # 🎯 ENTRADA NORMAL 2-5% (~80-100 min, teto MAX_ENTRADAS_DIA/dia)
+                        # 🎯 ENTRADA NORMAL 5-7% (~80-100 min, teto MAX_ENTRADAS_DIA/dia)
                         if (not postou_isca and _estado["entradas"] < MAX_ENTRADAS_DIA
                                 and agora - ultimo >= intervalo_seg):
-                            if postar_faixa(*FAIXA_NORMAL, "2-5%"):
+                            if postar_faixa(*FAIXA_NORMAL, "5-7%"):
                                 _estado["entradas"] += 1
                             # persiste o ts SEMPRE (mesmo se nada saiu) -> deploy não reposta
                             ultimo = agora
@@ -471,7 +471,7 @@ def iniciar():
     _parar.clear()
     _thread = threading.Thread(target=_loop, name="promo-telegram", daemon=True)
     _thread.start()
-    print(f">> Promo Telegram iniciado — entradas 2-5% (~{INTERVALO_MIN_MIN}-{INTERVALO_MAX_MIN} min, "
+    print(f">> Promo Telegram iniciado — entradas 5-7% (~{INTERVALO_MIN_MIN}-{INTERVALO_MAX_MIN} min, "
           f"máx {MAX_ENTRADAS_DIA}/dia) + 2 iscas PRO {int(ISCA_MIN_PCT)}-{int(ISCA_MAX_PCT)}%. "
           f"Bom dia 8-9h / boa noite 22-23h (aleatórios).")
 
