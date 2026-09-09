@@ -1337,7 +1337,9 @@ def checkout_cartao_asaas(request: Request, payload: dict = Body(...)):
         },
         "items": items,
         "externalReference": ext,
-        "customerData": {"name": user.get("nome") or user["email"], "email": user["email"]},
+        # SEM customerData: numa assinatura o Asaas exigiria CPF/telefone/endereço
+        # completos aqui. No checkout hospedado a própria página do Asaas coleta esses
+        # dados do cliente. Quem é o usuário nós já sabemos pelo externalReference.
     }
     try:
         r = requests.post(config.ASAAS_BASE_URL + "/checkouts", json=body,
