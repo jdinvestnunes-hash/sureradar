@@ -307,6 +307,16 @@ ABACATEPAY_API_KEY = os.getenv("ABACATEPAY_API_KEY", "").strip()
 ABACATEPAY_V2_API_KEY = os.getenv("ABACATEPAY_V2_API_KEY", "").strip()
 ABACATEPAY_WEBHOOK_SECRET = os.getenv("ABACATEPAY_WEBHOOK_SECRET", "").strip()
 
+# Asaas — gateway do PIX (a AbacatePay parou de rodar). Gera o QR transparente na
+# nossa própria página (igual era o Pix da Abacate). A chave da API vai no painel
+# do Asaas (Integrações → Chave de API). Base padrão = PRODUÇÃO; pra testar em
+# sandbox, setar ASAAS_BASE_URL="https://api-sandbox.asaas.com/v3".
+ASAAS_API_KEY = os.getenv("ASAAS_API_KEY", "").strip()
+ASAAS_BASE_URL = os.getenv("ASAAS_BASE_URL", "https://api.asaas.com/v3").strip().rstrip("/")
+# Token que o Asaas manda no header `asaas-access-token` de cada webhook (você define
+# ao cadastrar o webhook no painel). Se vazio, o webhook não valida (NÃO recomendado).
+ASAAS_WEBHOOK_TOKEN = os.getenv("ASAAS_WEBHOOK_TOKEN", "").strip()
+
 # E-mail transacional (Resend) — recuperar senha, etc.
 RESEND_API_KEY = os.getenv("RESEND_API_KEY", "").strip()
 # Fluxo de nutrição por e-mail (boas-vindas + nudges pró p/ quem não comprou).

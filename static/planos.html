@@ -434,7 +434,47 @@ async function pagarPix2(plano, btn, extras, label){
   btn.textContent = txt; btn.disabled = false;
 }
 
-// ---- Pix: pede CPF + celular (exigência da AbacatePay v1) ----
+// ---- Pix via Asaas: recebe o CPF do modal, gera o QR na NOSSA tela e faz o polling ----
+async function pagarPixAsaas(plano, btn, extras, label){
+  const txt = btn.textContent; btn.textContent = '⏳ Gerando...'; btn.disabled = true;
+  try {
+    const body = Object.assign({plano}, extras || {});
+    const r = await fetch('/api/checkout/pix-asaas', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+    const j = await r.json().catch(()=>({}));
+    if (r.status === 401){ toast('🔒 Faça login pra assinar.'); setTimeout(()=>location.href='/login?plano='+plano, 1200); btn.textContent=txt; btn.disabled=false; return; }
+    if (!r.ok || !j.brcode){
+      toast('⚠️ Não consegui gerar o Pix — ' + (j.detalhe || j.erro || ('HTTP '+r.status)));
+      btn.textContent = txt; btn.disabled = false;
+      setTimeout(()=> abrirPix(plano, btn, 'pix', extras, label), 2500);   // reabre pra tentar de novo
+      return;
+    }
+    const $ = document.getElementById.bind(document);
+    if (j.brimg) $('qr-img').src = j.brimg;
+    $('qr-code').value = j.brcode;
+    $('qr-plano').textContent = label || NOMES[plano] || 'Plano PRO';
+    $('qr-valor').textContent = brl(j.total);
+    $('qr-email').textContent = ME_EMAIL || 'sua conta';
+    $('qr-status').innerHTML = '⏳ Aguardando o pagamento…';
+    $('qr-status').style.color = 'var(--dim)';
+    $('qr-modal').classList.add('show');
+    pararPoll();
+    qrPoll = setInterval(async ()=>{
+      try {
+        const s = await fetch('/api/checkout/status?id=' + encodeURIComponent(j.id)).then(x=>x.json());
+        if (s.status === 'pago'){
+          pararPoll();
+          const st = $('qr-status'); st.innerHTML = '✅ Pagamento confirmado! Liberando…'; st.style.color = 'var(--green)';
+          setTimeout(()=>location.href='/perfil?pago=1', 1200);
+        }
+      } catch(e){}
+    }, 3000);
+  } catch (e) {
+    toast('⚠️ Falha de rede ao gerar o Pix.');
+  }
+  btn.textContent = txt; btn.disabled = false;
+}
+
+// ---- Pix: pede CPF + celular (exigência do processador) ----
 const $id = s => document.getElementById(s);
 let pixCtx = null;
 let ME_WHATS = "";   // WhatsApp salvo no cadastro (prefill do celular no Pix)
@@ -445,9 +485,9 @@ const NOMES = { mensal:'PRO Mensal', trimestral:'PRO Trimestral', anual:'PRO Anu
 const brl = v => 'R$ ' + Number(v || 0).toFixed(2).replace('.', ',');
 // pré-cria o customer da AbacatePay (email preenchido + cartão mais rápido no clique)
 fetch("/api/checkout/prep").catch(() => {});
-function abrirPix(plano, btn, metodo, extras){
+function abrirPix(plano, btn, metodo, extras, label){
   metodo = metodo || 'pix';
-  pixCtx = {plano, btn, metodo, extras: extras || {}}; $id('pix-err').textContent='';
+  pixCtx = {plano, btn, metodo, extras: extras || {}, label}; $id('pix-err').textContent='';
   const cartao = metodo === 'cartao';
   $id('pix-title').textContent = cartao ? '💳 Pagar com cartão' : '⚡ Pagar com Pix';
   $id('pix-sub').textContent = cartao
@@ -506,7 +546,9 @@ $id('pix-go').onclick = ()=>{
   if (cel.length < 10 || cel.length > 11){ $id('pix-err').textContent = 'Celular inválido — inclua o DDD.'; return; }
   fecharPix();
   // leva junto o que o card mandou (ex.: addon=true do order bump)
-  pagar(pixCtx.plano, pixCtx.metodo, pixCtx.btn, Object.assign({cpf, celular: cel}, pixCtx.extras));
+  const ex = Object.assign({cpf, celular: cel}, pixCtx.extras);
+  if (pixCtx.metodo === 'cartao') pagar(pixCtx.plano, 'cartao', pixCtx.btn, ex);  // legado (não usado: cartão vai direto pro Stripe)
+  else pagarPixAsaas(pixCtx.plano, pixCtx.btn, ex, pixCtx.label);                 // Pix via Asaas: gera o QR na nossa tela
 };
 
 // ---- Seletor de período (Mensal/Trimestral · Anual) ----
@@ -616,8 +658,8 @@ carregarPromoAnual();
 })();
 
 function irCheckout(plano, metodo, btn, extras, label){
-  if (metodo === 'pix') pagarPix2(plano, btn, extras, label);  // Pix transparente: QR na nossa tela (cai no modal CPF se falhar)
-  else pagar(plano, metodo, btn, extras);               // Cartão (v2) coleta CPF na tela da AbacatePay
+  if (metodo === 'pix') abrirPix(plano, btn, 'pix', extras, label);  // Pix (Asaas): coleta CPF e gera o QR na nossa tela
+  else pagar(plano, metodo, btn, extras);               // Cartão: Stripe coleta cartão+CPF+parcelas na tela dele
 }
 
 // ---- Popup relâmpago do Anual (aparece ao gerar Pix/cartão do MENSAL) ----

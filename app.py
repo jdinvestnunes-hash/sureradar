@@ -1167,17 +1167,117 @@ def checkout_pix_transparente(request: Request, payload: dict = Body(...)):
     return {"id": bid, "brcode": brcode, "brimg": brimg, "total": total}
 
 
+# ===========================================================================
+# PIX via Asaas (a AbacatePay parou de rodar). Gera o QR transparente (copia-e-cola
+# + imagem) pra renderizar na NOSSA página, igual era o Pix da Abacate. O Asaas EXIGE
+# um customer com CPF pra criar a cobrança, então o front coleta o CPF antes.
+# ===========================================================================
+def _asaas_hdr():
+    return {"access_token": config.ASAAS_API_KEY,
+            "Content-Type": "application/json",
+            "User-Agent": "SureRadar"}
+
+
+def _asaas_customer_id(user, cpf):
+    """Cria/reusa um customer no Asaas (exige cpfCnpj). Devolve o id ou levanta.
+    Procura por CPF antes pra não duplicar o mesmo cliente a cada cobrança."""
+    base = config.ASAAS_BASE_URL
+    try:
+        r = requests.get(base + "/customers", params={"cpfCnpj": cpf},
+                         headers=_asaas_hdr(), timeout=12)
+        if r.ok:
+            data = (r.json() or {}).get("data") or []
+            if data and data[0].get("id"):
+                return data[0]["id"]
+    except requests.RequestException:
+        pass
+    body = {"name": user.get("nome") or user["email"], "email": user["email"],
+            "cpfCnpj": cpf, "externalReference": str(user["id"])}
+    r = requests.post(base + "/customers", json=body, headers=_asaas_hdr(), timeout=15)
+    if not r.ok:
+        raise RuntimeError("customer: " + r.text[:200])
+    cid = (r.json() or {}).get("id")
+    if not cid:
+        raise RuntimeError("customer sem id")
+    return cid
+
+
+@app.post("/api/checkout/pix-asaas")
+def checkout_pix_asaas(request: Request, payload: dict = Body(...)):
+    """Pix TRANSPARENTE via Asaas: cria a cobrança + gera o QR (payload copia-e-cola +
+    imagem base64) e devolve pra renderizar na NOSSA página — sem redirect. Libera o
+    PRO no webhook PAYMENT_RECEIVED/CONFIRMED (a tela do QR fica no /api/checkout/status
+    até virar 'pago'). Mesma forma de resposta do antigo pix2, pro front não mudar."""
+    user = _usuario(request)
+    if not user:
+        return JSONResponse({"erro": "não autenticado"}, status_code=401)
+    plano, p = _plano_valido(payload)
+    if not p:
+        return JSONResponse({"erro": "plano inválido"}, status_code=400)
+    p = _preco_promo_anual(user, plano, p)             # Anual com desconto se a promo dela está ativa
+    if not config.ASAAS_API_KEY:
+        return JSONResponse({"erro": "Asaas não configurado"}, status_code=503)
+    cpf = "".join(ch for ch in str(payload.get("cpf", "")) if ch.isdigit())
+    if len(cpf) != 11 or not _cpf_valido(cpf):
+        return JSONResponse({"erro": "CPF inválido — confira os 11 dígitos."}, status_code=400)
+    bump = _quer_bump(payload, plano)
+    total = p["valor"] + (_combo_extra(plano) if bump else 0)
+    base = config.ASAAS_BASE_URL
+    try:
+        cid = _asaas_customer_id(user, cpf)
+    except Exception as e:
+        return JSONResponse({"erro": "Asaas (cliente)", "detalhe": str(e)[:200]}, status_code=502)
+    body = {
+        "customer": cid,
+        "billingType": "PIX",
+        "value": round(total, 2),
+        "dueDate": datetime.now().strftime("%Y-%m-%d"),
+        "description": "SureRadar " + p["nome"] + (" + Completo" if bump else ""),
+        "externalReference": str(user["id"]),
+    }
+    try:
+        r = requests.post(base + "/payments", json=body, headers=_asaas_hdr(), timeout=20)
+    except requests.RequestException as e:
+        return JSONResponse({"erro": "falha de rede", "detalhe": str(e)[:120]}, status_code=502)
+    if not r.ok:
+        print(">> asaas payment RECUSOU:", r.status_code, "|", r.text[:400])
+        return JSONResponse({"erro": "Asaas recusou", "detalhe": r.text[:300]}, status_code=502)
+    pid = (r.json() or {}).get("id")
+    if not pid:
+        return JSONResponse({"erro": "resposta inesperada do Asaas"}, status_code=502)
+    # QR do Pix (payload = copia-e-cola; encodedImage = PNG base64 sem o prefixo data:)
+    try:
+        rq = requests.get(base + "/payments/" + pid + "/pixQrCode",
+                          headers=_asaas_hdr(), timeout=20)
+    except requests.RequestException as e:
+        return JSONResponse({"erro": "falha de rede (QR)", "detalhe": str(e)[:120]}, status_code=502)
+    if not rq.ok:
+        print(">> asaas pixQrCode falhou:", rq.status_code, "|", rq.text[:300])
+        return JSONResponse({"erro": "Asaas (QR)", "detalhe": rq.text[:300]}, status_code=502)
+    q = rq.json() or {}
+    brcode = q.get("payload")
+    img = q.get("encodedImage")
+    brimg = ("data:image/png;base64," + img) if img else ""
+    if not brcode:
+        return JSONResponse({"erro": "QR sem payload", "detalhe": str(q)[:200]}, status_code=502)
+    auth.checkout_registrar("asaas", pid, user["id"], plano, p["dias"], total, "pix",
+                            addon="combo" if bump else None)
+    return {"id": pid, "brcode": brcode, "brimg": brimg, "total": total}
+
+
 @app.get("/api/checkout/status")
 def checkout_status(request: Request, id: str = ""):
     """Polling do Pix transparente: o front pergunta 'já caiu?'. Fonte da verdade é o
-    webhook, que marca o checkout como 'pago'. Só devolve o status do PRÓPRIO usuário."""
+    webhook, que marca o checkout como 'pago'. Só devolve o status do PRÓPRIO usuário.
+    Checa Asaas (Pix atual) e AbacatePay (legado) — os ids não colidem."""
     user = _usuario(request)
     if not user or not id:
         return {"status": "pendente"}
-    ck = auth.checkout_buscar("abacatepay", id)
-    if not ck or ck.get("user_id") != user["id"]:
-        return {"status": "pendente"}
-    return {"status": ck.get("status") or "pendente"}
+    for prov in ("asaas", "abacatepay"):
+        ck = auth.checkout_buscar(prov, id)
+        if ck and ck.get("user_id") == user["id"]:
+            return {"status": ck.get("status") or "pendente"}
+    return {"status": "pendente"}
 
 
 @app.get("/api/checkout/prep")
@@ -1265,6 +1365,35 @@ async def webhook_abacate(request: Request):
         for bid in cands:
             if auth.checkout_revogar("abacatepay", bid):
                 break
+    return {"ok": True}
+
+
+@app.post("/api/webhook/asaas")
+async def webhook_asaas(request: Request):
+    """Webhook do Asaas (Pix). Valida o token que o Asaas manda no header
+    `asaas-access-token` (definido por você ao cadastrar o webhook no painel).
+    PAYMENT_RECEIVED/CONFIRMED = pago -> libera o PRO; estorno/chargeback -> revoga."""
+    if (config.ASAAS_WEBHOOK_TOKEN and
+            request.headers.get("asaas-access-token") != config.ASAAS_WEBHOOK_TOKEN):
+        return JSONResponse({"erro": "token inválido"}, status_code=401)
+    try:
+        ev = await request.json()
+    except Exception:
+        return JSONResponse({"erro": "payload inválido"}, status_code=400)
+    evento = (ev.get("event") or "").upper()
+    pay = ev.get("payment") or {}
+    pid = pay.get("id")
+    print(">> webhook asaas:", evento, "| payment:", pid, "| status:", pay.get("status"))
+    if not pid:
+        return {"ok": True}
+    if evento in ("PAYMENT_RECEIVED", "PAYMENT_CONFIRMED", "PAYMENT_RECEIVED_IN_CASH"):
+        res = auth.checkout_pagar("asaas", pid)
+        if res:
+            _confirmar_compra_email(res["user_id"])
+            _avisar_venda_admin(res)
+    elif evento in ("PAYMENT_REFUNDED", "PAYMENT_CHARGEBACK_REQUESTED",
+                    "PAYMENT_CHARGEBACK_DISPUTE", "PAYMENT_REVERSED", "PAYMENT_DELETED"):
+        auth.checkout_revogar("asaas", pid)
     return {"ok": True}
 
 
