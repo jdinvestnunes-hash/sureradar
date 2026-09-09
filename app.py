@@ -1265,6 +1265,96 @@ def checkout_pix_asaas(request: Request, payload: dict = Body(...)):
     return {"id": pid, "brcode": brcode, "brimg": brimg, "total": total}
 
 
+# PNG 1x1 transparente — o item do Checkout Asaas EXIGE imageBase64 (não usamos imagem
+# de produto, então mandamos esse pixel só pra satisfazer a API).
+_ASAAS_PIXEL_PNG = ("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4"
+                    "2mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==")
+
+
+def _asaas_cycle(dias):
+    """Ciclo da assinatura Asaas a partir dos dias do plano (mensal/tri/anual)."""
+    if dias >= 365: return "YEARLY"
+    if dias >= 180: return "SEMIANNUALLY"
+    if dias >= 90:  return "QUARTERLY"
+    if dias >= 60:  return "BIMONTHLY"
+    return "MONTHLY"
+
+
+def _asaas_plano_dias(plano):
+    """Dias de acesso de cada plano/add-on (o webhook usa isso pra liberar/renovar)."""
+    if plano == "valor":  return int(config.ADDON_VALOR["dias"])
+    if plano == "middle": return int(config.ADDON_MIDDLE["dias"])
+    pp = config.PLANOS.get(plano)
+    return int(pp["dias"]) if pp else 30
+
+
+def _asaas_token(ref):
+    """Decodifica o externalReference que o cartão-assinatura carrega:
+    'u<user_id>:<plano>:<centavos>'. Devolve {user_id, plano, total} ou None.
+    É um token que NÓS geramos no servidor (não vem do usuário), então é confiável."""
+    try:
+        if not ref or not str(ref).startswith("u"):
+            return None
+        uid, plano, cents = str(ref)[1:].split(":")
+        return {"user_id": int(uid), "plano": plano, "total": int(cents) / 100.0}
+    except Exception:
+        return None
+
+
+@app.post("/api/checkout/cartao-asaas")
+def checkout_cartao_asaas(request: Request, payload: dict = Body(...)):
+    """Cartão = ASSINATURA RECORRENTE via checkout hospedado do Asaas
+    (chargeTypes ["RECURRENT"]): devolve o `link` da página do Asaas pra redirecionar
+    — o cartão é digitado LÁ (sem PCI pra nós) e renova sozinho a cada ciclo. O plano
+    vai no externalReference (u<id>:<plano>:<centavos>), então o webhook libera a 1ª
+    cobrança e reconhece as renovações sem depender de linha pré-registrada. O
+    'Completo' (combo) NÃO entra na assinatura: é bônus único e continua no Pix."""
+    user = _usuario(request)
+    if not user:
+        return JSONResponse({"erro": "não autenticado"}, status_code=401)
+    plano, p = _plano_valido(payload)
+    if not p:
+        return JSONResponse({"erro": "plano inválido"}, status_code=400)
+    p = _preco_promo_anual(user, plano, p)             # Anual com desconto se a promo dela está ativa
+    if not config.ASAAS_API_KEY:
+        return JSONResponse({"erro": "Asaas não configurado"}, status_code=503)
+    total = round(p["valor"], 2)
+    dias = int(p["dias"])
+    items = [{"name": ("SureRadar " + p["nome"])[:30], "description": p["nome"][:150],
+              "quantity": 1, "value": total, "imageBase64": _ASAAS_PIXEL_PNG}]
+    # token no externalReference: quem/qual plano — o webhook decodifica pra liberar
+    # sem linha fantasma (a régua de recuperação só cutuca linha 'pendente').
+    ext = "u%s:%s:%d" % (user["id"], plano, int(round(total * 100)))
+    body = {
+        "billingTypes": ["CREDIT_CARD"],
+        "chargeTypes": ["RECURRENT"],
+        "subscription": {"cycle": _asaas_cycle(dias),
+                         "nextDueDate": datetime.now().strftime("%Y-%m-%d")},
+        "callback": {
+            "successUrl": config.SITE_URL + "/perfil?pago=1",
+            "cancelUrl": config.SITE_URL + "/planos",
+            "expiredUrl": config.SITE_URL + "/planos",
+        },
+        "items": items,
+        "externalReference": ext,
+        "customerData": {"name": user.get("nome") or user["email"], "email": user["email"]},
+    }
+    try:
+        r = requests.post(config.ASAAS_BASE_URL + "/checkouts", json=body,
+                          headers=_asaas_hdr(), timeout=20)
+    except requests.RequestException as e:
+        return JSONResponse({"erro": "falha de rede", "detalhe": str(e)[:120]}, status_code=502)
+    if not r.ok:
+        print(">> asaas checkout RECUSOU:", r.status_code, "|", r.text[:400])
+        return JSONResponse({"erro": "Asaas recusou", "detalhe": r.text[:300]}, status_code=502)
+    d = r.json() or {}
+    link = d.get("link")
+    if not link:
+        return JSONResponse({"erro": "resposta inesperada do Asaas", "detalhe": str(d)[:200]},
+                            status_code=502)
+    return {"url": link}
+
+
 @app.get("/api/checkout/status")
 def checkout_status(request: Request, id: str = ""):
     """Polling do Pix transparente: o front pergunta 'já caiu?'. Fonte da verdade é o
@@ -1370,9 +1460,15 @@ async def webhook_abacate(request: Request):
 
 @app.post("/api/webhook/asaas")
 async def webhook_asaas(request: Request):
-    """Webhook do Asaas (Pix). Valida o token que o Asaas manda no header
-    `asaas-access-token` (definido por você ao cadastrar o webhook no painel).
-    PAYMENT_RECEIVED/CONFIRMED = pago -> libera o PRO; estorno/chargeback -> revoga."""
+    """Webhook do Asaas. Valida o token do header `asaas-access-token` (o que você
+    define ao cadastrar o webhook no painel). Cobre os dois fluxos:
+    - PIX (uma vez): a linha já foi registrada com o id do pagamento na criação ->
+      confirma por esse id.
+    - CARTÃO (assinatura recorrente): a 1ª cobrança traz o plano no externalReference
+      (u<id>:<plano>:<centavos>) -> libera o PRO + grava a assinatura; as renovações
+      chegam com o mesmo `subscription` -> estendem o acesso. Tudo IDEMPOTENTE pelo id
+      do pagamento (reentrega/evento duplicado não dobra o PRO). Estorno/chargeback
+      revoga; assinatura cancelada volta a pessoa pra free."""
     if (config.ASAAS_WEBHOOK_TOKEN and
             request.headers.get("asaas-access-token") != config.ASAAS_WEBHOOK_TOKEN):
         return JSONResponse({"erro": "token inválido"}, status_code=401)
@@ -1382,18 +1478,75 @@ async def webhook_asaas(request: Request):
         return JSONResponse({"erro": "payload inválido"}, status_code=400)
     evento = (ev.get("event") or "").upper()
     pay = ev.get("payment") or {}
-    pid = pay.get("id")
-    print(">> webhook asaas:", evento, "| payment:", pid, "| status:", pay.get("status"))
-    if not pid:
+    checkout = ev.get("checkout") or {}
+    sub = ev.get("subscription") or {}
+    pay_id = pay.get("id")
+    sub_id = (pay.get("subscription")
+              or (sub.get("id") if isinstance(sub, dict) else None)
+              or checkout.get("subscription"))
+    customer = pay.get("customer") or checkout.get("customer")
+    ref = (pay.get("externalReference") or checkout.get("externalReference")
+           or ev.get("externalReference"))
+    print(">> webhook asaas:", evento, "| pay:", pay_id, "| sub:", sub_id,
+          "| ref:", ref, "| status:", pay.get("status"))
+
+    # Assinatura encerrada/inativada no Asaas -> tira o PRO.
+    if evento in ("SUBSCRIPTION_DELETED", "SUBSCRIPTION_INACTIVATED") and sub_id:
+        auth.assinatura_cancelar(sub_id)
         return {"ok": True}
-    if evento in ("PAYMENT_RECEIVED", "PAYMENT_CONFIRMED", "PAYMENT_RECEIVED_IN_CASH"):
-        res = auth.checkout_pagar("asaas", pid)
+
+    # Estorno / chargeback / pagamento removido -> revoga o acesso daquela cobrança.
+    if evento in ("PAYMENT_REFUNDED", "PAYMENT_CHARGEBACK_REQUESTED",
+                  "PAYMENT_CHARGEBACK_DISPUTE", "PAYMENT_REVERSED", "PAYMENT_DELETED"):
+        for cand in (pay_id, ref):
+            if cand and auth.checkout_revogar("asaas", cand):
+                break
+        return {"ok": True}
+
+    # CHECKOUT_PAID: só mapeia a assinatura cedo (sub_id -> user/plano), status 'nova'.
+    # O acesso é liberado no evento de PAGAMENTO (que traz o id da cobrança p/ idempotência).
+    if evento == "CHECKOUT_PAID":
+        info = _asaas_token(ref)
+        if sub_id and info and not auth.assinatura_por_sub(sub_id):
+            auth.assinatura_set(info["user_id"], "asaas", sub_id, customer, info["plano"],
+                                _asaas_plano_dias(info["plano"]), info["total"], "nova")
+        return {"ok": True}
+
+    if evento not in ("PAYMENT_RECEIVED", "PAYMENT_CONFIRMED", "PAYMENT_RECEIVED_IN_CASH"):
+        return {"ok": True}
+
+    # 1) Pix (uma vez) OU reentrega de algo já registrado: casa pelo id do pagamento.
+    if pay_id:
+        res = auth.checkout_pagar("asaas", pay_id)
         if res:
-            _confirmar_compra_email(res["user_id"])
-            _avisar_venda_admin(res)
-    elif evento in ("PAYMENT_REFUNDED", "PAYMENT_CHARGEBACK_REQUESTED",
-                    "PAYMENT_CHARGEBACK_DISPUTE", "PAYMENT_REVERSED", "PAYMENT_DELETED"):
-        auth.checkout_revogar("asaas", pid)
+            if not res.get("_repetido"):
+                _confirmar_compra_email(res["user_id"])
+                _avisar_venda_admin(res)
+            return {"ok": True}
+
+    # 2) Cartão-assinatura: precisa de sub_id + id do pagamento pra liberar/renovar.
+    if not (sub_id and pay_id):
+        return {"ok": True}
+    a = auth.assinatura_por_sub(sub_id)
+    if not a:
+        # 1ª cobrança sem mapa prévio: identifica quem/plano pelo externalReference.
+        info = _asaas_token(ref)
+        if not info:
+            print(">> asaas: pagamento de assinatura sem mapa (sub/ref):", sub_id, "|", ref)
+            return {"ok": True}
+        auth.assinatura_set(info["user_id"], "asaas", sub_id, customer, info["plano"],
+                            _asaas_plano_dias(info["plano"]), info["total"], "nova")
+        a = auth.assinatura_por_sub(sub_id)
+    # Libera/renova keyando pelo id do pagamento (idempotente: mesmo pay_id não dobra).
+    auth.checkout_registrar("asaas", pay_id, a["user_id"], a["plano"],
+                            int(a["dias"]), float(a["valor"]), "cartao")
+    r = auth.checkout_pagar("asaas", pay_id)
+    if r and not r.get("_repetido"):
+        if str(a.get("status")) == "nova":               # 1ª cobrança paga -> boas-vindas
+            _confirmar_compra_email(a["user_id"])
+            auth.assinatura_set(a["user_id"], "asaas", sub_id, customer, a["plano"],
+                                int(a["dias"]), float(a["valor"]), "ativa")
+        _avisar_venda_admin(r)                            # 1ª venda e cada renovação
     return {"ok": True}
 
 
