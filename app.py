@@ -1353,7 +1353,8 @@ def checkout_cartao_asaas(request: Request, payload: dict = Body(...)):
     items = [{"name": ("SureRadar " + p["nome"])[:30], "description": p["nome"][:150],
               "quantity": 1, "value": total, "imageBase64": _ASAAS_PIXEL_PNG}]
     # token no externalReference: quem/qual plano — o webhook decodifica pra liberar
-    # sem linha fantasma (a régua de recuperação só cutuca linha 'pendente').
+    # a 1ª cobrança e reconhecer renovações sem depender de linha pré-registrada.
+    # (Registramos uma linha 'pendente' lá embaixo, só pra alimentar a recuperação.)
     ext = "u%s:%s:%d" % (user["id"], plano, int(round(total * 100)))
     body = {
         "billingTypes": ["CREDIT_CARD"],
@@ -1384,6 +1385,16 @@ def checkout_cartao_asaas(request: Request, payload: dict = Body(...)):
     if not link:
         return JSONResponse({"erro": "resposta inesperada do Asaas", "detalhe": str(d)[:200]},
                             status_code=502)
+    # Linha 'pendente' da INTENÇÃO de cartão (mesma lógica do Pix): alimenta a régua
+    # de recuperação pra quem abre o checkout e não conclui. NÃO é risco mandar e-mail
+    # pra quem paga: a régua exclui quem está PRO agora (não olha o status da linha);
+    # ao pagar, o webhook ativa o PRO e a pessoa sai da régua. O external_id é o próprio
+    # token (u<id>:<plano>:<centavos>) — não colide com os ids de pagamento do Pix e
+    # dedup naturalmente (ON CONFLICT DO NOTHING) se a pessoa tenta o mesmo plano de novo.
+    try:
+        auth.checkout_registrar("asaas", ext, user["id"], plano, dias, total, "cartao")
+    except Exception as e:
+        print("!! registrar intenção cartão (não-fatal):", e)
     return {"url": link}
 
 
