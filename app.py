@@ -1318,6 +1318,21 @@ def _asaas_plano_dias(plano):
     return int(pp["dias"]) if pp else 30
 
 
+def _asaas_sub_id(*cands):
+    """Extrai o id da assinatura dos formatos que o Asaas manda: às vezes string
+    ('sub_xxx'), às vezes objeto {'id':..,'cycle':..}, e às vezes só o cronograma
+    {'cycle':..,'nextDueDate':..} SEM id (é o caso do CHECKOUT_PAID). Devolve SEMPRE
+    string ou None — nunca um dict (passar dict pro SQL estourava 500 e travava a fila)."""
+    for c in cands:
+        if isinstance(c, str) and c:
+            return c
+        if isinstance(c, dict):
+            i = c.get("id")
+            if i:
+                return i
+    return None
+
+
 def _asaas_token(ref):
     """Decodifica o externalReference que o cartão-assinatura carrega:
     'u<user_id>:<plano>:<centavos>'. Devolve {user_id, plano, total} ou None.
@@ -1524,9 +1539,7 @@ async def webhook_asaas(request: Request):
     checkout = ev.get("checkout") or {}
     sub = ev.get("subscription") or {}
     pay_id = pay.get("id")
-    sub_id = (pay.get("subscription")
-              or (sub.get("id") if isinstance(sub, dict) else None)
-              or checkout.get("subscription"))
+    sub_id = _asaas_sub_id(pay.get("subscription"), sub, checkout.get("subscription"))
     customer = pay.get("customer") or checkout.get("customer")
     ref = (pay.get("externalReference") or checkout.get("externalReference")
            or ev.get("externalReference"))
@@ -1550,10 +1563,14 @@ async def webhook_asaas(request: Request):
     # CHECKOUT_PAID: só mapeia a assinatura cedo (sub_id -> user/plano), status 'nova'.
     # O acesso é liberado no evento de PAGAMENTO (que traz o id da cobrança p/ idempotência).
     if evento == "CHECKOUT_PAID":
-        info = _asaas_token(ref)
-        if sub_id and info and not auth.assinatura_por_sub(sub_id):
-            auth.assinatura_set(info["user_id"], "asaas", sub_id, customer, info["plano"],
-                                _asaas_plano_dias(info["plano"]), info["total"], "nova")
+        try:
+            info = _asaas_token(ref)
+            if sub_id and info and not auth.assinatura_por_sub(sub_id):
+                auth.assinatura_set(info["user_id"], "asaas", sub_id, customer, info["plano"],
+                                    _asaas_plano_dias(info["plano"]), info["total"], "nova")
+        except Exception as e:
+            # mapeamento cedo é só otimização; o PAGAMENTO libera o PRO pelo token.
+            print("!! webhook asaas CHECKOUT_PAID (não-fatal):", e)
         return {"ok": True}
 
     if evento not in ("PAYMENT_RECEIVED", "PAYMENT_CONFIRMED", "PAYMENT_RECEIVED_IN_CASH"):
