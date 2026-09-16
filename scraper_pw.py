@@ -21,6 +21,54 @@ import sys
 import time
 import requests
 from playwright.sync_api import sync_playwright
+import threading
+
+# ---------------------------------------------------------------------------
+# WATCHDOG DE PROGRESSO (16/09): 2x no mesmo dia o robô ficou MUDO no meio da
+# resolução de links (valuebets 07:54, middles 10:38) e só o vigia externo matou,
+# 60 min depois (LIMITE_ZUMBI_SEG) — 1 h de painel parado cada vez. Todas as
+# chamadas de navegação têm timeout, mas title()/close()/new_page() do Playwright
+# não têm, e se o renderizador da casa congela a chamada nunca volta.
+# Solução genérica: uma thread olha um "batimento" (cada link resolvido e cada
+# linha de log). Se ficar WD_LIMITE_SEG sem bater DURANTE uma varredura, salva o
+# cache e sai (exit 3); o vigia_loop.ps1 relança em ~1 min por "processo ausente".
+# Fora da varredura (sono entre fundas, pausa noturna, reciclagem/login) fica
+# DESARMADO, senão mataria o robô dormindo.
+WD_LIMITE_SEG = 420          # 7 min: 1 link no pior caso ~65s; página ~50s; POST c/ retry <2 min
+_WD = {"ultimo": time.time(), "armado": False}
+_print_orig = print
+
+
+def _wd_bater():
+    _WD["ultimo"] = time.time()
+
+
+def _wd_armar(ligado):
+    _wd_bater()
+    _WD["armado"] = bool(ligado)
+
+
+def print(*a, **k):          # toda linha de log conta como progresso
+    _wd_bater()
+    _print_orig(*a, **k)
+
+
+def _wd_loop():
+    while True:
+        time.sleep(15)
+        if _WD["armado"] and (time.time() - _WD["ultimo"]) > WD_LIMITE_SEG:
+            parado = int(time.time() - _WD["ultimo"])
+            _print_orig(f"!! WATCHDOG: {parado}s sem progresso na varredura — saindo (exit 3) "
+                        f"pro vigia relançar. Cache salvo.", flush=True)
+            try:
+                _salvar_cache()
+            except Exception:
+                pass
+            os._exit(3)
+
+
+def _wd_iniciar():
+    threading.Thread(target=_wd_loop, name="watchdog", daemon=True).start()
 
 # Cache dos links já resolvidos (redirect do surebet -> URL final na casa).
 # Persiste em arquivo pra não re-resolver a cada varredura.
@@ -238,6 +286,7 @@ def resolver_link(ctx, pg, nav_url):
         return LINK_CACHE[nav_url]
     if not _tem_orcamento():      # acabou a cota deste ciclo: fica pro próximo
         return None
+    _wd_bater()                   # progresso: 1 tentativa de link (watchdog)
     _gastar_orcamento()           # conta a tentativa (mesmo se falhar) + pausa
     final = nav_url
     # NAVEGA de verdade na aba (mesmo caminho de um clique no link: surebet ->
@@ -879,6 +928,7 @@ def main():
         def _sair(signum, frame):
             raise KeyboardInterrupt
         signal.signal(signal.SIGTERM, _sair)
+        _wd_iniciar()               # watchdog de progresso (só age com a varredura armada)
         print("=" * 60)
         print(" ROBÔ SUREBET (Playwright) — deixe a janela aberta.")
         print("=" * 60)
@@ -927,6 +977,7 @@ def main():
                     espera_min = random.uniform(*CICLO_FAIXA_MIN)   # sorteia o intervalo desta vez
                     prox_funda = time.time() + espera_min * 60
                     orcamento_novo_ciclo()                   # cota de links novos deste ciclo
+                    _wd_armar(True)                          # watchdog ligado durante a funda
                     try:
                         uma_varredura(page, ctx)             # PRINCIPAL: surebet (todas as págs)
                     except Exception as e:
@@ -941,6 +992,7 @@ def main():
                             uma_varredura_middle(page, ctx)
                         except Exception as e:
                             print("!! erro nas middles (surebet NÃO afetada):", str(e)[:150])
+                    _wd_armar(False)                         # fora da varredura: desarmado
                     ciclos += 1
                     # RECICLA o navegador de tempos em tempos pra não acumular memória
                     # (evita o OOM que mata o processo silenciosamente). O login persiste
