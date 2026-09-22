@@ -114,6 +114,16 @@
 
       <div id="promo"></div>
 
+      <!-- AVISO DATA FIFA — remover quando os campeonatos de clube voltarem -->
+      <div id="aviso-fifa" style="display:flex;gap:10px;align-items:flex-start;background:rgba(46,230,168,.08);border:1px solid rgba(46,230,168,.28);border-radius:12px;padding:11px 13px;margin:0 0 12px;font-size:13px;line-height:1.5;color:var(--text-dim)">
+        <span style="font-size:16px;line-height:1.3">⚽</span>
+        <div style="flex:1">
+          <b style="color:var(--text)">Estamos em Data FIFA.</b>
+          Com as seleções em campo, os campeonatos de clube param — há <b>menos jogos</b> e, naturalmente, <b>menos surebets</b> no período. É normal e passa quando a rodada dos clubes volta. O robô segue varrendo 24h e as entradas que surgirem aparecem aqui na hora.
+        </div>
+        <button onclick="this.parentElement.style.display='none'" aria-label="Fechar aviso" style="background:none;border:none;color:var(--text-dim);font-size:18px;line-height:1;cursor:pointer;padding:0 2px">×</button>
+      </div>
+
       <div class="list-head">
         <span id="count-label">0 oportunidades</span>
         <span id="updated-at" class="muted"></span>
