@@ -1560,16 +1560,29 @@ async def webhook_asaas(request: Request):
                 break
         return {"ok": True}
 
-    # CHECKOUT_PAID: só mapeia a assinatura cedo (sub_id -> user/plano), status 'nova'.
-    # O acesso é liberado no evento de PAGAMENTO (que traz o id da cobrança p/ idempotência).
+    # CHECKOUT_PAID (cartão): a hospedada foi paga -> o cartão foi aprovado. É o ÚNICO
+    # evento garantido da 1ª cobrança de assinatura recorrente do Asaas (traz o token no
+    # externalReference, mas NÃO traz id de pagamento nem de assinatura). Por isso a
+    # liberação acontece AQUI, pela linha keyed by `ref` (a mesma criada na geração do
+    # checkout): checkout_registrar é idempotente (não recria) e checkout_pagar é
+    # compartilhado com o evento de PAGAMENTO -> mesma cobrança nunca dobra o PRO.
     if evento == "CHECKOUT_PAID":
         try:
             info = _asaas_token(ref)
+            is_card = "CREDIT_CARD" in (checkout.get("billingTypes") or [])
+            paga = str(checkout.get("status") or "").upper() == "PAID"
+            if info and ref and is_card and paga:
+                auth.checkout_registrar("asaas", ref, info["user_id"], info["plano"],
+                                        _asaas_plano_dias(info["plano"]), info["total"], "cartao")
+                r = auth.checkout_pagar("asaas", ref)
+                if r and not r.get("_repetido"):
+                    _confirmar_compra_email(info["user_id"])
+                    _avisar_venda_admin(r)
+            # mapeia a assinatura cedo se já vier o sub_id (útil pro cancelamento/renovação)
             if sub_id and info and not auth.assinatura_por_sub(sub_id):
                 auth.assinatura_set(info["user_id"], "asaas", sub_id, customer, info["plano"],
-                                    _asaas_plano_dias(info["plano"]), info["total"], "nova")
+                                    _asaas_plano_dias(info["plano"]), info["total"], "ativa")
         except Exception as e:
-            # mapeamento cedo é só otimização; o PAGAMENTO libera o PRO pelo token.
             print("!! webhook asaas CHECKOUT_PAID (não-fatal):", e)
         return {"ok": True}
 
@@ -1590,24 +1603,37 @@ async def webhook_asaas(request: Request):
         return {"ok": True}
     a = auth.assinatura_por_sub(sub_id)
     if not a:
-        # 1ª cobrança sem mapa prévio: identifica quem/plano pelo externalReference.
+        # 1ª cobrança sem mapa prévio: identifica quem/plano pelo externalReference
+        # e grava a assinatura pra as renovações futuras se acharem pelo sub_id.
         info = _asaas_token(ref)
         if not info:
             print(">> asaas: pagamento de assinatura sem mapa (sub/ref):", sub_id, "|", ref)
             return {"ok": True}
         auth.assinatura_set(info["user_id"], "asaas", sub_id, customer, info["plano"],
-                            _asaas_plano_dias(info["plano"]), info["total"], "nova")
+                            _asaas_plano_dias(info["plano"]), info["total"], "ativa")
         a = auth.assinatura_por_sub(sub_id)
-    # Libera/renova keyando pelo id do pagamento (idempotente: mesmo pay_id não dobra).
+        # 1ª cobrança: se o CHECKOUT_PAID já liberou (linha keyed by `ref` = paga),
+        # não dobra o PRO — só confirmamos o mapa acima e saímos.
+        ja = auth.checkout_buscar("asaas", ref) if ref else None
+        if ja and str(ja.get("status")) == "pago":
+            return {"ok": True}
+        # ainda não liberou (CHECKOUT_PAID não veio, ou veio depois): libera pela MESMA
+        # linha keyed by `ref` -> idempotente com o CHECKOUT_PAID (o que vier depois vira _repetido).
+        if ref:
+            auth.checkout_registrar("asaas", ref, a["user_id"], a["plano"],
+                                    int(a["dias"]), float(a["valor"]), "cartao")
+            r = auth.checkout_pagar("asaas", ref)
+            if r and not r.get("_repetido"):
+                _confirmar_compra_email(a["user_id"])
+                _avisar_venda_admin(r)
+        return {"ok": True}
+    # Renovação (assinatura já mapeada): keya pelo id do pagamento (único por cobrança)
+    # -> estende o acesso sem tocar na linha da 1ª cobrança e sem dobrar.
     auth.checkout_registrar("asaas", pay_id, a["user_id"], a["plano"],
                             int(a["dias"]), float(a["valor"]), "cartao")
     r = auth.checkout_pagar("asaas", pay_id)
     if r and not r.get("_repetido"):
-        if str(a.get("status")) == "nova":               # 1ª cobrança paga -> boas-vindas
-            _confirmar_compra_email(a["user_id"])
-            auth.assinatura_set(a["user_id"], "asaas", sub_id, customer, a["plano"],
-                                int(a["dias"]), float(a["valor"]), "ativa")
-        _avisar_venda_admin(r)                            # 1ª venda e cada renovação
+        _avisar_venda_admin(r)                            # cada renovação
     return {"ok": True}
 
 
